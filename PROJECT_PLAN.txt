@@ -1,0 +1,986 @@
+================================================================================
+                        POCKETCARE - PROJECT PLAN
+================================================================================
+                        Academic Health Platform
+                        Start Date: December 2025
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Project Overview
+2. Core Objectives
+3. Technology Stack
+4. Development Phases
+5. Feature Breakdown
+6. Database Architecture
+7. API Integrations
+8. Security Considerations
+9. Testing Strategy
+10. Deployment Plan
+11. Risk Management
+12. Success Metrics
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+PocketCare is a mobile-first web application that helps users navigate 
+healthcare services by analyzing symptoms and connecting them with appropriate 
+medical professionals and facilities.
+
+Key Differentiation:
+- Symptom-to-specialist matching (NOT medical diagnosis)
+- Consolidated booking and emergency services
+- AI-powered navigation assistance
+- Academic project with production-ready architecture
+
+
+================================================================================
+2. CORE OBJECTIVES
+================================================================================
+
+Primary Goals:
+✓ Symptom analysis and specialist recommendation
+✓ Doctor and hospital directory with search/filter
+✓ Appointment booking and management
+✓ User authentication and profile management
+
+Secondary Goals (Stretch):
+○ OCR medical report reader
+○ SOS emergency request system
+○ Real-time communication (WebSocket chat)
+○ Weight management tracker
+○ Maps integration for nearby facilities
+
+
+================================================================================
+3. TECHNOLOGY STACK
+================================================================================
+
+FRONTEND
+--------
+- Framework: React.js (v18+)
+- Styling: Tailwind CSS
+- Language: JavaScript/ES6+
+- Routing: React Router
+- State Management: React Context API / Redux (if needed)
+- HTTP Client: Axios
+- Maps: Leaflet.js (OpenStreetMap) or Google Maps API
+
+BACKEND
+-------
+- Framework: Flask (Python 3.9+)
+- API: RESTful architecture
+- Authentication: JWT (JSON Web Tokens)
+- Real-time: Socket.IO (if implementing chat)
+- File Upload: Flask file handling
+- CORS: Flask-CORS
+
+DATABASE
+--------
+- Primary: MySQL (v8.0+)
+- ORM: SQLAlchemy (optional, for easier queries)
+- Migrations: Flask-Migrate or Alembic
+
+AI/ML SERVICES
+--------------
+- NLP: Google Gemini API
+- OCR: Tesseract.js or Google Cloud Vision API
+- Analysis: Symptom-to-specialty mapping algorithm
+
+DEPLOYMENT
+----------
+- Frontend: Vercel / Netlify
+- Backend: Heroku / Railway / DigitalOcean
+- Database: AWS RDS / PlanetScale
+- Version Control: Git + GitHub
+
+
+================================================================================
+4. DEVELOPMENT PHASES
+================================================================================
+
+PHASE 1: FOUNDATION (Weeks 1-4)
+--------------------------------
+Week 1-2: Setup & Planning
+  □ Initialize Git repository
+  □ Set up React frontend structure
+  □ Set up Flask backend structure
+  □ Create MySQL database schema
+  □ Configure development environment
+  □ Install dependencies
+
+Week 3-4: Authentication System
+  □ User registration (email, password, name, phone)
+  □ Login with JWT token generation
+  □ Password hashing (bcrypt)
+  □ Protected routes on frontend
+  □ Token validation on backend
+  □ Basic user profile page
+
+
+PHASE 2: CORE FEATURES (Weeks 5-8)
+-----------------------------------
+Week 5: Symptom Analyzer
+  □ Symptom input form (multi-select symptoms)
+  □ Integrate Gemini API for symptom categorization
+  □ Map symptom categories to medical specialties
+  □ Display recommended specialists
+  □ Show urgency level (low/medium/high)
+  □ Save symptom logs to database
+
+Week 6: Doctor & Hospital Directory
+  □ Create doctor profiles in database
+  □ Create hospital profiles in database
+  □ Build search and filter functionality
+    - By specialty
+    - By location (distance)
+    - By rating
+    - By availability
+  □ Display results with cards/list view
+  □ Detail pages for doctors and hospitals
+
+Week 7: Appointment Booking
+  □ Available time slots management
+  □ Appointment booking form
+  □ Booking confirmation
+  □ Email/SMS notification (optional)
+  □ View upcoming appointments
+  □ Cancel/reschedule functionality
+
+Week 8: User Dashboard
+  □ Dashboard layout
+  □ View appointment history
+  □ View symptom logs
+  □ Edit profile information
+  □ Change password
+  □ Delete account
+
+
+PHASE 3: ENHANCEMENT (Weeks 9-12)
+----------------------------------
+Week 9: UI/UX Polish
+  □ Responsive design for mobile/tablet/desktop
+  □ Loading states and error handling
+  □ Form validation and user feedback
+  □ Accessibility improvements (ARIA labels)
+  □ Dark mode (optional)
+
+Week 10: Testing & Bug Fixes
+  □ Unit tests for backend API
+  □ Integration tests for booking flow
+  □ Frontend component tests
+  □ End-to-end testing
+  □ Fix reported bugs
+  □ Performance optimization
+
+Week 11-12: Stretch Features (If Time Permits)
+  □ OCR Medical Report Reader
+  □ Maps integration for nearby hospitals
+  □ Real-time chat (WebSocket)
+  □ SOS emergency button
+  □ Weight management tool
+  □ Admin panel for managing doctors/hospitals
+
+
+PHASE 4: DEPLOYMENT (Week 13)
+------------------------------
+  □ Production environment setup
+  □ Deploy backend to cloud provider
+  □ Deploy frontend to hosting service
+  □ Configure production database
+  □ Set up environment variables
+  □ SSL certificate configuration
+  □ Final testing in production
+  □ Documentation and handoff
+
+
+================================================================================
+5. FEATURE BREAKDOWN
+================================================================================
+
+F1. USER AUTHENTICATION
+-----------------------
+Description: Secure user registration and login system
+Priority: HIGH (Must Have)
+Estimated Time: 1 week
+Dependencies: None
+
+Requirements:
+- User registration with email verification (optional)
+- Login with JWT token
+- Password reset functionality
+- Session management
+- Logout
+
+Technical Details:
+- Flask-JWT-Extended for token handling
+- Bcrypt for password hashing
+- Token expiration: 24 hours
+- Refresh token mechanism (optional)
+
+
+F2. SYMPTOM ANALYZER
+--------------------
+Description: AI-powered symptom-to-specialist matching
+Priority: HIGH (Must Have)
+Estimated Time: 1 week
+Dependencies: User Authentication
+
+Requirements:
+- Multi-select symptom input form
+- AI categorization using Gemini API
+- Map to medical specialties (e.g., fever → Internal Medicine)
+- Display urgency level
+- Show recommended doctors/hospitals
+- Medical disclaimer
+
+Specialty Mapping Examples:
+- Respiratory symptoms → Pulmonologist
+- Chest pain → Cardiologist
+- Skin issues → Dermatologist
+- Mental health → Psychiatrist
+- General symptoms → General Practitioner
+
+Technical Details:
+- Gemini API prompt engineering for accurate categorization
+- Fallback to general practitioner if uncertain
+- Store symptom logs for history
+
+
+F3. DOCTOR & HOSPITAL DIRECTORY
+--------------------------------
+Description: Searchable database of healthcare providers
+Priority: HIGH (Must Have)
+Estimated Time: 1 week
+Dependencies: None
+
+Requirements:
+- Browse doctors by specialty
+- Browse hospitals by services
+- Search by name or location
+- Filter by rating, distance, availability
+- View detailed profiles
+- Contact information
+
+Data Points:
+- Doctor: name, specialty, qualifications, experience, rating, hospital
+- Hospital: name, address, coordinates, phone, services, bed availability
+
+
+F4. APPOINTMENT BOOKING
+-----------------------
+Description: Book and manage appointments with doctors
+Priority: HIGH (Must Have)
+Estimated Time: 1 week
+Dependencies: User Authentication, Doctor Directory
+
+Requirements:
+- View available time slots
+- Book appointment (date, time, doctor)
+- Booking confirmation
+- View upcoming appointments
+- Cancel or reschedule
+- Appointment history
+
+Technical Details:
+- Time slot management (prevent double booking)
+- Status tracking: pending, confirmed, completed, cancelled
+- Email/SMS notifications (optional via Twilio)
+
+
+F5. OCR MEDICAL REPORT READER
+------------------------------
+Description: Upload and interpret medical reports
+Priority: MEDIUM (Nice to Have)
+Estimated Time: 2 weeks
+Dependencies: User Authentication
+
+Requirements:
+- Upload image/PDF of medical report
+- Extract text using OCR
+- AI-powered interpretation of results
+- Highlight abnormal values
+- Plain language explanation
+- Save reports to profile
+
+Technical Details:
+- Tesseract.js for client-side OCR
+- Or Google Cloud Vision API for better accuracy
+- Gemini API for medical interpretation
+- File size limits (10MB max)
+
+
+F6. SOS EMERGENCY REQUEST
+-------------------------
+Description: One-tap emergency alert to nearby hospitals
+Priority: MEDIUM (Nice to Have)
+Estimated Time: 2 weeks
+Dependencies: User Authentication, Location Services
+
+Requirements:
+- Emergency button on dashboard
+- Capture user location (GPS)
+- Send alert to 3 nearest hospitals
+- Notify emergency contacts
+- Real-time status updates
+- Hospital acknowledgment
+
+Technical Details:
+- Geolocation API
+- WebSocket for real-time updates
+- SMS notifications (Twilio)
+- Emergency contact management
+
+
+F7. REAL-TIME COMMUNICATION
+---------------------------
+Description: Chat between patients and doctors
+Priority: LOW (Optional)
+Estimated Time: 2 weeks
+Dependencies: User Authentication, Doctor Directory
+
+Requirements:
+- Text-based chat interface
+- Doctor-patient messaging
+- Appointment confirmations via chat
+- Message history
+- Online/offline status
+
+Technical Details:
+- Socket.IO for WebSocket connections
+- Message persistence in database
+- Room-based architecture (one room per appointment)
+
+
+F8. WEIGHT MANAGEMENT
+---------------------
+Description: Track weight, BMI, and get AI diet suggestions
+Priority: LOW (Optional)
+Estimated Time: 1 week
+Dependencies: User Authentication
+
+Requirements:
+- Input weight, height, age
+- Calculate and display BMI
+- Set weight goals
+- Track progress over time
+- AI-generated diet and exercise suggestions
+- Progress charts
+
+Technical Details:
+- Chart.js for visualizations
+- Gemini API for personalized recommendations
+
+
+================================================================================
+6. DATABASE ARCHITECTURE
+================================================================================
+
+SCHEMA DESIGN
+-------------
+
+Table: users
+------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+email           VARCHAR(255) UNIQUE NOT NULL
+password_hash   VARCHAR(255) NOT NULL
+name            VARCHAR(100) NOT NULL
+phone           VARCHAR(20)
+date_of_birth   DATE
+gender          ENUM('male', 'female', 'other')
+blood_group     VARCHAR(5)
+address         TEXT
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+
+Table: doctors
+--------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+name            VARCHAR(100) NOT NULL
+email           VARCHAR(255) UNIQUE
+phone           VARCHAR(20)
+specialty       VARCHAR(100) NOT NULL
+qualification   VARCHAR(255)
+experience      INT (years)
+rating          DECIMAL(2,1) DEFAULT 0.0
+hospital_id     INT (Foreign Key -> hospitals.id)
+consultation_fee DECIMAL(10,2)
+available_slots JSON (store time slots)
+bio             TEXT
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+
+Table: hospitals
+----------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+name            VARCHAR(200) NOT NULL
+address         TEXT NOT NULL
+city            VARCHAR(100)
+state           VARCHAR(100)
+latitude        DECIMAL(10,8)
+longitude       DECIMAL(11,8)
+phone           VARCHAR(20)
+email           VARCHAR(255)
+emergency_contact VARCHAR(20)
+total_beds      INT
+available_beds  INT
+icu_beds        INT
+services        JSON (list of services)
+rating          DECIMAL(2,1) DEFAULT 0.0
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+
+Table: appointments
+-------------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+user_id         INT NOT NULL (Foreign Key -> users.id)
+doctor_id       INT NOT NULL (Foreign Key -> doctors.id)
+appointment_date DATE NOT NULL
+appointment_time TIME NOT NULL
+symptoms        TEXT
+status          ENUM('pending', 'confirmed', 'completed', 'cancelled')
+notes           TEXT
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+
+Table: symptom_logs
+-------------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+user_id         INT NOT NULL (Foreign Key -> users.id)
+symptoms        TEXT NOT NULL (comma-separated or JSON)
+ai_analysis     TEXT (Gemini API response)
+recommended_specialty VARCHAR(100)
+urgency_level   ENUM('low', 'medium', 'high')
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+
+Table: medical_reports
+----------------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+user_id         INT NOT NULL (Foreign Key -> users.id)
+file_path       VARCHAR(500)
+file_name       VARCHAR(255)
+ocr_text        TEXT (extracted text)
+ai_interpretation TEXT (Gemini explanation)
+report_type     VARCHAR(100) (e.g., blood test, x-ray)
+uploaded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+
+Table: emergency_requests
+-------------------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+user_id         INT NOT NULL (Foreign Key -> users.id)
+latitude        DECIMAL(10,8)
+longitude       DECIMAL(11,8)
+status          ENUM('pending', 'acknowledged', 'resolved')
+hospital_id     INT (Foreign Key -> hospitals.id, which hospital responded)
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+resolved_at     TIMESTAMP
+
+
+Table: messages (for chat)
+--------------------------
+id              INT PRIMARY KEY AUTO_INCREMENT
+sender_id       INT NOT NULL (Foreign Key -> users.id)
+receiver_id     INT NOT NULL (Foreign Key -> users.id or doctors.id)
+appointment_id  INT (Foreign Key -> appointments.id)
+message         TEXT NOT NULL
+is_read         BOOLEAN DEFAULT FALSE
+created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+
+INDEXES FOR PERFORMANCE
+-----------------------
+CREATE INDEX idx_doctors_specialty ON doctors(specialty);
+CREATE INDEX idx_doctors_hospital ON doctors(hospital_id);
+CREATE INDEX idx_hospitals_location ON hospitals(latitude, longitude);
+CREATE INDEX idx_appointments_user ON appointments(user_id);
+CREATE INDEX idx_appointments_doctor ON appointments(doctor_id);
+CREATE INDEX idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX idx_symptom_logs_user ON symptom_logs(user_id);
+
+
+================================================================================
+7. API INTEGRATIONS
+================================================================================
+
+GOOGLE GEMINI API
+-----------------
+Purpose: AI-powered symptom analysis and report interpretation
+Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro
+API Key: Required (get from Google AI Studio)
+
+Use Cases:
+1. Symptom Analysis
+   Input: List of symptoms
+   Output: Medical specialty recommendation, urgency level
+
+2. Report Interpretation
+   Input: OCR-extracted text from medical report
+   Output: Plain language explanation, abnormal value highlights
+
+3. Health Chatbot
+   Input: User health questions
+   Output: General guidance (scoped to non-diagnostic advice)
+
+Sample Prompt for Symptom Analysis:
+"""
+You are a medical routing assistant. Based on the following symptoms, 
+recommend the most appropriate medical specialty and urgency level.
+
+Symptoms: {user_symptoms}
+
+Respond in JSON format:
+{
+  "specialty": "Specialty name",
+  "urgency": "low/medium/high",
+  "reasoning": "Brief explanation",
+  "disclaimer": "This is for informational purposes only."
+}
+"""
+
+
+OPENSTREETMAP / GOOGLE MAPS API
+-------------------------------
+Purpose: Display nearby hospitals and routing
+Library: Leaflet.js (for OpenStreetMap, free)
+Alternative: Google Maps JavaScript API (requires API key)
+
+Use Cases:
+1. Show hospitals on map
+2. Calculate distance from user location
+3. Display route to selected hospital
+
+
+TWILIO API (Optional)
+---------------------
+Purpose: SMS notifications for appointments and emergencies
+API Key: Required (get from Twilio console)
+
+Use Cases:
+1. Appointment confirmations
+2. Appointment reminders
+3. Emergency SOS alerts to contacts
+
+
+TESSERACT / GOOGLE CLOUD VISION (for OCR)
+-----------------------------------------
+Purpose: Extract text from medical report images
+Option 1: Tesseract.js (free, client-side)
+Option 2: Google Cloud Vision API (more accurate, requires API key)
+
+Use Cases:
+1. Extract text from lab reports
+2. Extract text from prescriptions
+
+
+================================================================================
+8. SECURITY CONSIDERATIONS
+================================================================================
+
+ACADEMIC PROJECT LEVEL
+----------------------
+✓ Password hashing with bcrypt
+✓ JWT authentication with expiration
+✓ Input validation and sanitization
+✓ CORS configuration (restrict origins)
+✓ Rate limiting on API endpoints
+✓ SQL injection prevention (parameterized queries)
+✓ XSS prevention (escape user inputs)
+✓ HTTPS for production deployment
+
+PRODUCTION/HIPAA LEVEL (Future)
+--------------------------------
+○ End-to-end encryption for health data
+○ Database encryption at rest
+○ Audit logging for all data access
+○ Two-factor authentication (2FA)
+○ Role-based access control (RBAC)
+○ GDPR/HIPAA compliance measures
+○ Regular security audits
+○ Data backup and recovery plan
+
+
+BEST PRACTICES
+--------------
+1. Never store plain text passwords
+2. Use environment variables for API keys
+3. Validate all user inputs on backend
+4. Implement CSRF protection
+5. Set secure HTTP headers
+6. Log security events (failed logins, etc.)
+7. Keep dependencies updated
+8. Use prepared statements for database queries
+
+
+================================================================================
+9. TESTING STRATEGY
+================================================================================
+
+BACKEND TESTING
+---------------
+Framework: pytest
+
+Unit Tests:
+- Test API endpoints (status codes, response format)
+- Test authentication (login, token validation)
+- Test database operations (CRUD)
+- Test symptom analysis logic
+- Test booking validation
+
+Example Test Cases:
+□ POST /api/register → 201 with valid data
+□ POST /api/login → 200 with correct credentials
+□ POST /api/login → 401 with wrong password
+□ GET /api/doctors → 200 with list of doctors
+□ POST /api/appointments → 201 with valid booking
+□ POST /api/appointments → 400 if time slot taken
+
+
+FRONTEND TESTING
+----------------
+Framework: Jest + React Testing Library
+
+Component Tests:
+- Test form submissions
+- Test navigation
+- Test conditional rendering
+- Test user interactions
+
+Example Test Cases:
+□ Symptom form submits correctly
+□ Doctor list displays properly
+□ Appointment booking form validates inputs
+□ Protected routes redirect to login
+
+
+INTEGRATION TESTING
+-------------------
+- Test complete user flows (register → login → book appointment)
+- Test API integration with frontend
+- Test Gemini API responses
+
+
+END-TO-END TESTING
+------------------
+Framework: Cypress or Playwright
+
+Full User Flows:
+□ User registration and login
+□ Search for doctor and book appointment
+□ Analyze symptoms and view recommendations
+□ Upload medical report and view interpretation
+
+
+================================================================================
+10. DEPLOYMENT PLAN
+================================================================================
+
+DEVELOPMENT ENVIRONMENT
+-----------------------
+Frontend: http://localhost:3000
+Backend: http://localhost:5000
+Database: MySQL on localhost:3306
+
+
+PRODUCTION DEPLOYMENT
+---------------------
+
+Step 1: Prepare Backend
+- Set environment variables (DATABASE_URL, SECRET_KEY, API_KEYS)
+- Configure production database (AWS RDS or PlanetScale)
+- Set up Flask production server (Gunicorn)
+- Deploy to Heroku/Railway/DigitalOcean
+
+Step 2: Prepare Frontend
+- Build React app (npm run build)
+- Configure API base URL to production backend
+- Deploy to Vercel/Netlify
+
+Step 3: Database Migration
+- Export development database schema
+- Import to production database
+- Seed with initial data (doctors, hospitals)
+
+Step 4: SSL & Domain
+- Configure custom domain (optional)
+- Enable HTTPS/SSL certificate
+- Update CORS settings to allow production domain
+
+Step 5: Testing
+- Test all features in production
+- Monitor error logs
+- Set up analytics (Google Analytics, optional)
+
+
+ENVIRONMENT VARIABLES
+---------------------
+Backend (.env):
+- DATABASE_URL=mysql://user:pass@host:port/dbname
+- JWT_SECRET_KEY=your_secret_key
+- GEMINI_API_KEY=your_gemini_key
+- FLASK_ENV=production
+
+Frontend (.env):
+- REACT_APP_API_URL=https://your-backend.herokuapp.com
+
+
+================================================================================
+11. RISK MANAGEMENT
+================================================================================
+
+IDENTIFIED RISKS & MITIGATION
+------------------------------
+
+Risk 1: Scope Creep
+Probability: HIGH
+Impact: HIGH
+Mitigation:
+- Stick to MVP features (authentication, symptom analyzer, directory, booking)
+- Use Kanban board to track progress
+- Say "no" to new features during development
+- Save stretch features for Phase 3
+
+
+Risk 2: AI Inaccuracy
+Probability: MEDIUM
+Impact: MEDIUM
+Mitigation:
+- Use detailed prompts for Gemini API
+- Add medical disclaimer on every page
+- Test with diverse symptom combinations
+- Fallback to "General Practitioner" if uncertain
+- Validate AI responses before displaying
+
+
+Risk 3: Time Constraints
+Probability: MEDIUM
+Impact: HIGH
+Mitigation:
+- Set realistic deadlines (4 weeks per phase)
+- Prioritize features by importance
+- Use pre-built components (Material-UI, Chakra UI)
+- Reuse code patterns
+- Pair programming to speed up development
+
+
+Risk 4: API Costs
+Probability: LOW
+Impact: MEDIUM
+Mitigation:
+- Use free tiers (Gemini API has generous limits)
+- Implement caching for repeated queries
+- Rate limiting to prevent abuse
+- Monitor API usage
+
+
+Risk 5: Database Performance
+Probability: LOW
+Impact: MEDIUM
+Mitigation:
+- Add indexes on frequently queried columns
+- Use pagination for large result sets
+- Implement caching (Redis, optional)
+- Optimize queries (avoid N+1 problems)
+
+
+Risk 6: Security Vulnerabilities
+Probability: MEDIUM
+Impact: HIGH
+Mitigation:
+- Follow OWASP Top 10 guidelines
+- Use security libraries (Flask-Security)
+- Regular dependency updates
+- Code reviews
+- Security testing before deployment
+
+
+================================================================================
+12. SUCCESS METRICS
+================================================================================
+
+ACADEMIC SUCCESS CRITERIA
+--------------------------
+✓ All MVP features functional (auth, symptom analyzer, directory, booking)
+✓ Clean, responsive UI/UX
+✓ Proper code documentation
+✓ Working demo/presentation
+✓ Complete project report
+✓ GitHub repository with README
+
+
+FUNCTIONAL METRICS
+------------------
+□ 100% uptime during demo
+□ < 2 second page load time
+□ < 3 second API response time
+□ 95% successful API calls
+□ Mobile responsive (tested on 3 devices)
+
+
+USER EXPERIENCE METRICS (If Testing with Users)
+------------------------------------------------
+□ Users can complete symptom analysis in < 2 minutes
+□ Users can book appointment in < 3 minutes
+□ Positive feedback on UI clarity
+□ Medical disclaimer clearly visible
+
+
+CODE QUALITY METRICS
+---------------------
+□ Backend test coverage > 70%
+□ Frontend test coverage > 60%
+□ No critical bugs in production
+□ Linting passes (ESLint, Pylint)
+□ Consistent code style
+
+
+================================================================================
+APPENDIX A: SAMPLE DATA
+================================================================================
+
+SAMPLE DOCTORS
+--------------
+1. Dr. Sarah Johnson - Cardiologist - City Hospital - 4.8 rating
+2. Dr. Michael Chen - Dermatologist - Metro Clinic - 4.9 rating
+3. Dr. Emily Rodriguez - Pediatrician - Children's Hospital - 4.7 rating
+4. Dr. James Williams - General Practitioner - Community Health Center - 4.5
+5. Dr. Priya Patel - Neurologist - Medical Center - 4.8 rating
+
+
+SAMPLE HOSPITALS
+----------------
+1. City Hospital - Downtown - Cardiology, Orthopedics, Emergency
+2. Metro Clinic - Midtown - Dermatology, ENT, Ophthalmology
+3. Children's Hospital - North District - Pediatrics, Neonatology
+4. Medical Center - West Side - Neurology, Oncology, Surgery
+5. Community Health Center - East End - General Medicine, Dental
+
+
+SAMPLE SYMPTOM-TO-SPECIALTY MAPPING
+------------------------------------
+Fever, Cough → Pulmonologist / General Practitioner
+Chest Pain → Cardiologist
+Skin Rash → Dermatologist
+Headache, Dizziness → Neurologist
+Stomach Pain → Gastroenterologist
+Joint Pain → Orthopedist
+Anxiety, Depression → Psychiatrist
+Eye Problems → Ophthalmologist
+
+
+================================================================================
+APPENDIX B: FOLDER STRUCTURE
+================================================================================
+
+PocketCare/
+├── backend/
+│   ├── app.py                    # Main Flask application
+│   ├── config.py                 # Configuration settings
+│   ├── requirements.txt          # Python dependencies
+│   ├── models/
+│   │   ├── user.py
+│   │   ├── doctor.py
+│   │   ├── hospital.py
+│   │   └── appointment.py
+│   ├── routes/
+│   │   ├── auth.py               # Login, register
+│   │   ├── symptoms.py           # Symptom analysis
+│   │   ├── doctors.py            # Doctor CRUD
+│   │   ├── hospitals.py          # Hospital CRUD
+│   │   └── appointments.py       # Booking APIs
+│   ├── utils/
+│   │   ├── gemini_api.py         # Gemini integration
+│   │   ├── auth_utils.py         # JWT helpers
+│   │   └── validators.py         # Input validation
+│   └── tests/
+│       ├── test_auth.py
+│       ├── test_appointments.py
+│       └── test_symptoms.py
+│
+├── frontend/
+│   ├── public/
+│   │   ├── index.html
+│   │   └── favicon.ico
+│   ├── src/
+│   │   ├── App.js
+│   │   ├── index.js
+│   │   ├── components/
+│   │   │   ├── Navbar.js
+│   │   │   ├── Footer.js
+│   │   │   ├── SymptomForm.js
+│   │   │   ├── DoctorCard.js
+│   │   │   └── AppointmentForm.js
+│   │   ├── pages/
+│   │   │   ├── Home.js
+│   │   │   ├── Login.js
+│   │   │   ├── Register.js
+│   │   │   ├── Dashboard.js
+│   │   │   ├── SymptomAnalyzer.js
+│   │   │   ├── DoctorDirectory.js
+│   │   │   └── Appointments.js
+│   │   ├── utils/
+│   │   │   ├── api.js            # Axios instance
+│   │   │   └── auth.js           # Auth helpers
+│   │   └── styles/
+│   │       └── tailwind.config.js
+│   ├── package.json
+│   └── .env
+│
+├── database/
+│   ├── schema.sql                # Database schema
+│   └── seed_data.sql             # Sample data
+│
+├── docs/
+│   ├── API_DOCUMENTATION.md
+│   ├── USER_GUIDE.md
+│   └── DEPLOYMENT.md
+│
+├── .gitignore
+├── README.md
+└── PROJECT_PLAN.txt              # This file
+
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Read and understand this project plan
+2. □ Set up Git repository
+3. □ Initialize React frontend (npx create-react-app frontend)
+4. □ Initialize Flask backend (flask init)
+5. □ Create MySQL database and tables
+6. □ Install dependencies (npm install, pip install)
+7. □ Start with user authentication
+8. □ Follow phase-by-phase development
+9. □ Regular commits and documentation
+10. □ Test as you build
+
+
+================================================================================
+CONTACT & COLLABORATION
+================================================================================
+
+For questions or clarification:
+- Review this document
+- Check API documentation
+- Search Stack Overflow
+- Consult project advisor
+
+Remember:
+- Start small, build incrementally
+- Test frequently
+- Document as you go
+- Ask for help when stuck
+- Celebrate small wins!
+
+
+================================================================================
+                            END OF PROJECT PLAN
+================================================================================
+Generated: December 22, 2025
+Version: 1.0

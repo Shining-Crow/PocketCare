@@ -1,0 +1,176 @@
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import create_access_token, get_jwt_identity
+from utils.database import execute_query
+from utils.auth_utils import hash_password, verify_password, jwt_required_custom
+from utils.validators import validate_email_format, validate_password_strength, validate_required_fields
+from datetime import datetime
+
+auth_bp = Blueprint('auth', __name__)
+
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    """Register a new user"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        is_valid, error = validate_required_fields(data, ['email', 'password', 'name'])
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        email = data.get('email').lower().strip()
+        password = data.get('password')
+        name = data.get('name').strip()
+        phone = data.get('phone', '').strip()
+        
+        # Validate email format
+        is_valid, error = validate_email_format(email)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        # Validate password strength
+        is_valid, error = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        # Check if user already exists
+        query = "SELECT id FROM users WHERE email = %s"
+        existing_user = execute_query(query, (email,), fetch_one=True)
+        
+        if existing_user:
+            return jsonify({'error': 'Email already registered'}), 409
+        
+        # Hash password
+        hashed_password = hash_password(password)
+        
+        # Insert new user
+        insert_query = """
+            INSERT INTO users (email, password_hash, name, phone, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        user_id = execute_query(
+            insert_query,
+            (email, hashed_password, name, phone, datetime.now()),
+            commit=True
+        )
+        
+        # Create access token
+        access_token = create_access_token(identity=user_id)
+        
+        return jsonify({
+            'message': 'User registered successfully',
+            'user': {
+                'id': user_id,
+                'email': email,
+                'name': name
+            },
+            'access_token': access_token
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'error': f'Registration failed: {str(e)}'}), 500
+
+
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    """Login user"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        is_valid, error = validate_required_fields(data, ['email', 'password'])
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        email = data.get('email').lower().strip()
+        password = data.get('password')
+        
+        # Get user from database
+        query = "SELECT id, email, password_hash, name, phone FROM users WHERE email = %s"
+        user = execute_query(query, (email,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'Invalid email or password'}), 401
+        
+        # Verify password
+        if not verify_password(password, user['password_hash']):
+            return jsonify({'error': 'Invalid email or password'}), 401
+        
+        # Create access token
+        access_token = create_access_token(identity=user['id'])
+        
+        return jsonify({
+            'message': 'Login successful',
+            'user': {
+                'id': user['id'],
+                'email': user['email'],
+                'name': user['name'],
+                'phone': user['phone']
+            },
+            'access_token': access_token
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Login failed: {str(e)}'}), 500
+
+
+@auth_bp.route('/profile', methods=['GET'])
+@jwt_required_custom
+def get_profile():
+    """Get user profile"""
+    try:
+        user_id = get_jwt_identity()
+        
+        query = """
+            SELECT id, email, name, phone, date_of_birth, gender, 
+                   blood_group, address, created_at
+            FROM users 
+            WHERE id = %s
+        """
+        user = execute_query(query, (user_id,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Convert datetime to string
+        if user['created_at']:
+            user['created_at'] = user['created_at'].isoformat()
+        if user['date_of_birth']:
+            user['date_of_birth'] = user['date_of_birth'].isoformat()
+        
+        return jsonify({'user': user}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch profile: {str(e)}'}), 500
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+@jwt_required_custom
+def update_profile():
+    """Update user profile"""
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Fields that can be updated
+        allowed_fields = ['name', 'phone', 'date_of_birth', 'gender', 'blood_group', 'address']
+        update_fields = []
+        update_values = []
+        
+        for field in allowed_fields:
+            if field in data:
+                update_fields.append(f"{field} = %s")
+                update_values.append(data[field])
+        
+        if not update_fields:
+            return jsonify({'error': 'No fields to update'}), 400
+        
+        update_values.append(user_id)
+        
+        query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+        execute_query(query, tuple(update_values), commit=True)
+        
+        return jsonify({'message': 'Profile updated successfully'}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500

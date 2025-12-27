@@ -1,0 +1,67 @@
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { HeartPulse } from "lucide-react";
+
+const Navbar = () => {
+    const navigate = useNavigate();
+
+    return (
+        <nav className="bg-white shadow-sm sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-16">
+
+                    {/* Logo */}
+                    <div className="flex items-center space-x-2 cursor-pointer"
+                        onClick={() => navigate("/")}>
+                        <HeartPulse className="w-8 h-8 text-blue-600" />
+                        <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            PocketCare
+                        </span>
+                    </div>
+
+                    {/* Desktop Links */}
+                    <div className="hidden md:flex space-x-8">
+                        <a
+                            href="#features"
+                            className="text-gray-700 hover:text-blue-600 transition"
+                        >
+                            Features
+                        </a>
+                        <a
+                            href="#how-it-works"
+                            className="text-gray-700 hover:text-blue-600 transition"
+                        >
+                            How It Works
+                        </a>
+                        <a
+                            href="#about"
+                            className="text-gray-700 hover:text-blue-600 transition"
+                        >
+                            About
+                        </a>
+                    </div>
+
+                    {/* Auth Buttons */}
+                    <div className="flex space-x-4"> 
+                        <button
+                            onClick={() => navigate("/login")}
+                            className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition"
+                        >
+                            Login
+                        </button>
+
+                        <button
+                            onClick={() => navigate("/getstarted")}
+                            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                        >
+                            Get Started
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </nav>
+    );
+};
+
+export default Navbar;

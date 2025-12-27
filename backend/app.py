@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import config
 import os
+from routes.appointments import appointments_bp
 
 def create_app(config_name='development'):
     """Application factory pattern"""
@@ -10,7 +11,7 @@ def create_app(config_name='development'):
     app = Flask(__name__)
     
     # Load configuration
-    app.config.from_object(config[config_name])
+    app.config.from_object(config[config_name]) 
     
     # Initialize extensions
     CORS(app, origins=app.config['CORS_ORIGINS'])
@@ -19,6 +20,7 @@ def create_app(config_name='development'):
     # Register blueprints (routes)
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(appointments_bp)
     
     # Root endpoint
     @app.route('/')

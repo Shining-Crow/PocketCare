@@ -17,24 +17,28 @@ PocketCare/
 ### Backend Setup
 
 1. Install Python dependencies:
+
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
 2. Configure environment:
+
 ```bash
 cp .env.example .env
 # Edit .env with your database credentials
 ```
 
 3. Set up MySQL database:
+
 ```bash
 mysql -u root -p < database/schema.sql
 mysql -u root -p pocketcare_db < database/seed_data.sql
 ```
 
 4. Run the backend:
+
 ```bash
 python app.py
 ```
@@ -44,12 +48,14 @@ Backend runs at `http://localhost:5000`
 ### Frontend Setup
 
 1. Install dependencies:
+
 ```bash
 cd frontend
 npm install
 ```
 
 2. Run the development server:
+
 ```bash
 npm start
 ```
@@ -78,7 +84,7 @@ Frontend runs at `http://localhost:3000`
 
 ## Tech Stack
 
-- **Frontend:** React, Tailwind CSS, Axios
+- **Frontend:** React, Tailwind CSS, Axiosjj
 - **Backend:** Flask, JWT, bcrypt
 - **Database:** MySQL
 - **AI:** Google Gemini API (to be integrated)
@@ -88,6 +94,7 @@ Frontend runs at `http://localhost:3000`
 ### Initial Setup for Team Members
 
 1. **Clone the repository:**
+
 ```bash
 git clone https://github.com/sadekinborno/PocketCare.git
 cd PocketCare
@@ -100,12 +107,14 @@ cd PocketCare
 #### Daily Workflow
 
 1. **Always start by updating your local repository:**
+
 ```bash
 git checkout main
 git pull origin main
 ```
 
 2. **Create a feature branch for your task:**
+
 ```bash
 git checkout -b feature/your-feature-name
 # or
@@ -113,42 +122,47 @@ git checkout -b fix/bug-description
 ```
 
 Branch naming conventions:
+
 - `feature/` - for new features (e.g., `feature/symptom-analyzer`)
 - `fix/` - for bug fixes (e.g., `fix/login-validation`)
 - `docs/` - for documentation updates
 - `refactor/` - for code refactoring
 
 3. **Make your changes and commit regularly:**
+
 ```bash
 git add .
 git commit -m "Clear description of what you changed"
 ```
 
 Commit message guidelines:
+
 - Use present tense ("Add feature" not "Added feature")
 - Be specific and descriptive
 - Reference issues if applicable (e.g., "Fix login bug #23")
 
 4. **Push your branch to GitHub:**
+
 ```bash
 git push origin feature/your-feature-name
 ```
 
 5. **Create a Pull Request (PR):**
+
    - Go to the GitHub repository
    - Click "Pull requests" → "New pull request"
    - Select your branch
    - Add a clear title and description
    - Request review from team members
    - Link any related issues
-
 6. **Code Review Process:**
+
    - At least one team member should review the PR
    - Address any feedback or requested changes
    - Once approved, merge the PR into main
    - Delete the feature branch after merging
-
 7. **After your PR is merged:**
+
 ```bash
 git checkout main
 git pull origin main
@@ -160,6 +174,7 @@ git branch -d feature/your-feature-name  # Delete local branch
 If you encounter merge conflicts:
 
 1. **Update your branch with latest main:**
+
 ```bash
 git checkout main
 git pull origin main
@@ -168,11 +183,12 @@ git merge main
 ```
 
 2. **Resolve conflicts in your code editor:**
+
    - Look for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
    - Choose which changes to keep
    - Remove conflict markers
-
 3. **Commit the resolution:**
+
 ```bash
 git add .
 git commit -m "Resolve merge conflicts"

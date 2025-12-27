@@ -1,16 +1,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  HeartPulse, 
-  Hospital, 
-  Calendar, 
-  MessageSquare, 
-  FileText, 
+import {
+  HeartPulse,
+  Hospital,
+  Calendar,
+  MessageSquare,
+  FileText,
   Activity,
   Shield,
   Clock,
   Users
 } from 'lucide-react';
+
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 
 function Home() {
   const navigate = useNavigate();
@@ -24,7 +27,8 @@ function Home() {
     {
       icon: <Hospital className="w-8 h-8" />,
       title: "Find Doctors & Hospitals",
-      description: "Search and book appointments with verified healthcare professionals"
+      description: "Search and book appointments with verified healthcare professionals",
+      link: "/appointments" // <--- here!
     },
     {
       icon: <Calendar className="w-8 h-8" />,
@@ -53,42 +57,12 @@ function Home() {
     { icon: <Hospital className="w-6 h-6" />, value: "500+", label: "Partner Hospitals" },
     { icon: <Clock className="w-6 h-6" />, value: "24/7", label: "Support Available" },
     { icon: <Shield className="w-6 h-6" />, value: "100%", label: "Secure & Private" }
-  ];
+  ]; 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <HeartPulse className="w-8 h-8 text-blue-600" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                PocketCare
-              </span>
-            </div>
-            <div className="hidden md:flex space-x-8">
-              <a href="#features" className="text-gray-700 hover:text-blue-600 transition">Features</a>
-              <a href="#how-it-works" className="text-gray-700 hover:text-blue-600 transition">How It Works</a>
-              <a href="#about" className="text-gray-700 hover:text-blue-600 transition">About</a>
-            </div>
-            <div className="flex space-x-4">
-              <button
-                onClick={() => navigate('/login')}
-                className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => navigate('/register')}
-                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
-              >
-                Get Started
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="pt-20 pb-32 px-4">
@@ -105,7 +79,7 @@ function Home() {
                 </span>
               </h1>
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Access AI-powered symptom analysis, find doctors, book appointments, 
+                Access AI-powered symptom analysis, find doctors, book appointments,
                 and get emergency help — all in one place.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -132,9 +106,9 @@ function Home() {
             </div>
             <div className="relative">
               <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-8">
-                <img 
-                  src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=400&fit=crop" 
-                  alt="Healthcare" 
+                <img
+                  src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=400&fit=crop"
+                  alt="Healthcare"
                   className="rounded-lg w-full"
                 />
                 <div className="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-xl p-4 flex items-center space-x-3">
@@ -192,7 +166,7 @@ function Home() {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-white rounded-xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 border border-gray-100"
               >
@@ -230,20 +204,7 @@ function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <HeartPulse className="w-6 h-6 text-blue-500" />
-            <span className="text-xl font-bold text-white">PocketCare</span>
-          </div>
-          <p className="mb-4">
-            © 2025 PocketCare. All rights reserved.
-          </p>
-          <p className="text-sm text-gray-500">
-            For informational purposes only. Always consult healthcare professionals.
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

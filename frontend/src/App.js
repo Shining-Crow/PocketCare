@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import { isAuthenticated } from './utils/auth';
+import GetStarted from './pages/GetStarted';
+import DoctorRegister from './pages/DoctorRegister';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -16,7 +18,9 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/getstarted" element={<GetStarted />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/doctorregister" element={<DoctorRegister />} />
         <Route path="/register" element={<Register />} />
         <Route 
           path="/dashboard" 

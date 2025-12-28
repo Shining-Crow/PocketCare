@@ -7,6 +7,7 @@ from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 
+# User Registration
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """Register a new user"""
@@ -70,7 +71,76 @@ def register():
     except Exception as e:
         return jsonify({'error': f'Registration failed: {str(e)}'}), 500
 
+# Doctor Registration
+@auth_bp.route('/doctor/register', methods=['POST'])
+def register_doctor():
+    try:
+        data = request.get_json()
 
+        # Required fields
+        required = ['name', 'email', 'password', 'specialty']
+        is_valid, error = validate_required_fields(data, required)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        email = data.get('email').lower().strip()
+        password = data.get('password')
+        name = data.get('name').strip()
+        specialty = data.get('specialty').strip()
+        qualification = data.get('qualification', '').strip()
+        experience = int(data.get('experience') or 0)
+        hospital_id = int(data.get('hospital_id') or 0)
+        consultation_fee = float(data.get('consultation_fee') or 0.0)
+        phone = data.get('phone', '').strip()
+        bio = data.get('bio', '').strip()
+
+        # Validate email and password
+        is_valid, error = validate_email_format(email)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        is_valid, error = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        # Check if doctor exists
+        query = "SELECT id FROM doctors WHERE email=%s"
+        existing = execute_query(query, (email,), fetch_one=True)
+        if existing:
+            return jsonify({'error': 'Email already registered'}), 409 
+
+        # Hash password
+        hashed_password = hash_password(password)
+
+        # Insert into DB
+        insert_query = """
+        INSERT INTO doctors (name, email, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """
+        doctor_id = execute_query(
+            insert_query,
+            (name, email, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
+            commit=True
+        )
+
+        # JWT token
+        access_token = create_access_token(identity=doctor_id)
+
+        return jsonify({
+            'message': 'Doctor registered successfully',
+            'user': {
+                'id': doctor_id,
+                'email': email,
+                'name': name,
+                'specialty': specialty
+            },
+            'access_token': access_token
+        }), 201
+
+    except Exception as e:
+        return jsonify({'error': f'Registration failed: {str(e)}'}), 500
+
+# Login
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login user"""
@@ -123,7 +193,7 @@ def get_profile():
         
         query = """
             SELECT id, email, name, phone, date_of_birth, gender, 
-                   blood_group, address, created_at
+                blood_group, address, created_at
             FROM users 
             WHERE id = %s
         """

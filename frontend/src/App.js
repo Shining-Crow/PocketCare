@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import HealthChat from './pages/HealthChat';
 import { isAuthenticated } from './utils/auth';
 import GetStarted from './pages/GetStarted';
 import DoctorRegister from './pages/DoctorRegister';
@@ -29,6 +30,14 @@ function App() {
               <Dashboard />
             </ProtectedRoute>
           } 
+        />
+        <Route 
+          path="/health-chat" 
+          element={
+            <ProtectedRoute>
+              <HealthChat />
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </Router>

@@ -361,14 +361,15 @@ function Dashboard() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Healthcare Services</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Calendar, title: 'Appointments', desc: 'Manage bookings', color: 'from-green-400 to-emerald-500', bg: 'bg-green-500/10' },
-              { icon: FileText, title: 'Medical Reports', desc: 'Upload & analyze', color: 'from-blue-400 to-cyan-500', bg: 'bg-blue-500/10' },
-              { icon: MessageSquare, title: 'Health Chat', desc: '24/7 AI assistant', color: 'from-cyan-400 to-teal-500', bg: 'bg-cyan-500/10' },
-              { icon: User, title: 'My Profile', desc: 'Health information', color: 'from-indigo-400 to-blue-500', bg: 'bg-indigo-500/10' },
+              { icon: Calendar, title: 'Appointments', desc: 'Manage bookings', color: 'from-green-400 to-emerald-500', bg: 'bg-green-500/10', onClick: () => navigate('/appointments') },
+              { icon: FileText, title: 'Medical Reports', desc: 'Upload & analyze', color: 'from-blue-400 to-cyan-500', bg: 'bg-blue-500/10', onClick: () => {} },
+              { icon: MessageSquare, title: 'Health Chat', desc: '24/7 AI assistant', color: 'from-cyan-400 to-teal-500', bg: 'bg-cyan-500/10', onClick: () => navigate('/health-chat') },
+              { icon: User, title: 'My Profile', desc: 'Health information', color: 'from-indigo-400 to-blue-500', bg: 'bg-indigo-500/10', onClick: () => {} },
             ].map((service, idx) => (
               <div
                 key={idx}
                 className="group relative bg-white rounded-2xl p-6 hover:bg-blue-50/40 transition-all duration-300 cursor-pointer border border-gray-200 hover:border-blue-300 transform hover:-translate-y-2 hover:shadow-lg"
+                onClick={service.onClick}
               >
                 <div className={`w-16 h-16 bg-gradient-to-br ${service.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-lg`}>
                   <service.icon className="w-8 h-8 text-white" />

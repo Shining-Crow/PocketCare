@@ -14,13 +14,15 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name]) 
     
     # Initialize extensions
-    CORS(app, origins=app.config['CORS_ORIGINS'])
+    CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}})
     jwt = JWTManager(app)
     
     # Register blueprints (routes)
     from routes.auth import auth_bp
+    from routes.doctors import doctors_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(appointments_bp)
+    app.register_blueprint(appointments_bp, url_prefix='/api')
+    app.register_blueprint(doctors_bp, url_prefix='/api')
     
     # Root endpoint
     @app.route('/')

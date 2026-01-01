@@ -56,7 +56,7 @@ def register():
         )
         
         # Create access token
-        access_token = create_access_token(identity=user_id)
+        access_token = create_access_token(identity=str(user_id))
         
         return jsonify({
             'message': 'User registered successfully',
@@ -124,7 +124,7 @@ def register_doctor():
         )
 
         # JWT token
-        access_token = create_access_token(identity=doctor_id)
+        access_token = create_access_token(identity=str(doctor_id))
 
         return jsonify({
             'message': 'Doctor registered successfully',
@@ -167,7 +167,7 @@ def login():
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Create access token
-        access_token = create_access_token(identity=user['id'])
+        access_token = create_access_token(identity=str(user['id']))
         
         return jsonify({
             'message': 'Login successful',

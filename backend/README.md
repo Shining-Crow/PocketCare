@@ -1,3 +1,9 @@
+# Gemini API Key
+Add your Gemini API key to your .env file:
+
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+```
 # PocketCare Backend
 
 Backend API for PocketCare health platform built with Flask.

@@ -21,7 +21,7 @@ export const registerDoctor = async (userData) => {
 };
 
 export const login = async (credentials) => {
-  const response = await api.post('/api/auth/login', credentials);
+  const response = await api.post('/auth/login', credentials);
   if (response.data.access_token) {
     localStorage.setItem('token', response.data.access_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));

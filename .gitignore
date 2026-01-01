@@ -1,5 +1,7 @@
 # Python
 backend/venv/
+backend/.venv/
+backend/env/
 backend/__pycache__/
 backend/**/__pycache__/
 *.pyc
@@ -11,11 +13,23 @@ backend/**/__pycache__/
 *.egg-info/
 dist/
 build/
+*.whl
+.eggs/
 
 # Environment variables
 backend/.env
+backend/.env.local
 .env
 .env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+.env.*
+
+# SSL keys and certificates
+*.pem
+*.key
+*.crt
 
 # Node.js
 frontend/node_modules/
@@ -23,32 +37,66 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.npm
 
 # Build outputs
 frontend/build/
 frontend/dist/
+backend/dist/
 
 # IDEs
 .vscode/
+.vscode/settings.json
+.vscode/extensions.json
 .idea/
+*.iml
 *.swp
 *.swo
 *~
+.DS_Store.swp
+
+# IDE runtime data
+.vscode-server/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
 # Logs
 *.log
+logs/
+*.log.*
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+*.mdb
 
 # Testing
 coverage/
 .coverage
+.coverage.*
 .pytest_cache/
+.hypothesis/
+htdocs_test/
+
+# Temporary files
+.tmp/
+*.tmp
+*.swp
+*.bak
+*.orig
+
+# Uploads and files
+uploads/
+
+# SASS and build caches
+.sass-cache/
+.cache/

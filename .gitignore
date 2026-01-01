@@ -22,6 +22,14 @@ backend/.env.local
 .env
 .env.local
 .env.*.local
+frontend/.env
+frontend/.env.local
+.env.*
+
+# SSL keys and certificates
+*.pem
+*.key
+*.crt
 
 # Node.js
 frontend/node_modules/
@@ -88,4 +96,7 @@ htdocs_test/
 
 # Uploads and files
 uploads/
+
+# SASS and build caches
+.sass-cache/
 .cache/

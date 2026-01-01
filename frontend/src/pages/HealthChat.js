@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import api from '../utils/api';
 import ChatMessage from '../components/ChatMessage';
 
 function HealthChat() {
-  const [messages, setMessages] = useState([
-    { sender: 'ai', text: 'Hello! I am your AI health assistant. How can I help you today?' }
-  ]);
+  const [messages, setMessages] = useState([]);
+    // Fetch chat history on mount
+    useEffect(() => {
+      const fetchHistory = async () => {
+        try {
+          const res = await api.get('/chat/history');
+          if (res.data && Array.isArray(res.data.history)) {
+            const sorted = res.data.history
+              .map(msg => ({
+                sender: msg.sender,
+                text: msg.message,
+                created_at: msg.created_at
+              }))
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            setMessages(sorted);
+          } else {
+            setMessages([{ sender: 'ai', text: 'Hello! I am your AI health assistant. How can I help you today?' }]);
+          }
+        } catch (err) {
+          setMessages([{ sender: 'ai', text: 'Hello! I am your AI health assistant. How can I help you today?' }]);
+        }
+      };
+      fetchHistory();
+    }, []);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +37,7 @@ function HealthChat() {
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
     try {
-      const res = await axios.post('/api/chat/send', { message: input });
+      const res = await api.post('/chat/send', { message: input });
       setMessages((prev) => [
         ...prev,
         { sender: 'ai', text: res.data.response || 'Sorry, I could not understand that.' }

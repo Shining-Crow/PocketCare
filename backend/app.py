@@ -7,14 +7,25 @@ from routes.appointments import appointments_bp
 
 def create_app(config_name='development'):
     """Application factory pattern"""
-    
     app = Flask(__name__)
+
+    # Error handler for 422 Unprocessable Entity
+    @app.errorhandler(422)
+    def handle_422(error):
+        import sys
+        print('--- 422 ERROR ---', file=sys.stderr)
+        print(error, file=sys.stderr)
+        try:
+            print(error.data, file=sys.stderr)
+        except Exception:
+            pass
+        return jsonify({'error': 'Unprocessable Entity', 'message': str(error)}), 422
     
     # Load configuration
     app.config.from_object(config[config_name]) 
     
     # Initialize extensions
-    CORS(app, origins=app.config['CORS_ORIGINS'])
+    CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True, allow_headers=["Content-Type", "Authorization"], methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
     jwt = JWTManager(app)
     
     # Register blueprints (routes)

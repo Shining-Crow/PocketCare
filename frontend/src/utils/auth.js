@@ -2,7 +2,7 @@ import api from './api';
 
 // Authentication functions or User register data
 export const register = async (userData) => {
-  const response = await api.post('/api/auth/register', userData);
+  const response = await api.post('/auth/register', userData);
   if (response.data.access_token) {
     localStorage.setItem('token', response.data.access_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -12,7 +12,7 @@ export const register = async (userData) => {
 
 // Doctor registrationo
 export const registerDoctor = async (userData) => {
-  const response = await api.post('/api/auth/doctor/register', userData);
+  const response = await api.post('/auth/doctor/register', userData);
   if (response.data.access_token) {
     localStorage.setItem('token', response.data.access_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -21,7 +21,7 @@ export const registerDoctor = async (userData) => {
 };
 
 export const login = async (credentials) => {
-  const response = await api.post('/api/auth/login', credentials);
+  const response = await api.post('/auth/login', credentials);
   if (response.data.access_token) {
     localStorage.setItem('token', response.data.access_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));

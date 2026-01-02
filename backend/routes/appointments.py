@@ -38,7 +38,10 @@ def get_doctors():
 
     return jsonify(doctors)
 
+from flask_jwt_extended import jwt_required
+
 @appointments_bp.route('/appointments', methods=['POST'])
+@jwt_required()
 def create_appointment():
     data = request.json
     user_id = get_jwt_identity()

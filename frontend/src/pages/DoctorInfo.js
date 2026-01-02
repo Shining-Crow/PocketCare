@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import Navbar from "../components/Navbar";
+import { isAuthenticated } from "../utils/auth";
 
 export default function DoctorInfo() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [doctor, setDoctor] = useState(null);
-
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
@@ -16,6 +17,11 @@ export default function DoctorInfo() {
     }, [id]);
 
     const bookAppointment = async () => {
+        if (!isAuthenticated()) {
+            localStorage.setItem('redirectAfterLogin', `/doctor/${id}`);
+            navigate("/login");
+            return;
+        }
         await api.post("/appointments", {
             doctor_id: id,
             appointment_date: date,
@@ -30,13 +36,11 @@ export default function DoctorInfo() {
     return (
         <>
             <Navbar />
-
             <div className="max-w-7xl mx-auto p-6 flex gap-6">
                 {/* LEFT — Doctor Info */}
                 <div className="w-3/4 bg-white rounded-xl shadow p-6 h-[80vh] overflow-y-auto">
                     <h1 className="text-3xl font-bold">{doctor.name}</h1>
                     <p className="text-gray-600">{doctor.specialty}</p>
-
                     <div className="mt-4 space-y-2">
                         <p><b>Email:</b> {doctor.email}</p>
                         <p><b>Phone:</b> {doctor.phone}</p>

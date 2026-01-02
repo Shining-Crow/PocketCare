@@ -8,16 +8,25 @@ import HealthChat from './pages/HealthChat';
 import { isAuthenticated } from './utils/auth';
 import GetStarted from './pages/GetStarted';
 import DoctorRegister from './pages/DoctorRegister';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Protected Route Component
+// Protected Route Component for Users
 function ProtectedRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" />;
+}
+
+// Protected Route Component for Admin
+function AdminProtectedRoute({ children }) {
+  const adminToken = localStorage.getItem('adminToken');
+  return adminToken ? children : <Navigate to="/admin/login" />;
 }
 
 function App() {
   return (
     <Router>
       <Routes>
+        {/* Regular User Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/getstarted" element={<GetStarted />} />
         <Route path="/login" element={<Login />} />
@@ -39,6 +48,21 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route 
+          path="/admin/dashboard" 
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          } 
+        />
+        <Route path="/admin" element={<Navigate to="/admin/login" />} />
+
+        {/* Catch all - redirect to home */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

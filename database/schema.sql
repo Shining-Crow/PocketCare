@@ -1,3 +1,6 @@
+-- Create database if not exists
+CREATE DATABASE IF NOT EXISTS pocketcare_db;
+USE pocketcare_db;
 
 -- ========================================================================
 -- TABLE: chat_messages
@@ -11,10 +14,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Create database if not exists
-CREATE DATABASE IF NOT EXISTS pocketcare_db;
-USE pocketcare_db;
 
 -- ============================================================================
 -- TABLE: users
@@ -166,6 +165,22 @@ CREATE TABLE IF NOT EXISTS messages (
     INDEX idx_sender (sender_id),
     INDEX idx_receiver (receiver_id),
     INDEX idx_appointment (appointment_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: admins
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS admins (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    role VARCHAR(50) DEFAULT 'admin' COMMENT 'admin, super_admin',
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================

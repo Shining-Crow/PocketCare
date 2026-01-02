@@ -31,6 +31,14 @@ INSERT INTO doctors (name, email, phone, specialty, qualification, experience, r
 ('Dr. Thomas White', 'thomas.white@communityhc.com', '+1-555-1010', 'Dentistry', 'DDS', 9, 4.6, 5, 90.00, '["10:00-11:00", "13:00-14:00", "15:00-16:00"]', 'General dentist providing preventive and restorative dental care.');
 
 -- ============================================================================
--- Note: User accounts should be created through the registration API
--- The seed data above is for doctors and hospitals only
+-- SEED: admins
 -- ============================================================================
+-- NOTE: Password hashes are bcrypt hashes for admin password: admin123
+INSERT INTO admins (email, password_hash, name, role, is_active) VALUES
+('admin@pocketcare.com', '$2b$12$4jHUCWRU1CGkWN1Yholv/ufx1setSeZJv.HcRfXYhY1P.0BoZhvcm', 'Admin User', 'admin', TRUE);
+
+-- ============================================================================
+-- Note: User accounts should be created through the registration API
+-- The seed data above is for doctors, hospitals, and admins only
+-- Admin email: admin@pocketcare.com
+-- Admin password: admin123

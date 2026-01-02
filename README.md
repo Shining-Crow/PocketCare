@@ -62,6 +62,43 @@ npm start
 
 Frontend runs at `http://localhost:3000`
 
+## Admin Portal
+
+### Accessing the Admin Dashboard
+
+1. Navigate to `http://localhost:3000/admin/login`
+2. Default admin credentials:
+   - **Email:** `admin@pocketcare.com`
+   - **Password:** `admin123`
+
+### Admin Dashboard Features
+
+- **Dashboard:** Overview of system statistics
+- **Users Management:** View and manage user accounts
+- **Doctors & Hospitals:** Manage healthcare providers
+- **Appointments:** Track and manage appointments
+- **SOS Alerts:** Monitor emergency requests
+- **Reports:** View OCR and medical reports
+- **AI Monitoring:** Monitor AI predictions and chatbot activity
+- **Settings:** Admin configuration options
+
+### Creating Additional Admin Accounts
+
+1. Use the password hash generator script:
+
+```bash
+cd backend
+python generate_admin_hash.py
+# Enter your desired password when prompted
+```
+
+2. Insert the hash into the database:
+
+```sql
+INSERT INTO admins (email, password_hash, name, role, is_active) 
+VALUES ('neweadmin@pocketcare.com', 'PASTE_HASH_HERE', 'Admin Name', 'admin', TRUE);
+```
+
 ## Phase 1 Status
 
 ✅ Project structure initialized
@@ -69,6 +106,7 @@ Frontend runs at `http://localhost:3000`
 ✅ Frontend authentication pages (login, register)
 ✅ Database schema created
 ✅ Basic routing and protected routes
+✅ Admin portal and dashboard
 
 ## Next Steps
 

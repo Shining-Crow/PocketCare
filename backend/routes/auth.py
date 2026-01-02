@@ -244,3 +244,96 @@ def update_profile():
         
     except Exception as e:
         return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500
+
+# Admin Login
+@auth_bp.route('/admin/login', methods=['POST'])
+def admin_login():
+    """Admin login endpoint"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        is_valid, error = validate_required_fields(data, ['email', 'password'])
+        if not is_valid:
+            return jsonify({'error': error}), 400
+        
+        email = data.get('email').lower().strip()
+        password = data.get('password')
+        
+        # Get admin from database
+        query = "SELECT id, email, password_hash, name, role, is_active FROM admins WHERE email = %s"
+        admin = execute_query(query, (email,), fetch_one=True)
+        
+        if not admin:
+            return jsonify({'error': 'Invalid email or password'}), 401
+        
+        if not admin['is_active']:
+            return jsonify({'error': 'Admin account is inactive'}), 403
+        
+        # Verify password
+        if not verify_password(password, admin['password_hash']):
+            return jsonify({'error': 'Invalid email or password'}), 401
+        
+        # Update last login
+        update_query = "UPDATE admins SET last_login = %s WHERE id = %s"
+        execute_query(update_query, (datetime.now(), admin['id']), commit=True)
+        
+        # Create access token
+        access_token = create_access_token(identity=f"admin_{admin['id']}")
+        
+        return jsonify({
+            'message': 'Admin login successful',
+            'admin': {
+                'id': admin['id'],
+                'email': admin['email'],
+                'name': admin['name'],
+                'role': admin['role']
+            },
+            'access_token': access_token
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Admin login failed: {str(e)}'}), 500
+
+
+# Get Dashboard Statistics
+@auth_bp.route('/admin/dashboard-stats', methods=['GET'])
+@jwt_required_custom
+def get_dashboard_stats():
+    """Get dashboard statistics for admin"""
+    try:
+        # Total users
+        users_query = "SELECT COUNT(*) as count FROM users"
+        users_count = execute_query(users_query, fetch_one=True)
+        
+        # Total doctors
+        doctors_query = "SELECT COUNT(*) as count FROM doctors"
+        doctors_count = execute_query(doctors_query, fetch_one=True)
+        
+        # Pending appointments
+        appointments_query = "SELECT COUNT(*) as count FROM appointments WHERE status = 'pending'"
+        pending_appointments = execute_query(appointments_query, fetch_one=True)
+        
+        # Active SOS alerts
+        sos_query = "SELECT COUNT(*) as count FROM emergency_requests WHERE status = 'pending'"
+        active_sos = execute_query(sos_query, fetch_one=True)
+        
+        # Medical reports reviewed
+        reports_query = "SELECT COUNT(*) as count FROM medical_reports"
+        total_reports = execute_query(reports_query, fetch_one=True)
+        
+        # Chat messages today
+        chats_query = "SELECT COUNT(*) as count FROM chat_messages WHERE DATE(created_at) = CURDATE()"
+        chats_today = execute_query(chats_query, fetch_one=True)
+        
+        return jsonify({
+            'total_users': users_count['count'],
+            'total_doctors': doctors_count['count'],
+            'pending_appointments': pending_appointments['count'],
+            'active_sos_alerts': active_sos['count'],
+            'total_reports': total_reports['count'],
+            'chats_today': chats_today['count']
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch statistics: {str(e)}'}), 500

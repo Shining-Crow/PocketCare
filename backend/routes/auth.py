@@ -114,12 +114,12 @@ def register_doctor():
 
         # Insert into DB
         insert_query = """
-        INSERT INTO doctors (name, email, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO doctors (name, email, password_hash, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """
         doctor_id = execute_query(
             insert_query,
-            (name, email, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
+            (name, email, hashed_password, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
             commit=True
         )
 
@@ -143,43 +143,48 @@ def register_doctor():
 # Login
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Login user"""
+    """Login user or doctor"""
     try:
         data = request.get_json()
-        
         # Validate required fields
         is_valid, error = validate_required_fields(data, ['email', 'password'])
         if not is_valid:
             return jsonify({'error': error}), 400
-        
+
         email = data.get('email').lower().strip()
         password = data.get('password')
-        
-        # Get user from database
-        query = "SELECT id, email, password_hash, name, phone FROM users WHERE email = %s"
-        user = execute_query(query, (email,), fetch_one=True)
-        
+        role = data.get('role', 'user')  # default to user
+
+        if role == 'doctor':
+            query = "SELECT id, email, password_hash, name, phone, specialty FROM doctors WHERE email = %s"
+            user = execute_query(query, (email,), fetch_one=True)
+        else:
+            query = "SELECT id, email, password_hash, name, phone FROM users WHERE email = %s"
+            user = execute_query(query, (email,), fetch_one=True)
+
         if not user:
             return jsonify({'error': 'Invalid email or password'}), 401
-        
-        # Verify password
+
         if not verify_password(password, user['password_hash']):
             return jsonify({'error': 'Invalid email or password'}), 401
-        
-        # Create access token
+
         access_token = create_access_token(identity=str(user['id']))
-        
+
+        user_data = {
+            'id': user['id'],
+            'email': user['email'],
+            'name': user['name'],
+            'phone': user['phone']
+        }
+        if role == 'doctor' and 'specialty' in user:
+            user_data['specialty'] = user['specialty']
+
         return jsonify({
             'message': 'Login successful',
-            'user': {
-                'id': user['id'],
-                'email': user['email'],
-                'name': user['name'],
-                'phone': user['phone']
-            },
+            'user': user_data,
             'access_token': access_token
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 

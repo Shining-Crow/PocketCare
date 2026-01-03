@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     specialty VARCHAR(100) NOT NULL,
     qualification VARCHAR(255),

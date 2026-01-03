@@ -5,6 +5,20 @@
 
 USE pocketcare_db;
 
+-- Ensure password_hash column exists in doctors table (if it doesn't already)
+SET @dbname = DATABASE();
+SET @tablename = "doctors";
+SET @columnname = "password_hash";
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE
+    (COLUMN_NAME = @columnname) AND (TABLE_NAME = @tablename) AND (TABLE_SCHEMA = @dbname)) > 0,
+  "SELECT 1",
+  CONCAT("ALTER TABLE ", @tablename, " ADD ", @columnname, " VARCHAR(255) NOT NULL DEFAULT '' AFTER email")
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
 -- ============================================================================
 -- SEED: hospitals
 -- ============================================================================
@@ -17,18 +31,19 @@ INSERT INTO hospitals (name, address, city, state, latitude, longitude, phone, e
 
 -- ============================================================================
 -- SEED: doctors
+-- Password hashes are for password123 using bcrypt
 -- ============================================================================
-INSERT INTO doctors (name, email, phone, specialty, qualification, experience, rating, hospital_id, consultation_fee, available_slots, bio) VALUES
-('Dr. Sarah Johnson', 'sarah.johnson@cityhospital.com', '+1-555-1001', 'Cardiology', 'MD, FACC', 15, 4.8, 1, 150.00, '["09:00-10:00", "10:00-11:00", "14:00-15:00", "15:00-16:00"]', 'Experienced cardiologist specializing in heart disease prevention and treatment.'),
-('Dr. Michael Chen', 'michael.chen@metroclinic.com', '+1-555-1002', 'Dermatology', 'MD, Board Certified', 10, 4.9, 2, 120.00, '["10:00-11:00", "11:00-12:00", "15:00-16:00", "16:00-17:00"]', 'Skin specialist with expertise in both medical and cosmetic dermatology.'),
-('Dr. Emily Rodriguez', 'emily.rodriguez@childrenshospital.com', '+1-555-1003', 'Pediatrics', 'MD, FAAP', 12, 4.7, 3, 100.00, '["09:00-10:00", "10:00-11:00", "13:00-14:00", "14:00-15:00"]', 'Compassionate pediatrician dedicated to child health and development.'),
-('Dr. James Williams', 'james.williams@communityhc.com', '+1-555-1004', 'General Practice', 'MD, Family Medicine', 8, 4.5, 5, 80.00, '["09:00-10:00", "11:00-12:00", "14:00-15:00", "16:00-17:00"]', 'General practitioner providing comprehensive primary care services.'),
-('Dr. Priya Patel', 'priya.patel@medicalcenter.com', '+1-555-1005', 'Neurology', 'MD, PhD, Neuroscience', 18, 4.8, 4, 180.00, '["10:00-11:00", "11:00-12:00", "15:00-16:00"]', 'Neurologist specializing in brain and nervous system disorders.'),
-('Dr. Robert Brown', 'robert.brown@cityhospital.com', '+1-555-1006', 'Orthopedics', 'MD, Orthopedic Surgery', 14, 4.6, 1, 160.00, '["09:00-10:00", "10:00-11:00", "14:00-15:00"]', 'Orthopedic surgeon expert in joint replacement and sports injuries.'),
-('Dr. Lisa Anderson', 'lisa.anderson@metroclinic.com', '+1-555-1007', 'Ophthalmology', 'MD, Eye Surgery', 11, 4.7, 2, 130.00, '["10:00-11:00", "13:00-14:00", "15:00-16:00"]', 'Eye care specialist offering comprehensive vision services.'),
-('Dr. David Martinez', 'david.martinez@medicalcenter.com', '+1-555-1008', 'Oncology', 'MD, Medical Oncology', 16, 4.9, 4, 200.00, '["09:00-10:00", "14:00-15:00", "15:00-16:00"]', 'Cancer specialist focused on personalized treatment plans.'),
-('Dr. Jennifer Lee', 'jennifer.lee@childrenshospital.com', '+1-555-1009', 'Neonatology', 'MD, FAAP', 13, 4.8, 3, 150.00, '["09:00-10:00", "10:00-11:00"]', 'Neonatal care expert dedicated to newborn health.'),
-('Dr. Thomas White', 'thomas.white@communityhc.com', '+1-555-1010', 'Dentistry', 'DDS', 9, 4.6, 5, 90.00, '["10:00-11:00", "13:00-14:00", "15:00-16:00"]', 'General dentist providing preventive and restorative dental care.');
+INSERT INTO doctors (name, email, password_hash, phone, specialty, qualification, experience, rating, hospital_id, consultation_fee, available_slots, bio) VALUES
+('Dr. Sarah Johnson', 'sarah.johnson@cityhospital.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1001', 'Cardiology', 'MD, FACC', 15, 4.8, 1, 150.00, '["09:00-10:00", "10:00-11:00", "14:00-15:00", "15:00-16:00"]', 'Experienced cardiologist specializing in heart disease prevention and treatment.'),
+('Dr. Michael Chen', 'michael.chen@metroclinic.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1002', 'Dermatology', 'MD, Board Certified', 10, 4.9, 2, 120.00, '["10:00-11:00", "11:00-12:00", "15:00-16:00", "16:00-17:00"]', 'Skin specialist with expertise in both medical and cosmetic dermatology.'),
+('Dr. Emily Rodriguez', 'emily.rodriguez@childrenshospital.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1003', 'Pediatrics', 'MD, FAAP', 12, 4.7, 3, 100.00, '["09:00-10:00", "10:00-11:00", "13:00-14:00", "14:00-15:00"]', 'Compassionate pediatrician dedicated to child health and development.'),
+('Dr. James Williams', 'james.williams@communityhc.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1004', 'General Practice', 'MD, Family Medicine', 8, 4.5, 5, 80.00, '["09:00-10:00", "11:00-12:00", "14:00-15:00", "16:00-17:00"]', 'General practitioner providing comprehensive primary care services.'),
+('Dr. Priya Patel', 'priya.patel@medicalcenter.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1005', 'Neurology', 'MD, PhD, Neuroscience', 18, 4.8, 4, 180.00, '["10:00-11:00", "11:00-12:00", "15:00-16:00"]', 'Neurologist specializing in brain and nervous system disorders.'),
+('Dr. Robert Brown', 'robert.brown@cityhospital.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1006', 'Orthopedics', 'MD, Orthopedic Surgery', 14, 4.6, 1, 160.00, '["09:00-10:00", "10:00-11:00", "14:00-15:00"]', 'Orthopedic surgeon expert in joint replacement and sports injuries.'),
+('Dr. Lisa Anderson', 'lisa.anderson@metroclinic.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1007', 'Ophthalmology', 'MD, Eye Surgery', 11, 4.7, 2, 130.00, '["10:00-11:00", "13:00-14:00", "15:00-16:00"]', 'Eye care specialist offering comprehensive vision services.'),
+('Dr. David Martinez', 'david.martinez@medicalcenter.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1008', 'Oncology', 'MD, Medical Oncology', 16, 4.9, 4, 200.00, '["09:00-10:00", "14:00-15:00", "15:00-16:00"]', 'Cancer specialist focused on personalized treatment plans.'),
+('Dr. Jennifer Lee', 'jennifer.lee@childrenshospital.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1009', 'Neonatology', 'MD, FAAP', 13, 4.8, 3, 150.00, '["09:00-10:00", "10:00-11:00"]', 'Neonatal care expert dedicated to newborn health.'),
+('Dr. Thomas White', 'thomas.white@communityhc.com', '$2b$12$QIXxB6UNVj0C.EymGBFgk.JD1eT5mZXyv5Sd6.0J4v3dKJbEIwNP6', '+1-555-1010', 'Dentistry', 'DDS', 9, 4.6, 5, 90.00, '["10:00-11:00", "13:00-14:00", "15:00-16:00"]', 'General dentist providing preventive and restorative dental care.');
 
 -- ============================================================================
 -- Note: User accounts should be created through the registration API

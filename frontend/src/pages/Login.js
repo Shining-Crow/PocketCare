@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../utils/auth';
 
+
 function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
+  const [role, setRole] = useState('user'); // 'user' or 'doctor'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +26,7 @@ function Login() {
     setLoading(true);
 
     try {
-      await login(formData);
+      await login({ ...formData, role });
       const redirectPath = localStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
         localStorage.removeItem('redirectAfterLogin');
@@ -50,14 +52,12 @@ function Login() {
             Welcome back
           </p>
         </div>
-        
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
-          
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -74,7 +74,6 @@ function Login() {
                 onChange={handleChange}
               />
             </div>
-            
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
@@ -90,21 +89,35 @@ function Login() {
                 onChange={handleChange}
               />
             </div>
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border ${role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'} font-medium`}
+                onClick={() => setRole('user')}
+              >
+                User
+              </button>
+              <button
+                type="button"
+                className={`px-4 py-2 rounded-md border ${role === 'doctor' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'} font-medium`}
+                onClick={() => setRole('doctor')}
+              >
+                Doctor
+              </button>
+            </div>
           </div>
-
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 mt-4"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Signing in...' : `Sign in as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
             </button>
           </div>
-          
           <div className="text-center text-sm">
             <span className="text-gray-600">Don't have an account? </span>
-            <Link to="/register" className="font-medium text-primary hover:text-blue-600">
+            <Link to="/getstarted" className="font-medium text-primary hover:text-blue-600">
               Sign up
             </Link>
           </div>

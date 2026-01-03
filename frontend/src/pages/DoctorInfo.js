@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import Navbar from "../components/Navbar";
 import { isAuthenticated } from "../utils/auth";
+import Footer from "../components/Footer";
 
 export default function DoctorInfo() {
     const { id } = useParams();
@@ -87,6 +88,8 @@ export default function DoctorInfo() {
                     </button>
                 </div>
             </div>
+            {/* Footer */}
+            <Footer />
         </>
     );
 }

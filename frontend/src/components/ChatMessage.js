@@ -1,11 +1,36 @@
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import React from "react";
+import ReactMarkdown from "react-markdown";
 
 function ChatMessage({ sender, text }) {
+  const isUser = sender === "user";
+
   return (
-    <div className={`mb-2 flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-      <div className={`px-4 py-2 rounded-lg max-w-xs whitespace-pre-wrap ${sender === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-gray-900 border'}`}>
-        <ReactMarkdown>{text}</ReactMarkdown>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div className={`flex items-start gap-3 max-w-[85%] ${isUser ? "flex-row-reverse" : ""}`}>
+        {/* Avatar */}
+        <div
+          className={
+            isUser
+              ? "w-9 h-9 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold"
+              : "w-9 h-9 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold"
+          }
+          aria-hidden="true"
+        >
+          {isUser ? "U" : "AI"}
+        </div>
+
+        {/* Bubble */}
+        <div
+          className={
+            isUser
+              ? "px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm"
+              : "px-4 py-3 rounded-2xl bg-white border border-gray-200 text-gray-900 shadow-sm"
+          }
+        >
+          <div className={`prose prose-sm max-w-none ${isUser ? "prose-invert" : ""}`}>
+            <ReactMarkdown>{text}</ReactMarkdown>
+          </div>
+        </div>
       </div>
     </div>
   );

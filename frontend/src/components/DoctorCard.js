@@ -1,29 +1,27 @@
 export default function DoctorCard({ doctor, onClick }) {
     return (
         <div
-            className="bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center text-center h-full border border-transparent hover:border-primary-500 hover:shadow-2xl transition-all duration-200 group relative overflow-hidden"
-            style={{ minHeight: '280px' }}
+            className="rounded-3xl bg-white shadow-xl p-8 flex flex-col items-center text-center h-full border border-blue-100 hover:shadow-2xl transition-all duration-200 group relative overflow-hidden"
+            style={{ minHeight: '300px' }}
         >
-            {/* Decorative background blob */}
-            <div className="absolute -top-8 -right-8 w-32 h-32 bg-blue-100 rounded-full opacity-30 group-hover:scale-110 transition-transform duration-300 z-0" />
 
             {/* Avatar */}
-            <div className="w-20 h-20 bg-gradient-to-tr from-blue-200 to-blue-400 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-md mb-3 z-10 border-4 border-white">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 text-3xl font-bold shadow mb-4 z-10 border-4 border-white">
                 {doctor.name ? doctor.name.charAt(0) : 'D'}
             </div>
 
             {/* Specialty badge */}
-            <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold mb-2 z-10 border border-blue-200">
+            <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold mb-2 z-10 border border-purple-200">
                 {doctor.specialty}
             </span>
 
             {/* Name */}
-            <h2 className="text-xl font-bold text-gray-800 mb-1 z-10 group-hover:text-blue-700 transition-colors duration-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-1 z-10 group-hover:text-blue-700 transition-colors duration-200">
                 {doctor.name}
             </h2>
 
             {/* Rating */}
-            <div className="flex items-center justify-center gap-1 mb-2 z-10">
+            <div className="flex items-center justify-center gap-1 mb-4 z-10">
                 {Array.from({ length: 5 }).map((_, i) => (
                     <svg
                         key={i}
@@ -39,7 +37,7 @@ export default function DoctorCard({ doctor, onClick }) {
 
             {/* Book button */}
             <button
-                className="mt-auto px-4 py-2 bg-blue-600 text-white rounded-full font-semibold shadow hover:bg-blue-700 transition-colors duration-200 z-10"
+                className="px-6 py-2 bg-white border-2 border-blue-600 text-blue-600 rounded-lg font-semibold shadow hover:border-purple-600 hover:text-purple-600 transition-all duration-200 mt-auto w-full"
                 onClick={onClick}
             >
                 View Profile

@@ -129,12 +129,21 @@ function DoctorDashboard() {
       return;
     }
 
+    // Check if user is a doctor
+    if (currentUser.role !== "doctor") {
+      console.error("User is not a doctor");
+      navigate("/dashboard");
+      return;
+    }
+
     const fetchDoctorData = async () => {
       try {
         setLoading(true);
+        console.log("Fetching doctor data...");
 
         // Fetch doctor profile
         const profileRes = await api.get("/doctor/profile");
+        console.log("Doctor profile response:", profileRes.data);
         const doctorData = profileRes.data.doctor;
         setDoctor(doctorData);
         setEditForm({
@@ -149,6 +158,7 @@ function DoctorDashboard() {
 
         // Fetch doctor stats
         const statsRes = await api.get("/doctor/stats");
+        console.log("Doctor stats response:", statsRes.data);
         setStats(statsRes.data);
 
         // Fetch today's appointments
@@ -156,10 +166,22 @@ function DoctorDashboard() {
         const appointmentsRes = await api.get(
           `/doctor/appointments?date=${today}`
         );
+        console.log("Doctor appointments response:", appointmentsRes.data);
         setTodayAppointments(appointmentsRes.data.appointments || []);
       } catch (error) {
         console.error("Error fetching doctor data:", error);
+        console.error("Error details:", error.response?.data);
+
+        // Show error message to user
+        if (error.response?.status === 401) {
+          alert("Session expired. Please login again.");
+          logout();
+          navigate("/login");
+          return;
+        }
+
         // Fall back to localStorage data if API fails
+        console.log("Falling back to localStorage data");
         setDoctor(currentUser);
         setEditForm({
           name: currentUser.name || "",
@@ -192,13 +214,40 @@ function DoctorDashboard() {
 
   const handleSaveProfile = async () => {
     try {
-      await api.put("/doctor/profile", editForm);
-      setDoctor({ ...doctor, ...editForm });
+      console.log("Updating profile with:", editForm);
+      const response = await api.put("/doctor/profile", editForm);
+      console.log("Update response:", response.data);
+
+      // Update local state
+      const updatedDoctor = { ...doctor, ...editForm };
+      setDoctor(updatedDoctor);
+
+      // Update localStorage to keep user data in sync
+      const currentUser = getCurrentUser();
+      const updatedUser = { ...currentUser, ...editForm };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
       setIsEditing(false);
       alert("Profile updated successfully!");
+
+      // Refresh profile from server to ensure sync
+      const profileRes = await api.get("/doctor/profile");
+      setDoctor(profileRes.data.doctor);
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("Failed to update profile. Please try again.");
+      console.error("Error details:", error.response?.data);
+
+      if (error.response?.status === 401) {
+        alert("Session expired. Please login again.");
+        logout();
+        navigate("/login");
+      } else {
+        alert(
+          `Failed to update profile: ${
+            error.response?.data?.error || error.message
+          }`
+        );
+      }
     }
   };
 

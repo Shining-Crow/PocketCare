@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import api from "../utils/api";
-import { Calendar, Clock, FileText, HeartPulse } from "lucide-react";
+import { Calendar, Clock, FileText, HeartPulse, User, Stethoscope } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
@@ -38,12 +38,14 @@ export default function BookAppointment() {
             <Navbar />
             <div className="flex-grow flex items-center justify-center py-12">
                 <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 relative overflow-hidden">
-                    <div className="absolute -top-8 -left-8 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full w-32 h-32 opacity-20 z-0"></div>
-                    <div className="absolute -bottom-8 -right-8 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full w-32 h-32 opacity-20 z-0"></div>
+                    <div className="absolute -top-8 -left-8 bg-blue-100 rounded-full w-32 h-32 opacity-20 z-0"></div>
+                    <div className="absolute -bottom-8 -right-8 bg-purple-100 rounded-full w-32 h-32 opacity-20 z-0"></div>
                     <div className="relative z-10">
                         <div className="flex items-center mb-6 space-x-3">
-                            <HeartPulse className="w-8 h-8 text-blue-600" />
-                            <h1 className="text-3xl font-bold text-gray-900">Book Appointment</h1>
+                            <User className="w-8 h-8 text-blue-600 bg-blue-100 rounded-full p-1" />
+                            <Stethoscope className="w-8 h-8 text-green-600 bg-green-100 rounded-full p-1" />
+                            <HeartPulse className="w-8 h-8 text-purple-600 bg-purple-100 rounded-full p-1" />
+                            <h1 className="text-3xl font-bold text-blue-700 ml-2">Book Appointment</h1>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div>
@@ -83,7 +85,7 @@ export default function BookAppointment() {
                             </div>
                             <button
                                 type="submit"
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-lg font-semibold shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all text-lg flex items-center justify-center gap-2"
+                                className="w-full bg-green-600 text-white p-3 rounded-lg font-semibold shadow-lg hover:bg-green-700 transition-all text-lg flex items-center justify-center gap-2"
                             >
                                 <HeartPulse className="w-5 h-5 text-white" /> Confirm Booking
                             </button>

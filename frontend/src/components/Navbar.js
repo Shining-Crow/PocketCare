@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeartPulse } from "lucide-react";
-import { isAuthenticated } from "../utils/auth";
 
 const Navbar = () => {
     const navigate = useNavigate();

@@ -37,7 +37,7 @@ export default function DoctorInfo() {
     return (
         <>
             <Navbar />
-            <div className="max-w-7xl mx-auto p-6 flex gap-6">
+            <div className="max-w-7xl mx-auto p-6 flex gap-6 bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 min-h-screen">
                 {/* LEFT — Doctor Info */}
                 <div className="w-3/4 bg-white rounded-xl shadow p-6 h-[80vh] overflow-y-auto">
                     <h1 className="text-3xl font-bold">{doctor.name}</h1>
@@ -60,29 +60,29 @@ export default function DoctorInfo() {
 
                 {/* RIGHT — Appointment Booking (Sticky) */}
                 <div className="w-1/4 bg-white rounded-xl shadow p-6 sticky top-6 h-fit">
-                    <h2 className="text-xl font-semibold mb-4">Book Appointment</h2>
+                    <h2 className="text-xl font-semibold mb-4 text-blue-700">Book Appointment</h2>
 
                     <input
                         type="date"
-                        className="w-full border p-2 rounded mb-3"
+                        className="w-full border-2 border-blue-200 bg-blue-50 p-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
                         onChange={(e) => setDate(e.target.value)}
                     />
 
                     <input
                         type="time"
-                        className="w-full border p-2 rounded mb-3"
+                        className="w-full border-2 border-purple-200 bg-purple-50 p-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
                         onChange={(e) => setTime(e.target.value)}
                     />
 
                     <textarea
                         placeholder="Symptoms"
-                        className="w-full border p-2 rounded mb-4"
+                        className="w-full border-2 border-green-200 bg-green-50 p-2 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
                         onChange={(e) => setSymptoms(e.target.value)}
                     />
 
                     <button
                         onClick={bookAppointment}
-                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+                        className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:bg-green-700 transition-all text-lg flex items-center justify-center gap-2"
                     >
                         Confirm Booking
                     </button>

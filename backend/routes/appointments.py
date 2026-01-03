@@ -1,75 +1,65 @@
+
 from flask import Blueprint, request, jsonify
-import pymysql
-from config import Config
+from utils.database import get_db_connection
+from flask_jwt_extended import get_jwt_identity
 
-appointments_bp = Blueprint('appointments', __name__, url_prefix='/api/appointments')
+appointments_bp = Blueprint('appointments', __name__)
 
-DB_CONFIG = {
-    "host": Config.DB_HOST,
-    "user": Config.DB_USER,
-    "password": Config.DB_PASSWORD,
-    "database": Config.DB_NAME,
-    "port": int(Config.DB_PORT)
-}
-
-# Helper to connect to MySQL
-def get_db_connection():
-    conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor) 
-    return conn
-
-# Get all upcoming appointments for a user
-@appointments_bp.route('/user/<int:user_id>', methods=['GET'])
-def get_appointments(user_id):
+# GET all doctors
+@appointments_bp.route('/doctors', methods=['GET', 'OPTIONS'])
+def get_doctors():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM appointments WHERE user_id=%s ORDER BY appointment_date, appointment_time", (user_id,))
-    appointments = cursor.fetchall()
+
+    name = request.args.get('name')
+    specialty = request.args.get('specialty')
+    min_fee = request.args.get('min_fee')
+    max_fee = request.args.get('max_fee')
+
+    query = "SELECT id, name, specialty, qualification, experience, rating, consultation_fee, bio FROM doctors WHERE 1=1"
+    params = []
+
+    if name:
+        query += " AND name LIKE %s"
+        params.append(f"%{name}%")
+
+    if specialty:
+        query += " AND specialty=%s"
+        params.append(specialty)
+
+    if min_fee and max_fee:
+        query += " AND consultation_fee BETWEEN %s AND %s"
+        params.extend([min_fee, max_fee])
+
+    cursor.execute(query, params)
+    doctors = cursor.fetchall()
     cursor.close()
     conn.close()
-    return jsonify(appointments)
 
-# Book a new appointment
-@appointments_bp.route('/book', methods=['POST'])
-def book_appointment():
-    data = request.get_json()
+    return jsonify(doctors)
 
-    user_id = data.get('user_id')
-    doctor_id = data.get('doctor_id')
-    appointment_date = data.get('appointment_date')
-    appointment_time = data.get('appointment_time')
+from flask_jwt_extended import jwt_required
 
-    if not all([user_id, doctor_id, appointment_date, appointment_time]):
-        return jsonify({'message': 'Missing required fields'}), 400
+@appointments_bp.route('/appointments', methods=['POST'])
+@jwt_required()
+def create_appointment():
+    data = request.json
+    user_id = get_jwt_identity()
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Check for double booking
     cursor.execute("""
-        SELECT id FROM appointments
-        WHERE doctor_id=%s AND appointment_date=%s AND appointment_time=%s
-    """, (doctor_id, appointment_date, appointment_time))
-    if cursor.fetchone():
-        return jsonify({'message': 'Time slot already booked'}), 400
-
-    cursor.execute("""
-        INSERT INTO appointments (user_id, doctor_id, appointment_date, appointment_time, status)
-        VALUES (%s, %s, %s, %s, 'pending')
-    """, (user_id, doctor_id, appointment_date, appointment_time))
-
+        INSERT INTO appointments 
+        (user_id, doctor_id, appointment_date, appointment_time, symptoms)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (
+        user_id,
+        data['doctor_id'],
+        data['appointment_date'],
+        data['appointment_time'],
+        data.get('symptoms')
+    ))
     conn.commit()
     cursor.close()
     conn.close()
-
-    return jsonify({'message': 'Appointment booked successfully'}), 201
-
-# Cancel appointment
-@appointments_bp.route('/cancel/<int:appointment_id>', methods=['DELETE'])
-def cancel_appointment(appointment_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE appointments SET status='cancelled' WHERE id=%s", (appointment_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return jsonify({'message': 'Appointment cancelled'})
+    return jsonify({"message": "Appointment booked"}), 201

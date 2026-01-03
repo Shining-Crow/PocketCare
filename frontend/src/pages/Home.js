@@ -28,12 +28,12 @@ function Home() {
       icon: <Hospital className="w-8 h-8" />,
       title: "Find Doctors & Hospitals",
       description: "Search and book appointments with verified healthcare professionals",
-      link: "/appointments" // <--- here!
     },
     {
       icon: <Calendar className="w-8 h-8" />,
       title: "Easy Booking",
-      description: "Schedule appointments and manage your healthcare visits seamlessly"
+      description: "Schedule appointments and manage your healthcare visits seamlessly",
+      link: "/appointments"
     },
     {
       icon: <FileText className="w-8 h-8" />,
@@ -121,13 +121,19 @@ function Home() {
                   </div>
                 </div>
                 <div className="absolute -top-6 -right-6 bg-white rounded-xl shadow-xl p-4 flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Calendar className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Easy Booking</p>
-                    <p className="text-xs text-gray-500">Quick & Simple</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/appointments')}
+                    className="flex items-center space-x-3 focus:outline-none"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Calendar className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Easy Booking</p>
+                      <p className="text-xs text-gray-500">Quick & Simple</p>
+                    </div>
+                  </button>
                 </div>
               </div>
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-400 rounded-2xl transform rotate-3"></div>
@@ -165,22 +171,36 @@ function Home() {
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 border border-gray-100"
-              >
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white mb-6">
-                  {feature.icon}
+            {features.map((feature, index) => {
+              const isClickable = !!feature.link;
+              const handleClick = () => {
+                if (feature.link) navigate(feature.link);
+              };
+              const clickableProps = isClickable
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    onClick: handleClick,
+                    onKeyPress: (e) => { if (e.key === 'Enter') handleClick(); },
+                    className: "bg-white rounded-xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 border border-gray-100 cursor-pointer"
+                  }
+                : {
+                    className: "bg-white rounded-xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 border border-gray-100"
+                  };
+              return (
+                <div key={index} {...clickableProps}>
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white mb-6">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    {feature.description}
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

@@ -1,8 +1,6 @@
-import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import api from "../utils/api";
 import { Calendar, Clock, FileText, HeartPulse, User, Stethoscope } from "lucide-react";
-import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 export default function BookAppointment() {
@@ -35,7 +33,6 @@ export default function BookAppointment() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-100 flex flex-col">
-            <Navbar />
             <div className="flex-grow flex items-center justify-center py-12">
                 <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 relative overflow-hidden">
                     <div className="absolute -top-8 -left-8 bg-blue-100 rounded-full w-32 h-32 opacity-20 z-0"></div>

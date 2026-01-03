@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout } from '../utils/auth';
+import { getCurrentUser } from '../utils/auth';
 import { 
   HeartPulse, 
   AlertCircle, 
@@ -10,9 +10,6 @@ import {
   User, 
   FileText, 
   MessageSquare,
-  LogOut,
-  Bell,
-  Settings,
   TrendingUp,
   Clock,
   Award,
@@ -64,11 +61,6 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, [sosHolding]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   const handleSOSActivate = () => {
     const typeLabel = selectedEmergency || 'general-emergency';
     // TODO: replace alert with real API call using typeLabel and emergencyNote
@@ -81,40 +73,6 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <HeartPulse className="w-8 h-8 text-blue-600" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                PocketCare
-              </span>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition group">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
-                <Settings className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition border border-red-200"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="font-medium">Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         

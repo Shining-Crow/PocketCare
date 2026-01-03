@@ -20,7 +20,6 @@ import {
   Search,
   MoreVertical,
 } from "lucide-react";
-import DoctorNavbar from "../components/DoctorNavbar";
 
 function DoctorDashboard() {
   const navigate = useNavigate();
@@ -200,10 +199,6 @@ function DoctorDashboard() {
     fetchDoctorData();
   }, [navigate]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
 
   const handleEditChange = (e) => {
     setEditForm({
@@ -297,8 +292,6 @@ function DoctorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Navbar  */}
-      <DoctorNavbar handleLogout={handleLogout}></DoctorNavbar>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Banner */}

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../utils/api";
-import Navbar from "../components/Navbar";
-import { isAuthenticated } from "../utils/auth";
 import Footer from "../components/Footer";
 
 export default function DoctorInfo() {
@@ -18,26 +16,20 @@ export default function DoctorInfo() {
     }, [id]);
 
     const bookAppointment = async () => {
-        if (!isAuthenticated()) {
-            localStorage.setItem('redirectAfterLogin', `/doctor/${id}`);
-            navigate("/login");
-            return;
-        }
         await api.post("/appointments", {
             doctor_id: id,
-            appointment_date: date,
-            appointment_time: time,
-            symptoms,
-        });
-        alert("Appointment booked!");
-    };
-
-    if (!doctor) return <p>Loading...</p>;
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 flex flex-col">
+                    <div className="max-w-7xl mx-auto p-6 flex gap-6 flex-grow">
 
     return (
         <>
+<<<<<<< HEAD
             <Navbar />
             <div className="max-w-7xl mx-auto p-6 flex gap-6 bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 min-h-screen">
+=======
+            <div className="max-w-7xl mx-auto p-6 flex gap-6">
+>>>>>>> 65c258f (feat: Refactor routing and layout for authenticated users; add UserNavbar and AuthenticatedLayout components)
                 {/* LEFT — Doctor Info */}
                 <div className="w-3/4 bg-white rounded-xl shadow p-6 h-[80vh] overflow-y-auto">
                     <h1 className="text-3xl font-bold">{doctor.name}</h1>
@@ -79,6 +71,8 @@ export default function DoctorInfo() {
                         className="w-full border-2 border-green-200 bg-green-50 p-2 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
                         onChange={(e) => setSymptoms(e.target.value)}
                     />
+                    <Footer />
+                </div>
 
                     <button
                         onClick={bookAppointment}

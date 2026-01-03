@@ -12,12 +12,17 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import Appointments from './pages/Appointments';
 import BookAppointment from './pages/BookAppointment';
 import DoctorInfo from './pages/DoctorInfo';
+import AuthenticatedLayout from './components/AuthenticatedLayout';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
-  return isAuthenticated() ? children : <Navigate to="/login" />;
+  return isAuthenticated() ? children : <Navigate to="/login" replace />;
+}
+
+function PublicOnlyRoute({ children }) {
+  return isAuthenticated() ? <Navigate to="/dashboard" replace /> : children;
 }
 
 // Protected Route Component for Admin
@@ -37,30 +42,61 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/getstarted" element={<GetStarted />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/doctorregister" element={<DoctorRegister />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/appointments" element={<Appointments />} />
-        <Route path="/doctor/:id" element={<DoctorInfo />} />
-        <Route path="/book/:doctorId" element={<BookAppointment />} />
         <Route
-          path="/dashboard"
+          path="/"
           element={
-            <ProtectedRoute>
-              <DashboardController />
-            </ProtectedRoute>
+            <PublicOnlyRoute>
+              <Home />
+            </PublicOnlyRoute>
           }
         />
         <Route
-          path="/health-chat"
+          path="/getstarted"
           element={
-            <ProtectedRoute>
-              <HealthChat />
-            </ProtectedRoute>
+            <PublicOnlyRoute>
+              <GetStarted />
+            </PublicOnlyRoute>
           }
         />
+        <Route
+          path="/login"
+          element={
+            <PublicOnlyRoute>
+              <Login />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicOnlyRoute>
+              <Register />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route
+          path="/doctorregister"
+          element={
+            <PublicOnlyRoute>
+              <DoctorRegister />
+            </PublicOnlyRoute>
+          }
+        />
+
+        {/* Authenticated area */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AuthenticatedLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<DashboardController />} />
+          <Route path="/health-chat" element={<HealthChat />} />
+          <Route path="/appointments" element={<Appointments />} />
+          <Route path="/doctor/:id" element={<DoctorInfo />} />
+          <Route path="/book/:doctorId" element={<BookAppointment />} />
+        </Route>
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />

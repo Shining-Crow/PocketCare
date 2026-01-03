@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth';
 import { 
@@ -43,6 +43,14 @@ function Dashboard() {
     }
   }, [navigate]);
 
+  const handleSOSActivate = useCallback(() => {
+    const typeLabel = selectedEmergency || 'general-emergency';
+    // TODO: replace alert with real API call using typeLabel and emergencyNote
+    alert(`🚨 SOS Activated (${typeLabel})! Contacting emergency services...`);
+    setSosHolding(false);
+    setSosProgress(0);
+  }, [selectedEmergency]);
+
   useEffect(() => {
     let interval;
     if (sosHolding) {
@@ -59,15 +67,7 @@ function Dashboard() {
       setSosProgress(0);
     }
     return () => clearInterval(interval);
-  }, [sosHolding]);
-
-  const handleSOSActivate = () => {
-    const typeLabel = selectedEmergency || 'general-emergency';
-    // TODO: replace alert with real API call using typeLabel and emergencyNote
-    alert(`🚨 SOS Activated (${typeLabel})! Contacting emergency services...`);
-    setSosHolding(false);
-    setSosProgress(0);
-  };
+  }, [sosHolding, handleSOSActivate]);
 
   if (!user) return null;
 

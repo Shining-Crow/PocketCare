@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import api from "../utils/api";
-import { Search, Stethoscope, DollarSign, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import DoctorCard from "../components/DoctorCard";
 import Footer from "../components/Footer";

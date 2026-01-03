@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
 import { Calendar, Clock, FileText, HeartPulse, User, Stethoscope } from "lucide-react";
 import Footer from "../components/Footer";

@@ -3,6 +3,7 @@ import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import DoctorCard from "../components/DoctorCard";
+import Footer from "../components/Footer";
 
 export default function Appointments() {
     const [doctors, setDoctors] = useState([]);
@@ -42,13 +43,11 @@ export default function Appointments() {
         fetchDoctors();
     }, [search, specialty, feeRange]);
 
-
-
     return (
         <div>
             {/* Navigation */}
                 <Navbar />
-            <div className="p-3 max-w-7xl mx-auto">
+            <div className="p-3 max-w-7xl mx-auto pb-14">
                 {/* Filter Navbar */}
                 <div className="w-full bg-white shadow rounded-lg p-4 mb-6 flex flex-wrap gap-4 items-center">
 
@@ -90,7 +89,6 @@ export default function Appointments() {
                 <br />
                 <h1 className="text-3xl font-bold mb-6">Available Doctors</h1>
 
-
                 {/* Card Grid Layout */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {doctors.map((doctor) => (
@@ -101,8 +99,9 @@ export default function Appointments() {
                         />
                     ))}
                 </div>
-
             </div>
+            {/* Footer */}
+            <Footer />
         </div>
     );
 }

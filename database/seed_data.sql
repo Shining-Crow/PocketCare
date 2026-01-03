@@ -5,6 +5,10 @@
 
 USE pocketcare_db;
 
+-- Clear existing seed data
+DELETE FROM doctors;
+DELETE FROM hospitals;
+
 -- Ensure password_hash column exists in doctors table (if it doesn't already)
 SET @dbname = DATABASE();
 SET @tablename = "doctors";

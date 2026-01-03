@@ -5,16 +5,24 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import HealthChat from './pages/HealthChat';
-import { isAuthenticated } from './utils/auth';
+import { isAuthenticated, getCurrentUser } from './utils/auth';
 import GetStarted from './pages/GetStarted';
 import DoctorRegister from './pages/DoctorRegister';
-import Appointments from "./pages/Appointments";
-import BookAppointment from "./pages/BookAppointment";
+import DoctorDashboard from './pages/DoctorDashboard';
+import Appointments from './pages/Appointments';
+import BookAppointment from './pages/BookAppointment';
 import DoctorInfo from './pages/DoctorInfo';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" />;
+}
+
+// Dashboard Controller - routes to correct dashboard based on role
+function DashboardController() {
+  const user = getCurrentUser();
+  console.log("DashboardController - Current user:", user);
+  return user?.role === "doctor" ? <DoctorDashboard /> : <Dashboard />;
 }
 
 function App() {
@@ -29,16 +37,16 @@ function App() {
         <Route path="/appointments" element={<Appointments />} />
         <Route path="/doctor/:id" element={<DoctorInfo />} />
         <Route path="/book/:doctorId" element={<BookAppointment />} />
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <DashboardController />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/health-chat" 
+        <Route
+          path="/health-chat"
           element={
             <ProtectedRoute>
               <HealthChat />

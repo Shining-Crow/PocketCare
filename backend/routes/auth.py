@@ -63,7 +63,8 @@ def register():
             'user': {
                 'id': user_id,
                 'email': email,
-                'name': name
+                'name': name,
+                'role': 'user'
             },
             'access_token': access_token
         }), 201
@@ -132,7 +133,8 @@ def register_doctor():
                 'id': doctor_id,
                 'email': email,
                 'name': name,
-                'specialty': specialty
+                'specialty': specialty,
+                'role': 'doctor'
             },
             'access_token': access_token
         }), 201
@@ -174,7 +176,8 @@ def login():
             'id': user['id'],
             'email': user['email'],
             'name': user['name'],
-            'phone': user['phone']
+            'phone': user['phone'],
+            'role': role
         }
         if role == 'doctor' and 'specialty' in user:
             user_data['specialty'] = user['specialty']

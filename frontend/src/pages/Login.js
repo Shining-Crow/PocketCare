@@ -26,8 +26,14 @@ function Login() {
     setLoading(true);
 
     try {
-      await login({ ...formData, role });
-      const redirectPath = localStorage.getItem('redirectAfterLogin');
+      console.log("Login - Attempting login with role:", role);
+      const response = await login({ ...formData, role });
+      console.log("Login - Response received:", response);
+      console.log(
+        "Login - User stored in localStorage:",
+        localStorage.getItem("user")
+      );
+      const redirectPath = localStorage.getItem("redirectAfterLogin");
       if (redirectPath) {
         localStorage.removeItem('redirectAfterLogin');
         navigate(redirectPath);
@@ -35,7 +41,11 @@ function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      console.error("Login error:", err);
+      setError(
+        err.response?.data?.error ||
+          "Login failed. Please check your credentials."
+      );
     } finally {
       setLoading(false);
     }

@@ -35,6 +35,5 @@ gunicorn==21.2.0
 	# Removed duplicate entry
 mysql-connector-python==8.1.0
 
-# React Markdown
-react-markdown
+
 

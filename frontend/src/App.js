@@ -12,10 +12,18 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import Appointments from './pages/Appointments';
 import BookAppointment from './pages/BookAppointment';
 import DoctorInfo from './pages/DoctorInfo';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" />;
+}
+
+// Protected Route Component for Admin
+function AdminProtectedRoute({ children }) {
+  const adminToken = localStorage.getItem('adminToken');
+  return adminToken ? children : <Navigate to="/admin/login" />;
 }
 
 // Dashboard Controller - routes to correct dashboard based on role
@@ -53,6 +61,21 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route 
+          path="/admin/dashboard" 
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboard />
+            </AdminProtectedRoute>
+          } 
+        />
+        <Route path="/admin" element={<Navigate to="/admin/login" />} />
+
+        {/* Catch all - redirect to home */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

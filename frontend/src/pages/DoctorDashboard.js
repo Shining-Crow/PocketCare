@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
+import api from "../utils/api";
 import {
-  HeartPulse,
   User,
   Calendar,
   MessageSquare,
@@ -16,23 +16,28 @@ import {
   CheckCircle,
   Users,
   TrendingUp,
-  BookOpen,
-  Settings,
-  Bell,
-  LogOut,
   Send,
   Search,
   MoreVertical,
 } from "lucide-react";
+import DoctorNavbar from "../components/DoctorNavbar";
 
 function DoctorDashboard() {
   const navigate = useNavigate();
   const [doctor, setDoctor] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [activeTab, setActiveTab] = useState("overview"); // overview, availability, chat
+  const [activeTab, setActiveTab] = useState("overview");
   const [selectedChat, setSelectedChat] = useState(null);
   const [chatMessage, setChatMessage] = useState("");
+  const [stats, setStats] = useState({
+    total_appointments: 0,
+    completed_appointments: 0,
+    total_patients: 0,
+    today_appointments: 0,
+  });
+  const [todayAppointments, setTodayAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [availabilitySlots, setAvailabilitySlots] = useState([
     { day: "Monday", slots: ["09:00-12:00", "14:00-17:00"] },
     { day: "Tuesday", slots: ["09:00-12:00", "14:00-17:00"] },
@@ -121,18 +126,56 @@ function DoctorDashboard() {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       navigate("/login");
-    } else {
-      setDoctor(currentUser);
-      setEditForm({
-        name: currentUser.name || "",
-        specialty: currentUser.specialty || "",
-        qualification: currentUser.qualification || "",
-        experience: currentUser.experience || 0,
-        consultation_fee: currentUser.consultation_fee || 0,
-        phone: currentUser.phone || "",
-        bio: currentUser.bio || "",
-      });
+      return;
     }
+
+    const fetchDoctorData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch doctor profile
+        const profileRes = await api.get("/doctor/profile");
+        const doctorData = profileRes.data.doctor;
+        setDoctor(doctorData);
+        setEditForm({
+          name: doctorData.name || "",
+          specialty: doctorData.specialty || "",
+          qualification: doctorData.qualification || "",
+          experience: doctorData.experience || 0,
+          consultation_fee: doctorData.consultation_fee || 0,
+          phone: doctorData.phone || "",
+          bio: doctorData.bio || "",
+        });
+
+        // Fetch doctor stats
+        const statsRes = await api.get("/doctor/stats");
+        setStats(statsRes.data);
+
+        // Fetch today's appointments
+        const today = new Date().toISOString().split("T")[0];
+        const appointmentsRes = await api.get(
+          `/doctor/appointments?date=${today}`
+        );
+        setTodayAppointments(appointmentsRes.data.appointments || []);
+      } catch (error) {
+        console.error("Error fetching doctor data:", error);
+        // Fall back to localStorage data if API fails
+        setDoctor(currentUser);
+        setEditForm({
+          name: currentUser.name || "",
+          specialty: currentUser.specialty || "",
+          qualification: currentUser.qualification || "",
+          experience: currentUser.experience || 0,
+          consultation_fee: currentUser.consultation_fee || 0,
+          phone: currentUser.phone || "",
+          bio: currentUser.bio || "",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctorData();
   }, [navigate]);
 
   const handleLogout = () => {
@@ -147,10 +190,16 @@ function DoctorDashboard() {
     });
   };
 
-  const handleSaveProfile = () => {
-    // TODO: API call to update profile
-    setDoctor({ ...doctor, ...editForm });
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    try {
+      await api.put("/doctor/profile", editForm);
+      setDoctor({ ...doctor, ...editForm });
+      setIsEditing(false);
+      alert("Profile updated successfully!");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      alert("Failed to update profile. Please try again.");
+    }
   };
 
   const handleCancelEdit = () => {
@@ -199,40 +248,8 @@ function DoctorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <HeartPulse className="w-8 h-8 text-blue-600" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                PocketCare
-              </span>
-              <span className="hidden sm:inline-block px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
-                Doctor Portal
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-              </button>
-              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
-                <Settings className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition border border-red-200"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Logout</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      {/* Navbar  */}
+      <DoctorNavbar handleLogout={handleLogout}></DoctorNavbar>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Banner */}
@@ -299,7 +316,9 @@ function DoctorDashboard() {
                     <Star className="w-6 h-6 text-amber-500" />
                     <TrendingUp className="w-4 h-4 text-green-500" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">4.8</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {doctor?.rating || "4.8"}
+                  </p>
                   <p className="text-sm text-gray-600">Rating</p>
                 </div>
 
@@ -317,7 +336,9 @@ function DoctorDashboard() {
                   <div className="flex items-center justify-between mb-2">
                     <Users className="w-6 h-6 text-green-600" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">248</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.total_patients}
+                  </p>
                   <p className="text-sm text-gray-600">Patients</p>
                 </div>
 
@@ -509,46 +530,55 @@ function DoctorDashboard() {
               <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                   <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                  Today's Appointments
+                  Today's Appointments ({stats.today_appointments})
                 </h2>
                 <div className="space-y-3">
-                  {[
-                    {
-                      time: "9:00 AM",
-                      patient: "John Smith",
-                      type: "Consultation",
-                    },
-                    {
-                      time: "10:30 AM",
-                      patient: "Sarah Johnson",
-                      type: "Follow-up",
-                    },
-                    {
-                      time: "2:00 PM",
-                      patient: "Mike Brown",
-                      type: "Check-up",
-                    },
-                  ].map((apt, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <User className="w-5 h-5 text-blue-600" />
+                  {loading ? (
+                    <p className="text-gray-500 text-center py-4">Loading...</p>
+                  ) : todayAppointments.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">
+                      No appointments for today
+                    </p>
+                  ) : (
+                    todayAppointments.map((apt, idx) => (
+                      <div
+                        key={apt.id || idx}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <User className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {apt.patient_name}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {apt.symptoms || "General consultation"}
+                            </p>
+                            <span
+                              className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
+                                apt.status === "confirmed"
+                                  ? "bg-green-100 text-green-700"
+                                  : apt.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : apt.status === "completed"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {apt.status}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {apt.patient}
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900">
+                            {apt.appointment_time?.substring(0, 5) || apt.time}
                           </p>
-                          <p className="text-sm text-gray-600">{apt.type}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">{apt.time}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -599,24 +629,32 @@ function DoctorDashboard() {
               {/* Quick Stats */}
               <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
-                  This Week
+                  Overall Stats
                 </h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Appointments</span>
-                    <span className="font-bold text-gray-900">32</span>
+                    <span className="text-gray-600">Total Appointments</span>
+                    <span className="font-bold text-gray-900">
+                      {stats.total_appointments}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">New Patients</span>
-                    <span className="font-bold text-gray-900">8</span>
+                    <span className="text-gray-600">Completed</span>
+                    <span className="font-bold text-green-600">
+                      {stats.completed_appointments}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Messages</span>
-                    <span className="font-bold text-gray-900">45</span>
+                    <span className="text-gray-600">Total Patients</span>
+                    <span className="font-bold text-gray-900">
+                      {stats.total_patients}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Revenue</span>
-                    <span className="font-bold text-green-600">$3,840</span>
+                    <span className="text-gray-600">Today's Appointments</span>
+                    <span className="font-bold text-blue-600">
+                      {stats.today_appointments}
+                    </span>
                   </div>
                 </div>
               </div>

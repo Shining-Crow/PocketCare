@@ -1,84 +1,107 @@
 import { useEffect, useState } from "react";
 import api from "../utils/api";
-import AppointmentForm from "../components/AppointmentForm";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import DoctorCard from "../components/DoctorCard";
+import Footer from "../components/Footer";
 
 export default function Appointments() {
-    const userId = 1; // Replace with logged-in user id
-    const [appointments, setAppointments] = useState([]);
+    const [doctors, setDoctors] = useState([]);
+    const navigate = useNavigate();
+
+    const [search, setSearch] = useState("");
+    const [specialty, setSpecialty] = useState("");
+    const [feeRange, setFeeRange] = useState("");
+
 
     useEffect(() => {
-        fetchAppointments();
-    }, []);
+        const fetchDoctors = async () => {
+            try {
+                const params = {};
 
-    const fetchAppointments = async () => {
-        const res = await api.get(`/appointments/user/${userId}`);
-        setAppointments(res.data);
-    };
+                if (search) params.name = search;
+                if (specialty) params.specialty = specialty;
+
+                if (feeRange === "low") {
+                    params.min_fee = 0;
+                    params.max_fee = 500;
+                } else if (feeRange === "mid") {
+                    params.min_fee = 500;
+                    params.max_fee = 1500;
+                } else if (feeRange === "high") {
+                    params.min_fee = 1500;
+                    params.max_fee = 10000;
+                }
+
+                const res = await api.get("/doctors", { params });
+                setDoctors(res.data);
+            } catch (error) {
+                console.error("Failed to fetch doctors", error);
+            }
+        };
+
+        fetchDoctors();
+    }, [search, specialty, feeRange]);
 
     return (
-        <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
-            {/* Header Section */}
-            <header className="mb-8">
-                <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Appointments</h1>
-                <p className="text-gray-500 mt-1">Manage and view your upcoming medical visits.</p>
-            </header>
+        <div>
+            {/* Navigation */}
+                <Navbar />
+            <div className="p-3 max-w-7xl mx-auto pb-14">
+                {/* Filter Navbar */}
+                <div className="w-full bg-white shadow rounded-lg p-4 mb-6 flex flex-wrap gap-4 items-center">
 
-            {/* Form Section - Wrapped in a Card */}
-            <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-10">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Book New Appointment</h2>
-                <AppointmentForm userId={userId} onBooked={fetchAppointments} />
-            </section>
+                    {/* Search */}
+                    <input
+                        type="text"
+                        placeholder="Search doctor name"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="border p-2 rounded w-full md:w-64"
+                    />
 
-            {/* List Section */}
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">Upcoming Appointments</h2>
-                    <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                        {appointments.length} Total
-                    </span>
+                    {/* Specialty */}
+                    <select
+                        value={specialty}
+                        onChange={(e) => setSpecialty(e.target.value)}
+                        className="border p-2 rounded"
+                    >
+                        <option value="">All Specialties</option>
+                        <option value="Cardiology">Cardiology</option>
+                        <option value="Neurology">Neurology</option>
+                        <option value="Orthopedic">Orthopedic</option>
+                        <option value="Dermatology">Dermatology</option>
+                    </select>
+
+                    {/* Fee */}
+                    <select
+                        value={feeRange}
+                        onChange={(e) => setFeeRange(e.target.value)}
+                        className="border p-2 rounded"
+                    >
+                        <option value="">All Fees</option>
+                        <option value="low">Below ৳500</option>
+                        <option value="mid">৳500 - ৳1500</option>
+                        <option value="high">Above ৳1500</option>
+                    </select>
                 </div>
 
-                <ul className="grid gap-4">
-                    {appointments.map((a) => (
-                        <li
-                            key={a.id}
-                            className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col md:flex-row md:items-center justify-between"
-                        >
-                            <div className="flex flex-col gap-1">
-                                <span className="text-sm font-semibold text-blue-600 uppercase tracking-wider">
-                                    Doctor ID: {a.doctor_id}
-                                </span>
-                                <div className="flex items-center text-gray-700 gap-4 mt-1">
-                                    <div className="flex items-center">
-                                        <span className="font-medium">{a.date}</span>
-                                    </div>
-                                    <div className="text-gray-400">|</div>
-                                    <div className="flex items-center italic">
-                                        {a.time}
-                                    </div>
-                                </div>
-                            </div>
+                <br />
+                <h1 className="text-3xl font-bold mb-6">Available Doctors</h1>
 
-                            <div className="mt-4 md:mt-0 flex items-center">
-                                {/* Status Badge */}
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${a.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
-                                        a.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                                            'bg-gray-100 text-gray-700'
-                                    }`}>
-                                    {a.status}
-                                </span>
-                            </div>
-                        </li>
+                {/* Card Grid Layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {doctors.map((doctor) => (
+                        <DoctorCard
+                            key={doctor.id}
+                            doctor={doctor}
+                            onClick={() => navigate(`/doctor/${doctor.id}`)}
+                        />
                     ))}
-                </ul>
-
-                {appointments.length === 0 && (
-                    <div className="text-center py-10 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                        <p className="text-gray-400 italic">No appointments scheduled yet.</p>
-                    </div>
-                )}
-            </section>
+                </div>
+            </div>
+            {/* Footer */}
+            <Footer />
         </div>
-
     );
 }

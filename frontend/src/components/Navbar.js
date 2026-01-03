@@ -1,9 +1,37 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeartPulse } from "lucide-react";
+import { isAuthenticated } from "../utils/auth";
 
 const Navbar = () => {
     const navigate = useNavigate();
+    const [loggedIn, setLoggedIn] = useState(false);
+
+    useEffect(() => {
+        const checkAuth = () => setLoggedIn(!!localStorage.getItem('token'));
+        checkAuth();
+        window.addEventListener('storage', checkAuth);
+        // Clear localStorage on tab/browser close to force logout
+        const handleUnload = () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+        };
+        window.addEventListener('beforeunload', handleUnload);
+        const interval = setInterval(checkAuth, 500);
+        return () => {
+            window.removeEventListener('storage', checkAuth);
+            window.removeEventListener('beforeunload', handleUnload);
+            clearInterval(interval);
+        };
+    }, []);
+
+        // Logout handler
+        const handleLogout = () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setLoggedIn(false);
+            navigate('/');
+        };
 
     return (
         <nav className="bg-white shadow-sm sticky top-0 z-50">
@@ -43,19 +71,29 @@ const Navbar = () => {
 
                     {/* Auth Buttons */}
                     <div className="flex space-x-4"> 
-                        <button
-                            onClick={() => navigate("/login")}
-                            className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition"
-                        >
-                            Login
-                        </button>
-
-                        <button
-                            onClick={() => navigate("/getstarted")}
-                            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
-                        >
-                            Get Started
-                        </button>
+                            {!loggedIn ? (
+                                <>
+                                    <button
+                                        onClick={() => navigate("/login")}
+                                        className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition"
+                                    >
+                                        Login
+                                    </button>
+                                    <button
+                                        onClick={() => navigate("/getstarted")}
+                                        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                                    >
+                                        Get Started
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 text-red-600 hover:text-red-700 font-medium transition"
+                                >
+                                    Log Out
+                                </button>
+                            )}
                     </div>
 
                 </div>

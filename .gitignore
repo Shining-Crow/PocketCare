@@ -100,3 +100,6 @@ uploads/
 # SASS and build caches
 .sass-cache/
 .cache/
+
+# My checker
+Database_Check.md

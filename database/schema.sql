@@ -1,19 +1,11 @@
+
+-- ============================================================================
+-- POCKETCARE DATABASE SCHEMA
+-- ============================================================================
+
 -- Create database if not exists
 CREATE DATABASE IF NOT EXISTS pocketcare_db;
 USE pocketcare_db;
-
--- ========================================================================
--- TABLE: chat_messages
--- ========================================================================
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    sender ENUM('user', 'ai') NOT NULL,
-    message TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
 -- TABLE: users
@@ -40,6 +32,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     specialty VARCHAR(100) NOT NULL,
     qualification VARCHAR(255),
@@ -168,19 +161,16 @@ CREATE TABLE IF NOT EXISTS messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
--- TABLE: admins
+-- TABLE: chat_messages
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS admins (
+CREATE TABLE IF NOT EXISTS chat_messages (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    role VARCHAR(50) DEFAULT 'admin' COMMENT 'admin, super_admin',
-    is_active BOOLEAN DEFAULT TRUE,
-    last_login TIMESTAMP NULL,
+    user_id INT NOT NULL,
+    sender ENUM('user', 'ai') NOT NULL,
+    message TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_email (email)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================

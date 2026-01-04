@@ -135,10 +135,23 @@ function DoctorDashboard() {
       return;
     }
 
+    // Immediately set doctor from localStorage to show dashboard
+    setDoctor(currentUser);
+    setEditForm({
+      name: currentUser.name || "",
+      specialty: currentUser.specialty || "",
+      qualification: currentUser.qualification || "",
+      experience: currentUser.experience || 0,
+      consultation_fee: currentUser.consultation_fee || 0,
+      phone: currentUser.phone || "",
+      bio: currentUser.bio || "",
+    });
+    setLoading(false);
+
+    // Then fetch updated data from API in the background
     const fetchDoctorData = async () => {
       try {
-        setLoading(true);
-        console.log("Fetching doctor data...");
+        console.log("Fetching doctor data from API...");
 
         // Fetch doctor profile
         const profileRes = await api.get("/doctor/profile");
@@ -168,34 +181,23 @@ function DoctorDashboard() {
         console.log("Doctor appointments response:", appointmentsRes.data);
         setTodayAppointments(appointmentsRes.data.appointments || []);
       } catch (error) {
-        console.error("Error fetching doctor data:", error);
+        console.error("Error fetching doctor data from API:", error);
         console.error("Error details:", error.response?.data);
 
         // Show error message to user
         if (error.response?.status === 401) {
-          alert("Session expired. Please login again.");
+          console.log("Session expired. Please login again.");
           logout();
           navigate("/login");
           return;
         }
 
-        // Fall back to localStorage data if API fails
-        console.log("Falling back to localStorage data");
-        setDoctor(currentUser);
-        setEditForm({
-          name: currentUser.name || "",
-          specialty: currentUser.specialty || "",
-          qualification: currentUser.qualification || "",
-          experience: currentUser.experience || 0,
-          consultation_fee: currentUser.consultation_fee || 0,
-          phone: currentUser.phone || "",
-          bio: currentUser.bio || "",
-        });
-      } finally {
-        setLoading(false);
+        // Already have fallback data from localStorage
+        console.log("Using cached data from localStorage");
       }
     };
 
+    // Fetch data but don't block the UI
     fetchDoctorData();
   }, [navigate]);
 
@@ -288,7 +290,16 @@ function DoctorDashboard() {
     );
   };
 
-  if (!doctor) return null;
+  if (!doctor) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">

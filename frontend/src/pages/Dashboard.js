@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser } from '../utils/auth';
+import { getCurrentUser, logout } from '../utils/auth';
 import { 
   HeartPulse, 
   AlertCircle, 
@@ -33,6 +33,8 @@ function Dashboard() {
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
+      // If token exists but user is missing, ensure we log out to avoid redirect loop
+      logout();
       navigate('/login');
     } else {
       setUser(currentUser);

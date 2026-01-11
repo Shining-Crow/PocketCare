@@ -1,91 +1,273 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
-import { Calendar, Clock, FileText, HeartPulse, User, Stethoscope } from "lucide-react";
+import { Calendar, FileText, CheckCircle } from "lucide-react";
 import Footer from "../components/Footer";
 
 export default function BookAppointment() {
     const { doctorId } = useParams();
     const navigate = useNavigate();
 
-    const [date, setDate] = useState("");
-    const [time, setTime] = useState("");
+    const [doctor, setDoctor] = useState(null);
+    const [selectedDate, setSelectedDate] = useState("");
+    const [selectedTime, setSelectedTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
+    const [loading, setLoading] = useState(true);
     const userId = JSON.parse(localStorage.getItem("user"))?.id || 1;
+
+    // Generate next 7 days with dates
+    const generateDates = () => {
+        const dates = [];
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            dates.push(date);
+        }
+        return dates;
+    };
+
+    const upcomingDates = generateDates();
+    const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    
+    // Get time slots from doctor's available_slots
+    const getTimeSlots = () => {
+        if (!doctor?.available_slots) return [];
+        try {
+            const slots = typeof doctor.available_slots === 'string' 
+                ? JSON.parse(doctor.available_slots) 
+                : doctor.available_slots;
+            return Array.isArray(slots) ? slots : [];
+        } catch (e) {
+            return [];
+        }
+    };
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchDoctor = async () => {
+            try {
+                const res = await api.get(`/doctors/${doctorId}`);
+                if (isMounted) {
+                    setDoctor(res.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch doctor", error);
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+        fetchDoctor();
+        return () => {
+            isMounted = false;
+        };
+    }, [doctorId]);
+
+    const handleDateClick = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        setSelectedDate(`${year}-${month}-${day}`);
+    };
+
+    const convert12to24Hours = (timeSlot) => {
+        // Convert "10:00-11:00" format to just "10:00:00" (start time)
+        if (timeSlot.includes('-')) {
+            const startTime = timeSlot.split('-')[0];
+            return `${startTime}:00`;
+        }
+        return timeSlot;
+    };
+
+    const format24to12Hours = (timeSlot) => {
+        // Convert "10:00-11:00" (24-hour) to "10:00 AM - 11:00 AM" (12-hour)
+        if (!timeSlot || !timeSlot.includes('-')) return timeSlot;
+        
+        const [startTime, endTime] = timeSlot.split('-');
+        const [startHour, startMin] = startTime.split(':');
+        const [endHour, endMin] = endTime.split(':');
+        
+        const convertTo12 = (hour, min) => {
+            const h = parseInt(hour, 10);
+            const period = h >= 12 ? 'PM' : 'AM';
+            const hour12 = h % 12 || 12;
+            return `${hour12}:${min} ${period}`;
+        };
+        
+        return `${convertTo12(startHour, startMin)} - ${convertTo12(endHour, endMin)}`;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Validation: Check if all fields are filled
+        if (!selectedDate || !selectedTime || !symptoms.trim()) {
+            alert("Please fill in all fields: Date, Time, and Symptoms");
+            return;
+        }
+
         try {
+            const convertedTime = convert12to24Hours(selectedTime);
             await api.post("/appointments", {
                 user_id: userId,
                 doctor_id: doctorId,
-                appointment_date: date,
-                appointment_time: time,
+                appointment_date: selectedDate,
+                appointment_time: convertedTime,
                 symptoms,
             });
 
-            alert("Appointment booked!");
+            alert("Appointment booked successfully!");
             navigate("/appointments");
         } catch (err) {
-            alert(err.response.data.error);
+            alert(err.response?.data?.error || "Failed to book appointment");
         }
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+                <p className="text-gray-600">Loading...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-100 flex flex-col">
-            <div className="flex-grow flex items-center justify-center py-12">
-                <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl p-8 border border-gray-100 relative overflow-hidden">
-                    <div className="absolute -top-8 -left-8 bg-blue-100 rounded-full w-32 h-32 opacity-20 z-0"></div>
-                    <div className="absolute -bottom-8 -right-8 bg-purple-100 rounded-full w-32 h-32 opacity-20 z-0"></div>
-                    <div className="relative z-10">
-                        <div className="flex items-center mb-6 space-x-3">
-                            <User className="w-8 h-8 text-blue-600 bg-blue-100 rounded-full p-1" />
-                            <Stethoscope className="w-8 h-8 text-green-600 bg-green-100 rounded-full p-1" />
-                            <HeartPulse className="w-8 h-8 text-purple-600 bg-purple-100 rounded-full p-1" />
-                            <h1 className="text-3xl font-bold text-blue-700 ml-2">Book Appointment</h1>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
+            <div className="flex-grow">
+                <div className="max-w-4xl mx-auto p-6">
+                    {/* Doctor Info Section */}
+                    <div className="flex gap-6 bg-white rounded-lg shadow-lg p-6 mb-8 border border-gray-400">
+                        {/* Doctor Image */}
+                        <div className="w-64 h-64 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0 overflow-hidden">
+                            {doctor?.image ? (
+                                <img 
+                                    src={doctor.image} 
+                                    alt={doctor.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <span className="text-7xl font-bold">{doctor?.name?.charAt(0)}</span>
+                            )}
                         </div>
+
+                        {/* Doctor Details */}
+                        <div className="flex-grow">
+                            <div className="flex items-center gap-2 mb-2">
+                                <h2 className="text-3xl font-bold text-gray-900">{doctor?.name}</h2>
+                                <CheckCircle className="w-6 h-6 text-blue-600" />
+                            </div>
+                            
+                            <p className="text-gray-600 mb-4">
+                                {doctor?.qualification} • {doctor?.experience} Years
+                            </p>
+
+                            <div className="space-y-2 mb-4">
+                                <p className="text-gray-700">
+                                    <span className="font-semibold">Email:</span> {doctor?.email || 'N/A'}
+                                </p>
+                                <p className="text-gray-700">
+                                    <span className="font-semibold">Phone:</span> {doctor?.phone || 'N/A'}
+                                </p>
+                                <p className="text-gray-700">
+                                    <span className="font-semibold">Rating:</span> ⭐ {doctor?.rating || 'N/A'}
+                                </p>
+                            </div>
+
+                            <div className="mb-4">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-2">About</h3>
+                                <p className="text-gray-600 text-sm leading-relaxed">
+                                    {doctor?.bio || "Dr. " + doctor?.name + " has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies."}
+                                </p>
+                            </div>
+
+                            <div className="text-lg font-semibold text-gray-900">
+                                Appointment fee: <span className="text-blue-600">৳{doctor?.consultation_fee || 500}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Booking Section */}
+                    <div className="bg-white p-8">
+                        <h3 className="text-2xl font-bold text-gray-900 mb-6">Booking slots</h3>
+
                         <form onSubmit={handleSubmit} className="space-y-6">
+                            {/* Date Selection */}
                             <div>
-                                <label className="flex items-center text-gray-700 font-semibold mb-2">
-                                    <Calendar className="w-5 h-5 mr-2 text-blue-500" /> Date
-                                </label>
-                                <input
-                                    type="date"
-                                    className="w-full p-3 border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                                    value={date}
-                                    onChange={(e) => setDate(e.target.value)}
-                                    required
-                                />
+                                <div className="flex gap-3 overflow-x-auto pb-2">
+                                    {upcomingDates.map((date, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => handleDateClick(date)}
+                                            className={`flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
+                                                selectedDate === `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                                                    ? 'bg-blue-600 text-white shadow-lg'
+                                                    : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
+                                            }`}
+                                        >
+                                            <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
+                                            <span className="text-lg">{date.getDate()}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
+
+                            {/* Time Selection */}
                             <div>
-                                <label className="flex items-center text-gray-700 font-semibold mb-2">
-                                    <Clock className="w-5 h-5 mr-2 text-purple-500" /> Time
-                                </label>
-                                <input
-                                    type="time"
-                                    className="w-full p-3 border-2 border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
-                                    value={time}
-                                    onChange={(e) => setTime(e.target.value)}
-                                    required
-                                />
+                                <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
+                                <div className="flex gap-3 flex-wrap">
+                                    {getTimeSlots().map((time) => (
+                                        <button
+                                            key={time}
+                                            type="button"
+                                            onClick={() => setSelectedTime(time)}
+                                            className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
+                                                selectedTime === time
+                                                    ? 'bg-blue-600 text-white border-blue-600'
+                                                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                            }`}
+                                        >
+                                            {format24to12Hours(time)}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
+
+                            {/* Symptoms Input */}
                             <div>
-                                <label className="flex items-center text-gray-700 font-semibold mb-2">
-                                    <FileText className="w-5 h-5 mr-2 text-green-500" /> Symptoms
+                                <label className="block text-gray-700 font-semibold mb-2">
+                                    <FileText className="inline w-5 h-5 mr-2 text-green-500" />
+                                    Describe Your Symptoms
                                 </label>
                                 <textarea
-                                    placeholder="Describe your symptoms"
-                                    className="w-full p-3 border-2 border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition min-h-[90px]"
+                                    placeholder="Please describe your symptoms in detail..."
+                                    className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition min-h-[100px] resize-none"
                                     value={symptoms}
                                     onChange={(e) => setSymptoms(e.target.value)}
                                 />
                             </div>
+
+                            {/* Validation Message */}
+                            {!selectedDate || !selectedTime || !symptoms.trim() ? (
+                                <p className="text-orange-600 text-sm font-medium">
+                                    Please select a date, time, and describe your symptoms to continue
+                                </p>
+                            ) : null}
+
+                            {/* Submit Button */}
                             <button
                                 type="submit"
-                                className="w-full bg-green-600 text-white p-3 rounded-lg font-semibold shadow-lg hover:bg-green-700 transition-all text-lg flex items-center justify-center gap-2"
+                                disabled={!selectedDate || !selectedTime || !symptoms.trim()}
+                                className={`w-full py-3 rounded-full font-bold text-white text-lg transition-all flex items-center justify-center gap-2 ${
+                                    selectedDate && selectedTime && symptoms.trim()
+                                        ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer shadow-lg'
+                                        : 'bg-gray-400 cursor-not-allowed opacity-60'
+                                }`}
                             >
-                                <HeartPulse className="w-5 h-5 text-white" /> Confirm Booking
+                                <Calendar className="w-5 h-5" />
+                                Book an appointment
                             </button>
                         </form>
                     </div>

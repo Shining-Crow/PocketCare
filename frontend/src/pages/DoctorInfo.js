@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
+import { Calendar, FileText, CheckCircle } from "lucide-react";
 import Footer from "../components/Footer";
 
 export default function DoctorInfo() {
@@ -11,10 +12,38 @@ export default function DoctorInfo() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    const [date, setDate] = useState("");
-    const [time, setTime] = useState("");
+    const [selectedDate, setSelectedDate] = useState("");
+    const [selectedTime, setSelectedTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
     const [booking, setBooking] = useState(false);
+
+    // Generate next 7 days with dates
+    const generateDates = () => {
+        const dates = [];
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            dates.push(date);
+        }
+        return dates;
+    };
+
+    const upcomingDates = generateDates();
+    const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    
+    // Get time slots from doctor's available_slots
+    const getTimeSlots = () => {
+        if (!doctor?.available_slots) return [];
+        try {
+            const slots = typeof doctor.available_slots === 'string' 
+                ? JSON.parse(doctor.available_slots) 
+                : doctor.available_slots;
+            return Array.isArray(slots) ? slots : [];
+        } catch (e) {
+            return [];
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -45,18 +74,53 @@ export default function DoctorInfo() {
         };
     }, [id]);
 
+    const handleDateClick = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        setSelectedDate(`${year}-${month}-${day}`);
+    };
+
+    const convert12to24Hours = (timeSlot) => {
+        // Convert "10:00-11:00" format to just "10:00:00" (start time)
+        if (timeSlot.includes('-')) {
+            const startTime = timeSlot.split('-')[0];
+            return `${startTime}:00`;
+        }
+        return timeSlot;
+    };
+
+    const format24to12Hours = (timeSlot) => {
+        // Convert "10:00-11:00" (24-hour) to "10:00 AM - 11:00 AM" (12-hour)
+        if (!timeSlot || !timeSlot.includes('-')) return timeSlot;
+        
+        const [startTime, endTime] = timeSlot.split('-');
+        const [startHour, startMin] = startTime.split(':');
+        const [endHour, endMin] = endTime.split(':');
+        
+        const convertTo12 = (hour, min) => {
+            const h = parseInt(hour, 10);
+            const period = h >= 12 ? 'PM' : 'AM';
+            const hour12 = h % 12 || 12;
+            return `${hour12}:${min} ${period}`;
+        };
+        
+        return `${convertTo12(startHour, startMin)} - ${convertTo12(endHour, endMin)}`;
+    };
+
     const bookAppointment = async () => {
-        if (!date || !time) {
-            alert("Please select a date and time.");
+        if (!selectedDate || !selectedTime || !symptoms.trim()) {
+            alert("Please fill in all fields: Date, Time, and Symptoms");
             return;
         }
 
         try {
             setBooking(true);
+            const convertedTime = convert12to24Hours(selectedTime);
             await api.post("/appointments", {
                 doctor_id: Number(id),
-                appointment_date: date,
-                appointment_time: time,
+                appointment_date: selectedDate,
+                appointment_time: convertedTime,
                 symptoms,
             });
             alert("Appointment booked successfully!");
@@ -70,98 +134,164 @@ export default function DoctorInfo() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-green-50 flex flex-col">
-            <div className="max-w-7xl mx-auto p-6 flex gap-6 flex-grow">
-                {loading ? (
-                    <div className="w-full bg-white rounded-xl shadow p-6">
-                        <p className="text-gray-600">Loading doctor profile...</p>
-                    </div>
-                ) : error ? (
-                    <div className="w-full bg-white rounded-xl shadow p-6">
-                        <p className="text-red-600 font-semibold mb-3">{error}</p>
-                        <button
-                            type="button"
-                            onClick={() => navigate("/appointments")}
-                            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
-                        >
-                            Back to Appointments
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        {/* LEFT — Doctor Info */}
-                        <div className="w-3/4 bg-white rounded-xl shadow p-6 h-[80vh] overflow-y-auto">
-                            <h1 className="text-3xl font-bold">{doctor?.name}</h1>
-                            <p className="text-gray-600">{doctor?.specialty}</p>
-
-                            <div className="mt-4 space-y-2">
-                                <p>
-                                    <b>Email:</b> {doctor?.email}
-                                </p>
-                                <p>
-                                    <b>Phone:</b> {doctor?.phone}
-                                </p>
-                                <p>
-                                    <b>Qualification:</b> {doctor?.qualification}
-                                </p>
-                                <p>
-                                    <b>Experience:</b> {doctor?.experience} years
-                                </p>
-                                <p>
-                                    <b>Rating:</b> ⭐ {doctor?.rating}
-                                </p>
-                                <p>
-                                    <b>Hospital ID:</b> {doctor?.hospital_id}
-                                </p>
-                                <p>
-                                    <b>Consultation Fee:</b> ৳{doctor?.consultation_fee}
-                                </p>
-                            </div>
-
-                            <div className="mt-6">
-                                <h2 className="text-xl font-semibold mb-2">About Doctor</h2>
-                                <p className="text-gray-700 whitespace-pre-line">{doctor?.bio}</p>
-                            </div>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
+            <div className="flex-grow">
+                <div className="max-w-4xl mx-auto p-6">
+                    {loading ? (
+                        <div className="bg-white rounded-lg shadow p-6 text-center">
+                            <p className="text-gray-600">Loading doctor profile...</p>
                         </div>
-
-                        {/* RIGHT — Appointment Booking (Sticky) */}
-                        <div className="w-1/4 bg-white rounded-xl shadow p-6 sticky top-6 h-fit">
-                            <h2 className="text-xl font-semibold mb-4 text-blue-700">
-                                Book Appointment
-                            </h2>
-
-                            <input
-                                type="date"
-                                value={date}
-                                className="w-full border-2 border-blue-200 bg-blue-50 p-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                                onChange={(e) => setDate(e.target.value)}
-                            />
-
-                            <input
-                                type="time"
-                                value={time}
-                                className="w-full border-2 border-purple-200 bg-purple-50 p-2 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
-                                onChange={(e) => setTime(e.target.value)}
-                            />
-
-                            <textarea
-                                placeholder="Symptoms"
-                                value={symptoms}
-                                className="w-full border-2 border-green-200 bg-green-50 p-2 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
-                                onChange={(e) => setSymptoms(e.target.value)}
-                            />
-
+                    ) : error ? (
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <p className="text-red-600 font-semibold mb-3">{error}</p>
                             <button
                                 type="button"
-                                onClick={bookAppointment}
-                                disabled={booking}
-                                className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all text-lg flex items-center justify-center gap-2"
+                                onClick={() => navigate("/appointments")}
+                                className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
                             >
-                                {booking ? "Booking..." : "Confirm Booking"}
+                                Back to Appointments
                             </button>
                         </div>
-                    </>
-                )}
+                    ) : (
+                        <>
+                            {/* Doctor Info Section */}
+                            <div className="flex gap-6 bg-white rounded-lg shadow-lg p-6 mb-8 border border-gray-400">
+                                {/* Doctor Image */}
+                                <div className="w-64 h-64 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0 overflow-hidden">
+                                    {doctor?.image ? (
+                                        <img 
+                                            src={doctor.image} 
+                                            alt={doctor.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-7xl font-bold">{doctor?.name?.charAt(0)}</span>
+                                    )}
+                                </div>
+
+                                {/* Doctor Details */}
+                                <div className="flex-grow">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <h2 className="text-3xl font-bold text-gray-900">{doctor?.name}</h2>
+                                        <CheckCircle className="w-6 h-6 text-blue-600" />
+                                    </div>
+                                    
+                                    <p className="text-gray-600 mb-4">
+                                        {doctor?.qualification} • {doctor?.experience} Years
+                                    </p>
+
+                                    <div className="space-y-2 mb-4">
+                                        <p className="text-gray-700">
+                                            <span className="font-semibold">Email:</span> {doctor?.email || 'N/A'}
+                                        </p>
+                                        <p className="text-gray-700">
+                                            <span className="font-semibold">Phone:</span> {doctor?.phone || 'N/A'}
+                                        </p>
+                                        <p className="text-gray-700">
+                                            <span className="font-semibold">Rating:</span> ⭐ {doctor?.rating || 'N/A'}
+                                        </p>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <h3 className="text-sm font-semibold text-gray-700 mb-2">About</h3>
+                                        <p className="text-gray-600 text-sm leading-relaxed">
+                                            {doctor?.bio || "Dr. " + doctor?.name + " has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies."}
+                                        </p>
+                                    </div>
+
+                                    <div className="text-lg font-semibold text-gray-900">
+                                        Appointment fee: <span className="text-blue-600">৳{doctor?.consultation_fee || 500}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Booking Section */}
+                            <div className="bg-white p-8">
+                                <h3 className="text-2xl font-bold text-gray-900 mb-6">Booking slots</h3>
+
+                                <div className="space-y-6">
+                                    {/* Date Selection */}
+                                    <div>
+                                        <div className="flex gap-3 overflow-x-auto pb-2">
+                                            {upcomingDates.map((date, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    type="button"
+                                                    onClick={() => handleDateClick(date)}
+                                                    className={`flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
+                                                        selectedDate === `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                                                            ? 'bg-blue-500 text-white shadow-lg'
+                                                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
+                                                    }`}
+                                                >
+                                                    <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
+                                                    <span className="text-lg">{date.getDate()}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Time Selection */}
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
+                                        <div className="flex gap-3 flex-wrap">
+                                            {getTimeSlots().map((time) => (
+                                                <button
+                                                    key={time}
+                                                    type="button"
+                                                    onClick={() => setSelectedTime(time)}
+                                                    className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
+                                                        selectedTime === time
+                                                            ? 'bg-blue-500 text-white border-blue-500'
+                                                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                                    }`}
+                                                >
+                                                    {format24to12Hours(time)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Symptoms Input */}
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">
+                                            <FileText className="inline w-5 h-5 mr-2 text-green-500" />
+                                            Describe Your Symptoms
+                                        </label>
+                                        <textarea
+                                            placeholder="Please describe your symptoms in detail..."
+                                            className="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition min-h-[100px] resize-none"
+                                            value={symptoms}
+                                            onChange={(e) => setSymptoms(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {/* Validation Message */}
+                                    {!selectedDate || !selectedTime || !symptoms.trim() ? (
+                                        <p className="text-orange-600 text-sm font-medium">
+                                            Please select a date, time, and describe your symptoms to continue
+                                        </p>
+                                    ) : null}
+
+                                    {/* Submit Button */}
+                                    <button
+                                        type="button"
+                                        onClick={bookAppointment}
+                                        disabled={!selectedDate || !selectedTime || !symptoms.trim() || booking}
+                                        className={`w-full py-3 rounded-full font-bold text-white text-lg transition-all flex items-center justify-center gap-2 ${
+                                            selectedDate && selectedTime && symptoms.trim()
+                                                ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer shadow-lg'
+                                                : 'bg-gray-400 cursor-not-allowed opacity-60'
+                                        }`}
+                                    >
+                                        <Calendar className="w-5 h-5" />
+                                        {booking ? "Booking..." : "Book an appointment"}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             <Footer />

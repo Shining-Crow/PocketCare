@@ -12,6 +12,7 @@ export default function Appointments() {
     const [feeRange, setFeeRange] = useState("");
 
     useEffect(() => {
+        let isMounted = true;
         const fetchDoctors = async () => {
             try {
                 const params = {};
@@ -28,12 +29,19 @@ export default function Appointments() {
                     params.max_fee = 10000;
                 }
                 const res = await api.get("/doctors", { params });
-                setDoctors(res.data);
+                if (isMounted) {
+                    setDoctors(res.data);
+                }
             } catch (error) {
-                console.error("Failed to fetch doctors", error);
+                if (isMounted) {
+                    console.error("Failed to fetch doctors", error);
+                }
             }
         };
         fetchDoctors();
+        return () => {
+            isMounted = false;
+        };
     }, [search, specialty, feeRange]);
 
     return (

@@ -1,15 +1,40 @@
 import { useEffect, useState } from "react";
 import api from "../utils/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DoctorCard from "../components/DoctorCard";
 import Footer from "../components/Footer";
 
 export default function Appointments() {
     const [doctors, setDoctors] = useState([]);
     const navigate = useNavigate();
+    const location = useLocation();
+    const [specialties, setSpecialties] = useState([]);
     const [search, setSearch] = useState("");
     const [specialty, setSpecialty] = useState("");
     const [feeRange, setFeeRange] = useState("");
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const sp = params.get("specialty");
+        if (sp) setSpecialty(sp);
+    }, [location.search]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchSpecialties = async () => {
+            try {
+                const res = await api.get('/specialties');
+                const list = Array.isArray(res.data?.specialties) ? res.data.specialties : [];
+                if (isMounted) setSpecialties(list);
+            } catch {
+                if (isMounted) setSpecialties([]);
+            }
+        };
+        fetchSpecialties();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -65,10 +90,27 @@ export default function Appointments() {
                             className="border p-2 rounded"
                         >
                             <option value="">All Specialties</option>
-                            <option value="Cardiology">Cardiology</option>
-                            <option value="Neurology">Neurology</option>
-                            <option value="Orthopedic">Orthopedic</option>
-                            <option value="Dermatology">Dermatology</option>
+                            {specialties.length ? (
+                                specialties
+                                    .filter((s) => (s?.name || '').toLowerCase() !== 'other')
+                                    .map((s) => (
+                                        <option key={s.id} value={s.name}>
+                                            {s.name}
+                                        </option>
+                                    ))
+                            ) : (
+                                <>
+                                    <option value="General Practice">General Practice</option>
+                                    <option value="Cardiology">Cardiology</option>
+                                    <option value="Dermatology">Dermatology</option>
+                                    <option value="Neurology">Neurology</option>
+                                    <option value="Orthopedics">Orthopedics</option>
+                                    <option value="Pediatrics">Pediatrics</option>
+                                    <option value="Oncology">Oncology</option>
+                                    <option value="Ophthalmology">Ophthalmology</option>
+                                    <option value="Dentistry">Dentistry</option>
+                                </>
+                            )}
                         </select>
                         {/* Fee */}
                         <select

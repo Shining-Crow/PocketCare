@@ -79,7 +79,7 @@ def register_doctor():
         data = request.get_json()
 
         # Required fields
-        required = ['name', 'email', 'password', 'specialty']
+        required = ['name', 'email', 'password']
         is_valid, error = validate_required_fields(data, required)
         if not is_valid:
             return jsonify({'error': error}), 400
@@ -87,13 +87,69 @@ def register_doctor():
         email = data.get('email').lower().strip()
         password = data.get('password')
         name = data.get('name').strip()
-        specialty = data.get('specialty').strip()
+        specialty = (data.get('specialty') or '').strip()
+        specialty_other = (data.get('specialty_other') or '').strip()
+        specialty_id = data.get('specialty_id')
         qualification = data.get('qualification', '').strip()
         experience = int(data.get('experience') or 0)
         hospital_id = int(data.get('hospital_id') or 0)
         consultation_fee = float(data.get('consultation_fee') or 0.0)
         phone = data.get('phone', '').strip()
         bio = data.get('bio', '').strip()
+
+        # Resolve specialty (predefined dropdown + Other)
+        resolved_specialty = None
+        resolved_specialty_id = None
+
+        if specialty_id is not None and str(specialty_id).strip() != '':
+            try:
+                resolved_specialty_id = int(specialty_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'specialty_id must be an integer'}), 400
+
+            row = execute_query(
+                'SELECT id, name FROM specialties WHERE id = %s',
+                (resolved_specialty_id,),
+                fetch_one=True,
+            )
+            if not row:
+                return jsonify({'error': 'Invalid specialty_id'}), 400
+
+            if (row.get('name') or '').lower() == 'other':
+                if not (specialty_other or specialty):
+                    return jsonify({'error': 'Please provide specialty_other when selecting Other'}), 400
+                resolved_specialty = specialty_other or specialty
+            else:
+                resolved_specialty = row.get('name')
+
+        else:
+            # Backward compatible: accept a specialty string.
+            if not specialty:
+                return jsonify({'error': 'Missing required fields: specialty or specialty_id'}), 400
+
+            # If it matches a predefined specialty, canonicalize it and store specialty_id.
+            match = execute_query(
+                'SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1',
+                (specialty,),
+                fetch_one=True,
+            )
+            if match:
+                resolved_specialty_id = match.get('id')
+                if (match.get('name') or '').lower() == 'other':
+                    resolved_specialty = specialty_other or specialty
+                else:
+                    resolved_specialty = match.get('name')
+            else:
+                # Treat unknown as Other
+                other_row = execute_query(
+                    'SELECT id, name FROM specialties WHERE LOWER(name) = "other" LIMIT 1',
+                    fetch_one=True,
+                )
+                resolved_specialty_id = other_row.get('id') if other_row else None
+                resolved_specialty = specialty_other or specialty
+
+        if not resolved_specialty:
+            return jsonify({'error': 'Specialty is required'}), 400
 
         # Validate email and password
         is_valid, error = validate_email_format(email)
@@ -115,12 +171,12 @@ def register_doctor():
 
         # Insert into DB
         insert_query = """
-        INSERT INTO doctors (name, email, password_hash, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, qualification, experience, hospital_id, consultation_fee, bio, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """
         doctor_id = execute_query(
             insert_query,
-            (name, email, hashed_password, phone, specialty, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
+            (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
             commit=True
         )
 
@@ -133,7 +189,7 @@ def register_doctor():
                 'id': doctor_id,
                 'email': email,
                 'name': name,
-                'specialty': specialty,
+                'specialty': resolved_specialty,
                 'role': 'doctor'
             },
             'access_token': access_token

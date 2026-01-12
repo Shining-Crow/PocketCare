@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 
 
 -- ============================================================================
+-- TABLE: specialties
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS specialties (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_specialties_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
 -- TABLE: doctors
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS doctors (
@@ -35,6 +45,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     specialty VARCHAR(100) NOT NULL,
+    specialty_id INT NULL,
     qualification VARCHAR(255),
     experience INT COMMENT 'Years of experience',
     rating DECIMAL(2,1) DEFAULT 0.0,
@@ -45,7 +56,9 @@ CREATE TABLE IF NOT EXISTS doctors (
     bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_specialty (specialty),
+    INDEX idx_specialty_id (specialty_id),
     INDEX idx_hospital (hospital_id)
+    CONSTRAINT fk_doctors_specialty_id FOREIGN KEY (specialty_id) REFERENCES specialties(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================

@@ -10,10 +10,94 @@ def fix_database():
     Safe to run multiple times.
     - Ensures doctors.password_hash exists
     - Ensures consultation chat tables exist (consultation_threads, consultation_messages)
+    - Ensures specialties table exists and doctors.specialty_id exists
     """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # --- Specialties lookup table (and doctors.specialty_id) ---
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS specialties (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_specialties_name (name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
+        conn.commit()
+
+        # Ensure "Other" exists for custom specialties
+        cursor.execute("INSERT INTO specialties (name) VALUES (%s) ON DUPLICATE KEY UPDATE name=VALUES(name)", ("Other",))
+        conn.commit()
+
+        # Ensure doctors.specialty_id exists
+        cursor.execute(
+            """
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='doctors' AND COLUMN_NAME='specialty_id'
+            """
+        )
+        if cursor.fetchone():
+            print("✓ specialty_id column already exists in doctors table")
+        else:
+            print("Adding specialty_id column to doctors table...")
+            cursor.execute("ALTER TABLE doctors ADD COLUMN specialty_id INT NULL")
+            conn.commit()
+            print("✓ specialty_id column added successfully")
+
+        # Backfill doctors.specialty_id from doctors.specialty (best effort)
+        try:
+            cursor.execute(
+                """
+                UPDATE doctors d
+                JOIN specialties s ON LOWER(TRIM(d.specialty)) = LOWER(TRIM(s.name))
+                SET d.specialty_id = s.id
+                WHERE d.specialty_id IS NULL AND d.specialty IS NOT NULL AND d.specialty <> ''
+                """
+            )
+            conn.commit()
+        except Exception:
+            # Non-fatal; continue.
+            pass
+
+        # Ensure index exists (ignore failures)
+        try:
+            cursor.execute("CREATE INDEX idx_specialty_id ON doctors(specialty_id)")
+            conn.commit()
+        except Exception:
+            pass
+
+        # Ensure FK exists (ignore failures if existing data prevents constraint)
+        try:
+            cursor.execute(
+                """
+                SELECT CONSTRAINT_NAME
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'doctors'
+                  AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                  AND CONSTRAINT_NAME = 'fk_doctors_specialty_id'
+                """
+            )
+            if cursor.fetchone():
+                print("✓ fk_doctors_specialty_id already exists")
+            else:
+                cursor.execute(
+                    """
+                    ALTER TABLE doctors
+                    ADD CONSTRAINT fk_doctors_specialty_id
+                    FOREIGN KEY (specialty_id) REFERENCES specialties(id)
+                    ON DELETE SET NULL
+                    """
+                )
+                conn.commit()
+                print("✓ fk_doctors_specialty_id added")
+        except Exception:
+            # Constraint is a nice-to-have; app can still function without it.
+            pass
         
         # Check if password_hash column exists
         cursor.execute("""

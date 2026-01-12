@@ -9,6 +9,38 @@ USE pocketcare_db;
 DELETE FROM doctors;
 DELETE FROM hospitals;
 
+-- ============================================================================
+-- SEED: specialties (idempotent)
+-- ============================================================================
+INSERT INTO specialties (name) VALUES
+('General Practice'),
+('Internal Medicine'),
+('Pediatrics'),
+('Gynecology'),
+('Dermatology'),
+('ENT'),
+('Ophthalmology'),
+('Dentistry'),
+('Cardiology'),
+('Neurology'),
+('Psychiatry'),
+('Pulmonology'),
+('Gastroenterology'),
+('Endocrinology'),
+('Nephrology'),
+('Urology'),
+('Orthopedics'),
+('Rheumatology'),
+('Oncology'),
+('Hematology'),
+('Infectious Disease'),
+('General Surgery'),
+('Emergency Medicine'),
+('Physiotherapy'),
+('Nutrition'),
+('Other')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
 -- Ensure password_hash column exists in doctors table (if it doesn't already)
 SET @dbname = DATABASE();
 SET @tablename = "doctors";
@@ -54,7 +86,12 @@ INSERT INTO doctors (name, email, password_hash, phone, specialty, qualification
 -- ============================================================================
 -- NOTE: Password hashes are bcrypt hashes for admin password: admin123
 INSERT INTO admins (email, password_hash, name, role, is_active) VALUES
-('admin@pocketcare.com', '$2b$12$4jHUCWRU1CGkWN1Yholv/ufx1setSeZJv.HcRfXYhY1P.0BoZhvcm', 'Admin User', 'admin', TRUE);
+('admin@pocketcare.com', '$2b$12$4jHUCWRU1CGkWN1Yholv/ufx1setSeZJv.HcRfXYhY1P.0BoZhvcm', 'Admin User', 'admin', TRUE)
+ON DUPLICATE KEY UPDATE
+password_hash = VALUES(password_hash),
+name = VALUES(name),
+role = VALUES(role),
+is_active = VALUES(is_active);
 
 -- ============================================================================
 -- Note: User accounts should be created through the registration API

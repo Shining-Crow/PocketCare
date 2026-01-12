@@ -325,7 +325,11 @@ function Dashboard() {
                 <p className="text-gray-600 mb-6">
                   Get instant insights about your symptoms with our advanced AI
                 </p>
-                <button className="w-full bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => navigate("/symptom-checker")}
+                  className="w-full bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-lg"
+                >
                   Start Analysis →
                 </button>
               </div>
@@ -351,7 +355,11 @@ function Dashboard() {
                   Search and book appointments with verified healthcare
                   professionals
                 </p>
-                <button className="w-full bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => navigate("/appointments")}
+                  className="w-full bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg"
+                >
                   Browse Now →
                 </button>
               </div>

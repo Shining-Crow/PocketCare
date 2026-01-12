@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../utils/api'; 
 
 const DoctorRegister = () => {
     const navigate = useNavigate();
+    const [specialties, setSpecialties] = useState([]);
+    const [selectedSpecialtyId, setSelectedSpecialtyId] = useState('');
+    const [specialtyOther, setSpecialtyOther] = useState('');
+
+    const otherSpecialtyId = useMemo(() => {
+        const other = specialties.find((s) => (s?.name || '').toLowerCase() === 'other');
+        return other ? String(other.id) : '';
+    }, [specialties]);
+
+    const showOtherInput = selectedSpecialtyId && otherSpecialtyId && selectedSpecialtyId === otherSpecialtyId;
+
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -15,6 +26,26 @@ const DoctorRegister = () => {
         consultation_fee: '',
         bio: '',
     });
+        useEffect(() => {
+            const fetchSpecialties = async () => {
+                try {
+                    const res = await api.get('/specialties');
+                    const list = Array.isArray(res.data?.specialties) ? res.data.specialties : [];
+                    setSpecialties(list);
+
+                    // Default select the first item if available
+                    if (list.length && !selectedSpecialtyId) {
+                        setSelectedSpecialtyId(String(list[0].id));
+                    }
+                } catch {
+                    // If specialties API fails, fallback to old free-text input behavior.
+                    setSpecialties([]);
+                }
+            };
+            fetchSpecialties();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, []);
+
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -28,7 +59,21 @@ const DoctorRegister = () => {
         setLoading(true);
 
         try {
-            const response = await api.post('/auth/doctor/register', formData);
+            const payload = { ...formData };
+
+            if (specialties.length && selectedSpecialtyId) {
+                payload.specialty_id = Number(selectedSpecialtyId);
+                if (showOtherInput) {
+                    payload.specialty_other = specialtyOther;
+                    // keep specialty for backward compatibility
+                    payload.specialty = specialtyOther;
+                } else {
+                    const selected = specialties.find((s) => String(s.id) === String(selectedSpecialtyId));
+                    payload.specialty = selected?.name || payload.specialty;
+                }
+            }
+
+            const response = await api.post('/auth/doctor/register', payload);
             if (response.data.access_token) {
                 localStorage.setItem('token', response.data.access_token);
                 localStorage.setItem('doctor', JSON.stringify(response.data.doctor));
@@ -131,16 +176,48 @@ const DoctorRegister = () => {
                             <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">
                                 Specialty
                             </label>
-                            <input
-                                id="specialty"
-                                name="specialty"
-                                type="text"
-                                required
-                                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                placeholder="Cardiology"
-                                value={formData.specialty}
-                                onChange={handleChange}
-                            />
+                            {specialties.length ? (
+                                <>
+                                    <select
+                                        id="specialty"
+                                        name="specialty"
+                                        required
+                                        className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                        value={selectedSpecialtyId}
+                                        onChange={(e) => {
+                                            setSelectedSpecialtyId(e.target.value);
+                                            setSpecialtyOther('');
+                                        }}
+                                    >
+                                        {specialties.map((s) => (
+                                            <option key={s.id} value={String(s.id)}>
+                                                {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {showOtherInput && (
+                                        <input
+                                            className="mt-2 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                            placeholder="Type your specialty (e.g., Allergy & Immunology)"
+                                            value={specialtyOther}
+                                            onChange={(e) => setSpecialtyOther(e.target.value)}
+                                            required
+                                        />
+                                    )}
+                                </>
+                            ) : (
+                                <input
+                                    id="specialty"
+                                    name="specialty"
+                                    type="text"
+                                    required
+                                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                    placeholder="Cardiology"
+                                    value={formData.specialty}
+                                    onChange={handleChange}
+                                />
+                            )}
                         </div>
 
                         <div>

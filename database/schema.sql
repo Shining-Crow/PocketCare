@@ -174,6 +174,39 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- =========================================================================
+-- TABLE: consultation_threads (doctor-user chats, per appointment)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS consultation_threads (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    appointment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    doctor_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_consultation_threads_appointment (appointment_id),
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE CASCADE,
+    INDEX idx_consultation_threads_user (user_id),
+    INDEX idx_consultation_threads_doctor (doctor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- TABLE: consultation_messages
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS consultation_messages (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    thread_id INT NOT NULL,
+    sender_role ENUM('user', 'doctor') NOT NULL,
+    sender_id INT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (thread_id) REFERENCES consultation_threads(id) ON DELETE CASCADE,
+    INDEX idx_consultation_messages_thread (thread_id),
+    INDEX idx_consultation_messages_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ============================================================================
 -- TABLE: admins
 -- ============================================================================

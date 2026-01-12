@@ -17,9 +17,13 @@ def jwt_required_custom(fn):
     """Custom JWT required decorator with error handling"""
     @wraps(fn)
     def wrapper(*args, **kwargs):
+        # Only treat JWT verification errors as 401.
+        # Do NOT swallow application errors (e.g., database/table missing), otherwise
+        # real server bugs look like auth failures and cause redirect loops.
         try:
             verify_jwt_in_request()
-            return fn(*args, **kwargs)
         except Exception as e:
-            return jsonify({'error': 'Invalid or expired token'}), 401
+            return jsonify({'error': 'Invalid or expired token', 'message': str(e)}), 401
+
+        return fn(*args, **kwargs)
     return wrapper

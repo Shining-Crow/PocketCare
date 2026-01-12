@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
+import ConsultationChatPanel from "../components/ConsultationChatPanel";
 import {
   User,
   Calendar,
-  MessageSquare,
   Star,
   Award,
   Clock,
@@ -16,9 +16,6 @@ import {
   CheckCircle,
   Users,
   TrendingUp,
-  Send,
-  Search,
-  MoreVertical,
 } from "lucide-react";
 
 function DoctorDashboard() {
@@ -27,8 +24,6 @@ function DoctorDashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [activeTab, setActiveTab] = useState("overview");
-  const [selectedChat, setSelectedChat] = useState(null);
-  const [chatMessage, setChatMessage] = useState("");
   const [stats, setStats] = useState({
     total_appointments: 0,
     completed_appointments: 0,
@@ -43,82 +38,6 @@ function DoctorDashboard() {
     { day: "Wednesday", slots: ["09:00-12:00"] },
     { day: "Thursday", slots: ["09:00-12:00", "14:00-17:00"] },
     { day: "Friday", slots: ["09:00-12:00", "14:00-16:00"] },
-  ]);
-
-  const [patients] = useState([
-    {
-      id: 1,
-      name: "John Smith",
-      lastMessage: "Thank you doctor!",
-      time: "2m ago",
-      unread: 2,
-      online: true,
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      lastMessage: "When should I take the medicine?",
-      time: "15m ago",
-      unread: 0,
-      online: true,
-    },
-    {
-      id: 3,
-      name: "Mike Brown",
-      lastMessage: "Appointment confirmed",
-      time: "1h ago",
-      unread: 0,
-      online: false,
-    },
-    {
-      id: 4,
-      name: "Emily Davis",
-      lastMessage: "Can we reschedule?",
-      time: "2h ago",
-      unread: 1,
-      online: false,
-    },
-    {
-      id: 5,
-      name: "Robert Wilson",
-      lastMessage: "Test results received",
-      time: "3h ago",
-      unread: 0,
-      online: false,
-    },
-  ]);
-
-  const [chatHistory] = useState([
-    {
-      id: 1,
-      sender: "patient",
-      message: "Hello Dr., I have a question about my medication",
-      time: "10:30 AM",
-    },
-    {
-      id: 2,
-      sender: "doctor",
-      message: "Hello! Of course, how can I help you?",
-      time: "10:32 AM",
-    },
-    {
-      id: 3,
-      sender: "patient",
-      message: "Should I take it before or after meals?",
-      time: "10:33 AM",
-    },
-    {
-      id: 4,
-      sender: "doctor",
-      message: "Take it after meals, twice daily. Morning and evening.",
-      time: "10:35 AM",
-    },
-    {
-      id: 5,
-      sender: "patient",
-      message: "Thank you doctor!",
-      time: "10:36 AM",
-    },
   ]);
 
   useEffect(() => {
@@ -201,7 +120,6 @@ function DoctorDashboard() {
     fetchDoctorData();
   }, [navigate]);
 
-
   const handleEditChange = (e) => {
     setEditForm({
       ...editForm,
@@ -259,14 +177,6 @@ function DoctorDashboard() {
       bio: doctor.bio || "",
     });
     setIsEditing(false);
-  };
-
-  const handleSendMessage = () => {
-    if (chatMessage.trim()) {
-      // TODO: Send message via API
-      console.log("Sending message:", chatMessage);
-      setChatMessage("");
-    }
   };
 
   const addTimeSlot = (day) => {
@@ -347,13 +257,6 @@ function DoctorDashboard() {
             }`}
           >
             Patient Chat
-            {patients.filter((p) => p.unread > 0).length > 0 && (
-              <span className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {patients
-                  .filter((p) => p.unread > 0)
-                  .reduce((sum, p) => sum + p.unread, 0)}
-              </span>
-            )}
           </button>
         </div>
 
@@ -784,165 +687,8 @@ function DoctorDashboard() {
 
         {/* Chat Tab */}
         {activeTab === "chat" && (
-          <div className="grid lg:grid-cols-3 gap-6 h-[calc(100vh-300px)]">
-            {/* Patient List */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search patients..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="overflow-y-auto h-full">
-                {patients.map((patient) => (
-                  <div
-                    key={patient.id}
-                    onClick={() => setSelectedChat(patient)}
-                    className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition ${
-                      selectedChat?.id === patient.id ? "bg-blue-50" : ""
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="relative">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                          {patient.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </div>
-                        {patient.online && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-1">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {patient.name}
-                          </p>
-                          {patient.unread > 0 && (
-                            <span className="w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
-                              {patient.unread}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 truncate">
-                          {patient.lastMessage}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {patient.time}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Chat Window */}
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col">
-              {selectedChat ? (
-                <>
-                  {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-200 bg-gray-50">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-3">
-                        <div className="relative">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                            {selectedChat.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </div>
-                          {selectedChat.online && (
-                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {selectedChat.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {selectedChat.online ? "Online" : "Offline"}
-                          </p>
-                        </div>
-                      </div>
-                      <button className="p-2 hover:bg-gray-200 rounded-lg transition">
-                        <MoreVertical className="w-5 h-5 text-gray-600" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Chat Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {chatHistory.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex ${
-                          msg.sender === "doctor"
-                            ? "justify-end"
-                            : "justify-start"
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[70%] ${
-                            msg.sender === "doctor"
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-200 text-gray-900"
-                          } rounded-lg p-3`}
-                        >
-                          <p className="text-sm">{msg.message}</p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              msg.sender === "doctor"
-                                ? "text-blue-100"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {msg.time}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Chat Input */}
-                  <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={chatMessage}
-                        onChange={(e) => setChatMessage(e.target.value)}
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && handleSendMessage()
-                        }
-                        placeholder="Type your message..."
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center space-x-2"
-                      >
-                        <Send className="w-4 h-4" />
-                        <span>Send</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
-                  <div className="text-center">
-                    <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">
-                      Select a patient to start chatting
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="h-[calc(100vh-300px)]">
+            <ConsultationChatPanel role="doctor" className="h-full" />
           </div>
         )}
       </div>

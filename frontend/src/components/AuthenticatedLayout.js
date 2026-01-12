@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import DoctorNavbar from "./DoctorNavbar";
 import UserNavbar from "./UserNavbar";
@@ -10,6 +10,12 @@ function AuthenticatedLayout() {
   const user = getCurrentUser();
   const isDoctor = user?.role === "doctor";
 
+  useEffect(() => {
+    // React Router doesn't reset scroll by default.
+    // This prevents landing on the dashboard slightly scrolled down after login/navigation.
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
+
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -19,11 +25,7 @@ function AuthenticatedLayout() {
 
   return (
     <div className="min-h-screen">
-      {isDoctor ? (
-        <DoctorNavbar handleLogout={handleLogout} />
-      ) : (
-        <UserNavbar />
-      )}
+      {isDoctor ? <DoctorNavbar handleLogout={handleLogout} /> : <UserNavbar />}
 
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">

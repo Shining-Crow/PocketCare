@@ -1,21 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout } from '../utils/auth';
-import { 
-  HeartPulse, 
-  AlertCircle, 
-  Activity, 
-  Hospital, 
-  Calendar, 
-  User, 
-  FileText, 
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getCurrentUser, logout } from "../utils/auth";
+import ConsultationChatPanel from "../components/ConsultationChatPanel";
+import {
+  HeartPulse,
+  AlertCircle,
+  Activity,
+  Hospital,
+  Calendar,
+  User,
+  FileText,
   MessageSquare,
   TrendingUp,
   Clock,
   Award,
   Zap,
-  AlertTriangle
-} from 'lucide-react';
+  AlertTriangle,
+} from "lucide-react";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -25,17 +26,17 @@ function Dashboard() {
   const [stats, setStats] = useState({
     appointments: 0,
     reports: 0,
-    streak: 0
+    streak: 0,
   });
   const [selectedEmergency, setSelectedEmergency] = useState(null);
-  const [emergencyNote, setEmergencyNote] = useState('');
+  const [emergencyNote, setEmergencyNote] = useState("");
 
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       // If token exists but user is missing, ensure we log out to avoid redirect loop
       logout();
-      navigate('/login');
+      navigate("/login");
     } else {
       setUser(currentUser);
       // Animate stats on load
@@ -46,7 +47,7 @@ function Dashboard() {
   }, [navigate]);
 
   const handleSOSActivate = useCallback(() => {
-    const typeLabel = selectedEmergency || 'general-emergency';
+    const typeLabel = selectedEmergency || "general-emergency";
     // TODO: replace alert with real API call using typeLabel and emergencyNote
     alert(`🚨 SOS Activated (${typeLabel})! Contacting emergency services...`);
     setSosHolding(false);
@@ -77,7 +78,6 @@ function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
         {/* Welcome Section with Stats */}
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           {/* Welcome Card */}
@@ -86,7 +86,9 @@ function Dashboard() {
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <p className="text-blue-600 text-sm mb-2">Welcome back 👋</p>
-                  <h1 className="text-4xl font-bold text-gray-900 mb-2">{user.name}</h1>
+                  <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                    {user.name}
+                  </h1>
                   <p className="text-gray-500">{user.email}</p>
                 </div>
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-md">
@@ -99,7 +101,9 @@ function Dashboard() {
                     <Calendar className="w-5 h-5 text-blue-600" />
                     <TrendingUp className="w-4 h-4 text-green-500" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.appointments}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.appointments}
+                  </p>
                   <p className="text-xs text-gray-500">Appointments</p>
                 </div>
                 <div className="bg-cyan-50 rounded-xl p-4 border border-cyan-100">
@@ -107,7 +111,9 @@ function Dashboard() {
                     <FileText className="w-5 h-5 text-cyan-600" />
                     <TrendingUp className="w-4 h-4 text-green-500" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.reports}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.reports}
+                  </p>
                   <p className="text-xs text-gray-500">Reports</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
@@ -115,7 +121,9 @@ function Dashboard() {
                     <Award className="w-5 h-5 text-amber-500" />
                     <Zap className="w-4 h-4 text-amber-500" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.streak}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {stats.streak}
+                  </p>
                   <p className="text-xs text-gray-500">Day Streak</p>
                 </div>
               </div>
@@ -128,20 +136,33 @@ function Dashboard() {
               <p className="text-green-600 text-sm mb-4">Health Score</p>
               <div className="relative w-32 h-32 mx-auto mb-4">
                 <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="64" cy="64" r="56" stroke="rgba(15,23,42,0.08)" strokeWidth="12" fill="none" />
-                  <circle 
-                    cx="64" 
-                    cy="64" 
-                    r="56" 
-                    stroke="url(#gradient)" 
-                    strokeWidth="12" 
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="rgba(15,23,42,0.08)"
+                    strokeWidth="12"
+                    fill="none"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="url(#gradient)"
+                    strokeWidth="12"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 56}`}
                     strokeDashoffset={`${2 * Math.PI * 56 * 0.15}`}
                     className="transition-all duration-1000"
                   />
                   <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient
+                      id="gradient"
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="100%"
+                    >
                       <stop offset="0%" stopColor="#10b981" />
                       <stop offset="100%" stopColor="#059669" />
                     </linearGradient>
@@ -157,8 +178,8 @@ function Dashboard() {
         </div>
 
         {/* Enhanced SOS Card */}
-        <div className="mb-10">
-          <div className="max-w-xl mx-auto bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
+        <div className="mb-10 grid lg:grid-cols-2 gap-6 items-start">
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-6 text-center">
               Emergency SOS
             </h2>
@@ -187,7 +208,9 @@ function Dashboard() {
                     strokeWidth="10"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 88}`}
-                    strokeDashoffset={`${2 * Math.PI * 88 * (1 - sosProgress / 100)}`}
+                    strokeDashoffset={`${
+                      2 * Math.PI * 88 * (1 - sosProgress / 100)
+                    }`}
                     className="transition-all duration-100"
                     strokeLinecap="round"
                   />
@@ -202,10 +225,10 @@ function Dashboard() {
                   onTouchStart={() => setSosHolding(true)}
                   onTouchEnd={() => setSosHolding(false)}
                   className="relative w-36 h-36 rounded-full bg-white shadow-md border border-gray-200 flex flex-col items-center justify-center transition-transform duration-150"
-                  style={{ transform: sosHolding ? 'scale(0.96)' : 'scale(1)' }}
+                  style={{ transform: sosHolding ? "scale(0.96)" : "scale(1)" }}
                 >
                   <span className="text-2xl font-semibold tracking-wide text-gray-900">
-                    {sosHolding ? `${Math.floor(sosProgress)}%` : 'HOLD'}
+                    {sosHolding ? `${Math.floor(sosProgress)}%` : "HOLD"}
                   </span>
                   <span className="mt-1 text-[11px] uppercase tracking-[0.25em] text-gray-500">
                     Panic Mode
@@ -215,8 +238,8 @@ function Dashboard() {
 
               <p className="mt-5 text-xs text-gray-500 text-center">
                 {sosHolding
-                  ? 'Keep holding to confirm SOS. Release to cancel.'
-                  : 'Press and hold for 1 second to send an emergency alert.'}
+                  ? "Keep holding to confirm SOS. Release to cancel."
+                  : "Press and hold for 1 second to send an emergency alert."}
               </p>
             </div>
 
@@ -227,12 +250,16 @@ function Dashboard() {
               </h3>
               <div className="grid grid-cols-3 gap-3 text-xs">
                 {[
-                  { id: 'chest-pain', label: 'Chest Pain', icon: HeartPulse },
-                  { id: 'breathing', label: 'Breathing Issue', icon: Activity },
-                  { id: 'bleeding', label: 'Heavy Bleeding', icon: AlertTriangle },
-                  { id: 'unconscious', label: 'Unconscious', icon: User },
-                  { id: 'seizure', label: 'Seizure', icon: Zap },
-                  { id: 'other', label: 'Other Medical', icon: AlertCircle },
+                  { id: "chest-pain", label: "Chest Pain", icon: HeartPulse },
+                  { id: "breathing", label: "Breathing Issue", icon: Activity },
+                  {
+                    id: "bleeding",
+                    label: "Heavy Bleeding",
+                    icon: AlertTriangle,
+                  },
+                  { id: "unconscious", label: "Unconscious", icon: User },
+                  { id: "seizure", label: "Seizure", icon: Zap },
+                  { id: "other", label: "Other Medical", icon: AlertCircle },
                 ].map((type) => {
                   const active = selectedEmergency === type.id;
                   return (
@@ -244,8 +271,8 @@ function Dashboard() {
                       }
                       className={`flex items-center justify-center gap-1 rounded-xl border px-2 py-2 transition text-[11px] ${
                         active
-                          ? 'border-red-500 bg-red-50 text-red-600'
-                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
+                          ? "border-red-500 bg-red-50 text-red-600"
+                          : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
                       }`}
                     >
                       <type.icon className="w-3.5 h-3.5" />
@@ -267,6 +294,9 @@ function Dashboard() {
               />
             </div>
           </div>
+
+          {/* Chat panel beside SOS */}
+          <ConsultationChatPanel role="user" />
         </div>
 
         {/* Quick Actions with 3D Effect */}
@@ -284,11 +314,17 @@ function Dashboard() {
                     <Activity className="w-8 h-8 text-orange-600" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">Symptom Checker</h3>
-                    <p className="text-orange-600 text-sm font-medium">AI-Powered Analysis</p>
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      Symptom Checker
+                    </h3>
+                    <p className="text-orange-600 text-sm font-medium">
+                      AI-Powered Analysis
+                    </p>
                   </div>
                 </div>
-                <p className="text-gray-600 mb-6">Get instant insights about your symptoms with our advanced AI</p>
+                <p className="text-gray-600 mb-6">
+                  Get instant insights about your symptoms with our advanced AI
+                </p>
                 <button className="w-full bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-lg">
                   Start Analysis →
                 </button>
@@ -303,11 +339,18 @@ function Dashboard() {
                     <Hospital className="w-8 h-8 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">Find Doctors</h3>
-                    <p className="text-blue-600 text-sm font-medium">500+ Specialists</p>
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      Find Doctors
+                    </h3>
+                    <p className="text-blue-600 text-sm font-medium">
+                      500+ Specialists
+                    </p>
                   </div>
                 </div>
-                <p className="text-gray-600 mb-6">Search and book appointments with verified healthcare professionals</p>
+                <p className="text-gray-600 mb-6">
+                  Search and book appointments with verified healthcare
+                  professionals
+                </p>
                 <button className="w-full bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg">
                   Browse Now →
                 </button>
@@ -318,25 +361,61 @@ function Dashboard() {
 
         {/* Healthcare Services Grid */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Healthcare Services</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            Healthcare Services
+          </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Calendar, title: 'Appointments', desc: 'Manage bookings', color: 'from-green-400 to-emerald-500', bg: 'bg-green-500/10', onClick: () => navigate('/appointments') },
-              { icon: FileText, title: 'Medical Reports', desc: 'Upload & analyze', color: 'from-blue-400 to-cyan-500', bg: 'bg-blue-500/10', onClick: () => {} },
-              { icon: MessageSquare, title: 'Health Chat', desc: '24/7 AI assistant', color: 'from-cyan-400 to-teal-500', bg: 'bg-cyan-500/10', onClick: () => navigate('/health-chat') },
-              { icon: User, title: 'My Profile', desc: 'Health information', color: 'from-indigo-400 to-blue-500', bg: 'bg-indigo-500/10', onClick: () => {} },
+              {
+                icon: Calendar,
+                title: "Appointments",
+                desc: "Manage bookings",
+                color: "from-green-400 to-emerald-500",
+                bg: "bg-green-500/10",
+                onClick: () => navigate("/appointments"),
+              },
+              {
+                icon: FileText,
+                title: "Medical Reports",
+                desc: "Upload & analyze",
+                color: "from-blue-400 to-cyan-500",
+                bg: "bg-blue-500/10",
+                onClick: () => {},
+              },
+              {
+                icon: MessageSquare,
+                title: "Health Chat",
+                desc: "24/7 AI assistant",
+                color: "from-cyan-400 to-teal-500",
+                bg: "bg-cyan-500/10",
+                onClick: () => navigate("/health-chat"),
+              },
+              {
+                icon: User,
+                title: "My Profile",
+                desc: "Health information",
+                color: "from-indigo-400 to-blue-500",
+                bg: "bg-indigo-500/10",
+                onClick: () => {},
+              },
             ].map((service, idx) => (
               <div
                 key={idx}
                 className="group relative bg-white rounded-2xl p-6 hover:bg-blue-50/40 transition-all duration-300 cursor-pointer border border-gray-200 hover:border-blue-300 transform hover:-translate-y-2 hover:shadow-lg"
                 onClick={service.onClick}
               >
-                <div className={`w-16 h-16 bg-gradient-to-br ${service.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-lg`}>
+                <div
+                  className={`w-16 h-16 bg-gradient-to-br ${service.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-lg`}
+                >
                   <service.icon className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{service.title}</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  {service.title}
+                </h3>
                 <p className="text-sm text-gray-600 mb-4">{service.desc}</p>
-                <span className={`text-sm font-semibold bg-gradient-to-r ${service.color} bg-clip-text text-transparent group-hover:underline`}>
+                <span
+                  className={`text-sm font-semibold bg-gradient-to-r ${service.color} bg-clip-text text-transparent group-hover:underline`}
+                >
                   Open →
                 </span>
               </div>
@@ -355,7 +434,9 @@ function Dashboard() {
             </div>
             <div className="space-y-3">
               <p className="text-gray-600 text-sm">No recent activity yet</p>
-              <p className="text-gray-500 text-xs">Start using PocketCare to see your health journey here</p>
+              <p className="text-gray-500 text-xs">
+                Start using PocketCare to see your health journey here
+              </p>
             </div>
           </div>
 
@@ -365,7 +446,9 @@ function Dashboard() {
               Daily Health Tip
             </h3>
             <p className="text-gray-700 leading-relaxed">
-              💧 <strong>Stay Hydrated:</strong> Drink at least 8 glasses of water daily. Proper hydration improves energy, skin health, and overall wellbeing.
+              💧 <strong>Stay Hydrated:</strong> Drink at least 8 glasses of
+              water daily. Proper hydration improves energy, skin health, and
+              overall wellbeing.
             </p>
           </div>
         </div>

@@ -34,6 +34,7 @@ gunicorn==21.2.0
 # Mysql Connector 
 	# Removed duplicate entry
 mysql-connector-python==8.1.0
+cryptography==41.0.7
 
 
 

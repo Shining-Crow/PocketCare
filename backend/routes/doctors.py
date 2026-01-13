@@ -10,7 +10,9 @@ doctors_bp = Blueprint('doctors', __name__)
 def get_doctor(id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM doctors WHERE id=%s", (id,))
+    cursor.execute("""SELECT id, name, email, phone, specialty, qualification, 
+                      experience, rating, consultation_fee, bio, available_slots, 
+                      available_days, created_at FROM doctors WHERE id=%s""", (id,))
     doctor = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -27,7 +29,8 @@ def get_doctor_profile():
         
         query = """
             SELECT id, name, email, phone, specialty, qualification, 
-                   experience, rating, consultation_fee, bio, created_at
+                   experience, rating, consultation_fee, bio, available_slots,
+                   available_days, created_at
             FROM doctors 
             WHERE id = %s
         """
@@ -57,7 +60,7 @@ def update_doctor_profile():
         
         # Fields that can be updated
         allowed_fields = ['name', 'phone', 'specialty', 'qualification', 
-                         'experience', 'consultation_fee', 'bio']
+                         'experience', 'consultation_fee', 'bio', 'available_slots', 'available_days']
         update_fields = []
         update_values = []
         

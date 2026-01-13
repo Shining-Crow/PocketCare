@@ -18,7 +18,7 @@ def get_doctors():
     min_fee = request.args.get('min_fee')
     max_fee = request.args.get('max_fee')
 
-    query = "SELECT id, name, specialty, qualification, experience, rating, consultation_fee, bio FROM doctors WHERE 1=1"
+    query = "SELECT id, name, specialty, qualification, experience, rating, consultation_fee, bio, available_slots, available_days FROM doctors WHERE 1=1"
     params = []
 
     if name:

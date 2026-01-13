@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
 import ConsultationChatPanel from "../components/ConsultationChatPanel";
+import TimeSlotPicker from "../components/TimeSlotPicker";
 import {
   User,
   Calendar,
@@ -33,12 +34,17 @@ function DoctorDashboard() {
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [availabilitySlots, setAvailabilitySlots] = useState([
-    { day: "Monday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Tuesday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Wednesday", slots: ["09:00-12:00"] },
-    { day: "Thursday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Friday", slots: ["09:00-12:00", "14:00-16:00"] },
+    { day: "Monday", slots: [] },
+    { day: "Tuesday", slots: [] },
+    { day: "Wednesday", slots: [] },
+    { day: "Thursday", slots: [] },
+    { day: "Friday", slots: [] },
+    { day: "Saturday", slots: [] },
+    { day: "Sunday", slots: [] },
   ]);
+  const [timeSlotPickerOpen, setTimeSlotPickerOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -120,6 +126,11 @@ function DoctorDashboard() {
     fetchDoctorData();
   }, [navigate]);
 
+  // Load doctor availability on mount
+  useEffect(() => {
+    loadDoctorAvailability();
+  }, []);
+
   const handleEditChange = (e) => {
     setEditForm({
       ...editForm,
@@ -180,14 +191,20 @@ function DoctorDashboard() {
   };
 
   const addTimeSlot = (day) => {
-    const newSlot = prompt("Enter time slot (e.g., 09:00-12:00):");
-    if (newSlot) {
-      setAvailabilitySlots(
-        availabilitySlots.map((slot) =>
-          slot.day === day ? { ...slot, slots: [...slot.slots, newSlot] } : slot
-        )
-      );
-    }
+    setSelectedDay(day);
+    setTimeSlotPickerOpen(true);
+  };
+
+  const handleSaveTimeSlots = (newSlots) => {
+    setAvailabilitySlots(
+      availabilitySlots.map((slot) =>
+        slot.day === selectedDay 
+          ? { ...slot, slots: [...slot.slots, ...newSlots] } 
+          : slot
+      )
+    );
+    // Auto-save after adding slots
+    saveAvailabilityToBackend();
   };
 
   const removeTimeSlot = (day, slotToRemove) => {
@@ -198,6 +215,54 @@ function DoctorDashboard() {
           : slot
       )
     );
+    // Auto-save after removing slot
+    saveAvailabilityToBackend();
+  };
+
+  const saveAvailabilityToBackend = async () => {
+    try {
+      setSaving(true);
+      
+      // Convert availability slots to the format expected by backend
+      const allSlots = availabilitySlots.flatMap(daySlot => daySlot.slots);
+      const availableDays = availabilitySlots
+        .filter(daySlot => daySlot.slots.length > 0)
+        .map(daySlot => daySlot.day);
+
+      await api.put("/doctor/profile", {
+        available_slots: JSON.stringify(allSlots),
+        available_days: JSON.stringify(availableDays),
+      });
+      
+      // Show success message briefly
+      setTimeout(() => setSaving(false), 1000);
+    } catch (error) {
+      console.error("Error saving availability:", error);
+      setSaving(false);
+    }
+  };
+
+  const loadDoctorAvailability = async () => {
+    try {
+      const response = await api.get("/doctor/profile");
+      const doctor = response.data.doctor;
+      
+      if (doctor.available_slots && doctor.available_days) {
+        const slots = JSON.parse(doctor.available_slots);
+        const days = JSON.parse(doctor.available_days);
+        
+        // For now, assign the same slots to all available days
+        // In the future, this could be more sophisticated per-day scheduling
+        const updatedSlots = availabilitySlots.map(daySlot => ({
+          ...daySlot,
+          slots: days.includes(daySlot.day) ? [...slots] : []
+        }));
+        
+        setAvailabilitySlots(updatedSlots);
+      }
+    } catch (error) {
+      console.error("Error loading doctor availability:", error);
+    }
   };
 
   if (!doctor) {
@@ -627,8 +692,19 @@ function DoctorDashboard() {
                   <Clock className="w-6 h-6 mr-2 text-blue-600" />
                   Set Your Availability
                 </h2>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
-                  Save Changes
+                <button 
+                  onClick={saveAvailabilityToBackend}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition font-medium flex items-center space-x-2"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
 
@@ -692,6 +768,14 @@ function DoctorDashboard() {
           </div>
         )}
       </div>
+
+      {/* Time Slot Picker Modal */}
+      <TimeSlotPicker
+        isOpen={timeSlotPickerOpen}
+        onClose={() => setTimeSlotPickerOpen(false)}
+        onSave={handleSaveTimeSlots}
+        day={selectedDay}
+      />
     </div>
   );
 }

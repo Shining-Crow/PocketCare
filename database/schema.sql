@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_specialty (specialty),
     INDEX idx_specialty_id (specialty_id),
-    INDEX idx_hospital (hospital_id)
+    INDEX idx_hospital (hospital_id),
     CONSTRAINT fk_doctors_specialty_id FOREIGN KEY (specialty_id) REFERENCES specialties(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

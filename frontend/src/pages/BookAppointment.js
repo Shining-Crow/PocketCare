@@ -30,15 +30,67 @@ export default function BookAppointment() {
     const upcomingDates = generateDates();
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     
-    // Get time slots from doctor's available_slots
+    // Get time slots from doctor's available_slots for the selected date
     const getTimeSlots = () => {
-        if (!doctor?.available_slots) return [];
+        // Return empty array if no date selected or no doctor data
+        if (!selectedDate || !doctor) {
+            return [];
+        }
+        
         try {
-            const slots = typeof doctor.available_slots === 'string' 
-                ? JSON.parse(doctor.available_slots) 
-                : doctor.available_slots;
-            return Array.isArray(slots) ? slots : [];
+            // Get the day name for the selected date
+            const selectedDateObj = new Date(selectedDate);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const selectedDayName = dayNames[selectedDateObj.getDay()];
+            
+            console.log(`Getting time slots for ${selectedDayName} (${selectedDate})`);
+            console.log("Doctor data:", doctor);
+            
+            // Try to use day-specific availability first (new format)
+            if (doctor?.day_specific_availability) {
+                const daySpecificData = typeof doctor.day_specific_availability === 'string'
+                    ? JSON.parse(doctor.day_specific_availability)
+                    : doctor.day_specific_availability;
+                
+                console.log("Day-specific availability data:", daySpecificData);
+                const daySlots = daySpecificData[selectedDayName] || [];
+                console.log(`Day-specific slots for ${selectedDayName}:`, daySlots);
+                return daySlots;
+            }
+            
+            // Fallback to old format (same slots for all available days)
+            if (doctor?.available_slots && doctor?.available_days) {
+                const slots = typeof doctor.available_slots === 'string' 
+                    ? JSON.parse(doctor.available_slots) 
+                    : doctor.available_slots;
+                
+                const availableDays = typeof doctor.available_days === 'string'
+                    ? JSON.parse(doctor.available_days)
+                    : doctor.available_days;
+                
+                console.log("Available days:", availableDays);
+                console.log("Available slots:", slots);
+                
+                if (!Array.isArray(slots) || !Array.isArray(availableDays)) {
+                    console.log("Invalid slots or days data");
+                    return [];
+                }
+                
+                // Check if doctor is available on the selected day
+                if (!availableDays.includes(selectedDayName)) {
+                    console.log(`Doctor not available on ${selectedDayName}`);
+                    return []; // Doctor not available on this day
+                }
+                
+                // Return all slots if doctor is available on this day (old behavior)
+                console.log(`Using old format slots for ${selectedDayName}:`, slots);
+                return slots;
+            }
+            
+            console.log("No availability data found");
+            return [];
         } catch (e) {
+            console.error("Error getting time slots:", e);
             return [];
         }
     };
@@ -69,7 +121,11 @@ export default function BookAppointment() {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        setSelectedDate(`${year}-${month}-${day}`);
+        const newSelectedDate = `${year}-${month}-${day}`;
+        
+        setSelectedDate(newSelectedDate);
+        // Clear selected time when date changes to force user to select from available slots
+        setSelectedTime('');
     };
 
     const convert12to24Hours = (timeSlot) => {
@@ -97,6 +153,37 @@ export default function BookAppointment() {
         };
         
         return `${convertTo12(startHour, startMin)} - ${convertTo12(endHour, endMin)}`;
+    };
+
+    // Check if doctor is available on a specific date
+    const isDoctorAvailableOnDate = (date) => {
+        try {
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayName = dayNames[date.getDay()];
+            
+            // Check new format first
+            if (doctor?.day_specific_availability) {
+                const daySpecificData = typeof doctor.day_specific_availability === 'string'
+                    ? JSON.parse(doctor.day_specific_availability)
+                    : doctor.day_specific_availability;
+                
+                return daySpecificData[dayName] && daySpecificData[dayName].length > 0;
+            }
+            
+            // Fallback to old format
+            if (doctor?.available_days) {
+                const availableDays = typeof doctor.available_days === 'string'
+                    ? JSON.parse(doctor.available_days)
+                    : doctor.available_days;
+                
+                if (!Array.isArray(availableDays)) return false;
+                return availableDays.includes(dayName);
+            }
+            
+            return false;
+        } catch (e) {
+            return false;
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -196,43 +283,79 @@ export default function BookAppointment() {
                             {/* Date Selection */}
                             <div>
                                 <div className="flex gap-3 overflow-x-auto pb-2">
-                                    {upcomingDates.map((date, idx) => (
-                                        <button
-                                            key={idx}
-                                            type="button"
-                                            onClick={() => handleDateClick(date)}
-                                            className={`flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
-                                                selectedDate === `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                                                    ? 'bg-blue-600 text-white shadow-lg'
-                                                    : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
-                                            }`}
-                                        >
-                                            <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
-                                            <span className="text-lg">{date.getDate()}</span>
-                                        </button>
-                                    ))}
+                                    {upcomingDates.map((date, idx) => {
+                                        const isAvailable = isDoctorAvailableOnDate(date);
+                                        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                        const isSelected = selectedDate === dateStr;
+                                        
+                                        return (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => isAvailable ? handleDateClick(date) : null}
+                                                disabled={!isAvailable}
+                                                className={`flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all relative ${
+                                                    !isAvailable
+                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-2 border-gray-200'
+                                                        : isSelected
+                                                            ? 'bg-blue-600 text-white shadow-lg'
+                                                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
+                                                }`}
+                                                title={!isAvailable ? 'Doctor not available on this day' : ''}
+                                            >
+                                                <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
+                                                <span className="text-lg">{date.getDate()}</span>
+                                                {!isAvailable && (
+                                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+                                                        ×
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            {/* Time Selection */}
-                            <div>
-                                <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
-                                <div className="flex gap-3 flex-wrap">
-                                    {getTimeSlots().map((time) => (
-                                        <button
-                                            key={time}
-                                            type="button"
-                                            onClick={() => setSelectedTime(time)}
-                                            className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
-                                                selectedTime === time
-                                                    ? 'bg-blue-600 text-white border-blue-600'
-                                                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                                            }`}
-                                        >
-                                            {format24to12Hours(time)}
-                                        </button>
-                                    ))}
+                            {/* Time Selection - Only show when date is selected AND doctor has availability */}
+                            {selectedDate && selectedDate.trim() !== "" && (
+                                <div>
+                                    <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
+                                    {getTimeSlots().length === 0 ? (
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                            <p className="text-yellow-800 font-medium">
+                                                Doctor is not available on the selected day
+                                            </p>
+                                            <p className="text-yellow-600 text-sm mt-1">
+                                                Please select a different date where the doctor is available
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-3 flex-wrap">
+                                            {getTimeSlots().map((time) => (
+                                                <button
+                                                    key={time}
+                                                    type="button"
+                                                    onClick={() => setSelectedTime(time)}
+                                                    className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
+                                                        selectedTime === time
+                                                            ? 'bg-blue-600 text-white border-blue-600'
+                                                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                                    }`}
+                                                >
+                                                    {format24to12Hours(time)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
+                            )}
+
+                            {/* Debug info - remove this later */}
+                            <div style={{display: 'none'}}>
+                                <p>selectedDate: '{selectedDate}'</p>
+                                <p>selectedDate type: {typeof selectedDate}</p>
+                                <p>selectedDate length: {selectedDate?.length}</p>
+                                <p>Condition result: {selectedDate && selectedDate.trim() !== ""}</p>
                             </div>
 
                             {/* Symptoms Input */}

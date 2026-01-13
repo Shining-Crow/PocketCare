@@ -1,11 +1,58 @@
 
 from flask import Blueprint, request, jsonify
 from utils.database import get_db_connection
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 import re
 import pymysql
 
 appointments_bp = Blueprint('appointments', __name__)
+
+# Get user appointments
+@appointments_bp.route('/user/appointments', methods=['GET'])
+@jwt_required()
+def get_user_appointments():
+    """Get appointments for logged-in user (patient)"""
+    try:
+        raw_identity = get_jwt_identity()
+        user_id = int(raw_identity)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Fetch user's appointments with doctor details
+        cursor.execute("""
+            SELECT a.id, a.appointment_date, a.appointment_time, a.symptoms, 
+                   a.status, a.notes, a.created_at,
+                   d.name as doctor_name, d.specialty, d.phone as doctor_phone,
+                   d.consultation_fee
+            FROM appointments a
+            JOIN doctors d ON a.doctor_id = d.id
+            WHERE a.user_id = %s
+            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+        """, (user_id,))
+        
+        appointments = cursor.fetchall()
+        
+        # Convert datetime objects to strings
+        for apt in appointments:
+            if apt.get('appointment_date'):
+                apt['appointment_date'] = apt['appointment_date'].isoformat()
+            if apt.get('appointment_time'):
+                apt['appointment_time'] = str(apt['appointment_time'])
+            if apt.get('created_at'):
+                apt['created_at'] = apt['created_at'].isoformat()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'appointments': appointments}), 200
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid user ID'}), 400
+    except pymysql.MySQLError as e:
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch appointments: {str(e)}'}), 500
 
 # GET all doctors
 @appointments_bp.route('/doctors', methods=['GET', 'OPTIONS'])
@@ -127,3 +174,223 @@ def create_appointment():
                 conn.close()
             except Exception:
                 pass
+
+
+# Cancel appointment endpoint
+@appointments_bp.route('/appointments/<int:appointment_id>/cancel', methods=['PUT'])
+@jwt_required()
+def cancel_appointment(appointment_id):
+    """Cancel an appointment - can be done by patient or doctor"""
+    try:
+        raw_identity = get_jwt_identity()
+        user_id = int(raw_identity)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get appointment details first to verify ownership
+        cursor.execute("""
+            SELECT a.user_id, a.doctor_id, a.status, u.name as patient_name, d.name as doctor_name
+            FROM appointments a
+            JOIN users u ON a.user_id = u.id
+            JOIN doctors d ON a.doctor_id = d.id
+            WHERE a.id = %s
+        """, (appointment_id,))
+        
+        appointment = cursor.fetchone()
+        if not appointment:
+            return jsonify({'error': 'Appointment not found'}), 404
+        
+        # Check if user is authorized to cancel this appointment
+        # Either the patient who booked it or the doctor
+        is_patient = appointment['user_id'] == user_id
+        is_doctor = appointment['doctor_id'] == user_id
+        
+        if not (is_patient or is_doctor):
+            return jsonify({'error': 'You are not authorized to cancel this appointment'}), 403
+        
+        # Check if appointment is already cancelled or completed
+        if appointment['status'] in ['cancelled', 'completed']:
+            return jsonify({'error': f'Cannot cancel appointment that is already {appointment["status"]}'}), 400
+        
+        # Update appointment status to cancelled
+        cursor.execute("""
+            UPDATE appointments 
+            SET status = 'cancelled'
+            WHERE id = %s
+        """, (appointment_id,))
+        
+        conn.commit()
+        
+        canceller_type = "doctor" if is_doctor else "patient"
+        return jsonify({
+            'message': f'Appointment cancelled successfully by {canceller_type}',
+            'appointment_id': appointment_id,
+            'cancelled_by': canceller_type
+        }), 200
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid user ID'}), 400
+    except pymysql.MySQLError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Failed to cancel appointment: {str(e)}'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+# Accept/Confirm appointment endpoint (doctors only)
+@appointments_bp.route('/appointments/<int:appointment_id>/confirm', methods=['PUT'])
+@jwt_required()
+def confirm_appointment(appointment_id):
+    """Confirm/Accept an appointment - can only be done by doctor"""
+    conn = None
+    cursor = None
+    try:
+        raw_identity = get_jwt_identity()
+        doctor_id = int(raw_identity)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verify the doctor exists
+        cursor.execute("SELECT id FROM doctors WHERE id = %s", (doctor_id,))
+        doctor = cursor.fetchone()
+        
+        if not doctor:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Only doctors can confirm appointments'}), 403
+        
+        # Get appointment details
+        cursor.execute("""
+            SELECT id, doctor_id, status
+            FROM appointments
+            WHERE id = %s
+        """, (appointment_id,))
+        
+        appointment = cursor.fetchone()
+        
+        if not appointment:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Appointment not found'}), 404
+        
+        # Check if the doctor owns this appointment
+        if doctor_id != appointment['doctor_id']:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'You are not authorized to confirm this appointment'}), 403
+        
+        # Check current status
+        if appointment['status'].lower() == 'cancelled':
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Cannot confirm a cancelled appointment'}), 400
+        
+        if appointment['status'].lower() == 'confirmed':
+            cursor.close()
+            conn.close()
+            return jsonify({'message': 'Appointment is already confirmed'}), 200
+        
+        # Update appointment status to confirmed
+        cursor.execute(
+            "UPDATE appointments SET status = 'confirmed' WHERE id = %s",
+            (appointment_id,)
+        )
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Appointment confirmed successfully'}), 200
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid appointment ID'}), 400
+    except pymysql.MySQLError as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'error': f'Failed to accept appointment: {str(e)}'}), 500
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+# Delete appointment endpoint (only for cancelled appointments)
+@appointments_bp.route('/appointments/<int:appointment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_appointment(appointment_id):
+    """Delete a cancelled appointment - can be done by patient or doctor"""
+    try:
+        raw_identity = get_jwt_identity()
+        current_user_id = int(raw_identity)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get appointment details
+        cursor.execute("""
+            SELECT a.id, a.user_id, a.doctor_id, a.status
+            FROM appointments a
+            WHERE a.id = %s
+        """, (appointment_id,))
+        
+        appointment = cursor.fetchone()
+        
+        if not appointment:
+            return jsonify({'error': 'Appointment not found'}), 404
+        
+        # Check if the current user is authorized to delete this appointment
+        is_authorized = False
+        
+        # Check if current user is the patient
+        if current_user_id == appointment['user_id']:
+            is_authorized = True
+        else:
+            # Check if current user is the doctor
+            cursor.execute("SELECT id FROM doctors WHERE id = %s", (current_user_id,))
+            doctor = cursor.fetchone()
+            if doctor and current_user_id == appointment['doctor_id']:
+                is_authorized = True
+        
+        if not is_authorized:
+            return jsonify({'error': 'You are not authorized to delete this appointment'}), 403
+        
+        # Only allow deletion of cancelled appointments
+        if appointment['status'].lower() != 'cancelled':
+            return jsonify({'error': 'Only cancelled appointments can be deleted'}), 400
+        
+        # Delete the appointment
+        cursor.execute("DELETE FROM appointments WHERE id = %s", (appointment_id,))
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({'message': 'Appointment deleted successfully'}), 200
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid user ID or appointment ID'}), 400
+    except pymysql.MySQLError as e:
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete appointment: {str(e)}'}), 500

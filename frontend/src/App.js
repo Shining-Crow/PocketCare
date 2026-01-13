@@ -11,6 +11,7 @@ import GetStarted from './pages/GetStarted';
 import DoctorRegister from './pages/DoctorRegister';
 import DoctorDashboard from './pages/DoctorDashboard';
 import Appointments from './pages/Appointments';
+import DoctorSearch from './pages/DoctorSearch';
 import BookAppointment from './pages/BookAppointment';
 import DoctorInfo from './pages/DoctorInfo';
 import AuthenticatedLayout from './components/AuthenticatedLayout';
@@ -96,6 +97,7 @@ function App() {
           <Route path="/health-chat" element={<HealthChat />} />
           <Route path="/symptom-checker" element={<SymptomChecker />} />
           <Route path="/appointments" element={<Appointments />} />
+          <Route path="/doctors" element={<DoctorSearch />} />
           <Route path="/doctor/:id" element={<DoctorInfo />} />
           <Route path="/book/:doctorId" element={<BookAppointment />} />
         </Route>

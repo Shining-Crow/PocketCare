@@ -12,7 +12,7 @@ def get_doctor(id):
     cursor = conn.cursor()
     cursor.execute("""SELECT id, name, email, phone, specialty, qualification, 
                       experience, rating, consultation_fee, bio, available_slots, 
-                      available_days, created_at FROM doctors WHERE id=%s""", (id,))
+                      available_days, day_specific_availability, created_at FROM doctors WHERE id=%s""", (id,))
     doctor = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -30,7 +30,7 @@ def get_doctor_profile():
         query = """
             SELECT id, name, email, phone, specialty, qualification, 
                    experience, rating, consultation_fee, bio, available_slots,
-                   available_days, created_at
+                   available_days, day_specific_availability, created_at
             FROM doctors 
             WHERE id = %s
         """
@@ -60,7 +60,7 @@ def update_doctor_profile():
         
         # Fields that can be updated
         allowed_fields = ['name', 'phone', 'specialty', 'qualification', 
-                         'experience', 'consultation_fee', 'bio', 'available_slots', 'available_days']
+                         'experience', 'consultation_fee', 'bio', 'available_slots', 'available_days', 'day_specific_availability']
         update_fields = []
         update_values = []
         

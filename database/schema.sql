@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     consultation_fee DECIMAL(10,2),
     available_slots JSON COMMENT 'Store available time slots',
     available_days JSON COMMENT 'Store available days (e.g., ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])',
+    day_specific_availability JSON COMMENT 'Store day-specific time slots (e.g., {"Monday": ["09:00-10:00", "10:00-11:00"], "Tuesday": [...]})',
     bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_specialty (specialty),

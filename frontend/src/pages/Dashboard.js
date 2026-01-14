@@ -400,7 +400,7 @@ function Dashboard() {
               },
               {
                 icon: User,
-                title: "My Profile",
+                title: "Weight Management Tool",
                 desc: "Health information",
                 color: "from-indigo-400 to-blue-500",
                 bg: "bg-indigo-500/10",

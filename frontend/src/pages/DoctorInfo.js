@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
 import { Calendar, FileText, CheckCircle } from "lucide-react";
 import Footer from "../components/Footer";
+import SuccessModal from "../components/SuccessModal";
 
 export default function DoctorInfo() {
     const { id } = useParams();
@@ -16,6 +17,7 @@ export default function DoctorInfo() {
     const [selectedTime, setSelectedTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
     const [booking, setBooking] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Generate next 7 days with dates
     const generateDates = () => {
@@ -32,15 +34,53 @@ export default function DoctorInfo() {
     const upcomingDates = generateDates();
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     
-    // Get time slots from doctor's available_slots
+    // Get time slots from doctor's available_slots for the selected date
     const getTimeSlots = () => {
-        if (!doctor?.available_slots) return [];
+        // Return empty array if no date selected or no doctor data
+        if (!selectedDate || !doctor) {
+            return [];
+        }
+        
         try {
-            const slots = typeof doctor.available_slots === 'string' 
-                ? JSON.parse(doctor.available_slots) 
-                : doctor.available_slots;
-            return Array.isArray(slots) ? slots : [];
+            // Get the day name for the selected date
+            const selectedDateObj = new Date(selectedDate);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const selectedDayName = dayNames[selectedDateObj.getDay()];
+            
+            // Try to use day-specific availability first (new format)
+            if (doctor?.day_specific_availability) {
+                const daySpecificData = typeof doctor.day_specific_availability === 'string'
+                    ? JSON.parse(doctor.day_specific_availability)
+                    : doctor.day_specific_availability;
+                
+                const daySlots = daySpecificData[selectedDayName] || [];
+                return daySlots;
+            }
+            
+            // Fallback to old format (same slots for all available days)
+            if (doctor?.available_slots && doctor?.available_days) {
+                const slots = typeof doctor.available_slots === 'string' 
+                    ? JSON.parse(doctor.available_slots) 
+                    : doctor.available_slots;
+                
+                const availableDays = typeof doctor.available_days === 'string'
+                    ? JSON.parse(doctor.available_days)
+                    : doctor.available_days;
+                
+                if (!Array.isArray(slots) || !Array.isArray(availableDays)) return [];
+                
+                // Check if doctor is available on the selected day
+                if (!availableDays.includes(selectedDayName)) {
+                    return []; // Doctor not available on this day
+                }
+                
+                // Return all slots if doctor is available on this day (old behavior)
+                return slots;
+            }
+            
+            return [];
         } catch (e) {
+            console.error("Error getting time slots:", e);
             return [];
         }
     };
@@ -74,11 +114,46 @@ export default function DoctorInfo() {
         };
     }, [id]);
 
+    // Check if doctor is available on a specific date
+    const isDoctorAvailableOnDate = (date) => {
+        try {
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayName = dayNames[date.getDay()];
+            
+            // Check new format first
+            if (doctor?.day_specific_availability) {
+                const daySpecificData = typeof doctor.day_specific_availability === 'string'
+                    ? JSON.parse(doctor.day_specific_availability)
+                    : doctor.day_specific_availability;
+                
+                return daySpecificData[dayName] && daySpecificData[dayName].length > 0;
+            }
+            
+            // Fallback to old format
+            if (doctor?.available_days) {
+                const availableDays = typeof doctor.available_days === 'string'
+                    ? JSON.parse(doctor.available_days)
+                    : doctor.available_days;
+                
+                if (!Array.isArray(availableDays)) return false;
+                return availableDays.includes(dayName);
+            }
+            
+            return false;
+        } catch (e) {
+            return false;
+        }
+    };
+
     const handleDateClick = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        setSelectedDate(`${year}-${month}-${day}`);
+        const newSelectedDate = `${year}-${month}-${day}`;
+        
+        setSelectedDate(newSelectedDate);
+        // Clear selected time when date changes to force user to select from available slots
+        setSelectedTime('');
     };
 
     const convert12to24Hours = (timeSlot) => {
@@ -116,21 +191,47 @@ export default function DoctorInfo() {
 
         try {
             setBooking(true);
+            
+            // Get user ID from localStorage
+            const user = JSON.parse(localStorage.getItem("user"));
+            const userId = user?.id;
+            
+            if (!userId) {
+                alert("Please log in to book an appointment.");
+                return;
+            }
+            
             const convertedTime = convert12to24Hours(selectedTime);
-            await api.post("/appointments", {
+            const appointmentData = {
+                user_id: userId,
                 doctor_id: Number(id),
                 appointment_date: selectedDate,
                 appointment_time: convertedTime,
                 symptoms,
-            });
-            alert("Appointment booked successfully!");
-            navigate("/appointments");
+            };
+            console.log("Creating appointment with data:", appointmentData);
+            
+            await api.post("/appointments", appointmentData);
+            
+            // Show success modal instead of alert
+            setShowSuccessModal(true);
         } catch (e) {
             console.error("Failed to book appointment", e);
             alert(e?.response?.data?.error || "Failed to book appointment.");
         } finally {
             setBooking(false);
         }
+    };
+
+    const handleModalClose = () => {
+        setShowSuccessModal(false);
+        // Reset form
+        setSelectedDate("");
+        setSelectedTime("");
+        setSymptoms("");
+        
+        // Navigate to user's appointments page (not doctor dashboard)
+        navigate("/appointments");
     };
 
     return (
@@ -213,44 +314,69 @@ export default function DoctorInfo() {
                                     {/* Date Selection */}
                                     <div>
                                         <div className="flex gap-3 overflow-x-auto pb-2">
-                                            {upcomingDates.map((date, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    type="button"
-                                                    onClick={() => handleDateClick(date)}
-                                                    className={`flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
-                                                        selectedDate === `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                                                            ? 'bg-blue-500 text-white shadow-lg'
-                                                            : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
-                                                    }`}
-                                                >
-                                                    <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
-                                                    <span className="text-lg">{date.getDate()}</span>
-                                                </button>
-                                            ))}
+                                            {upcomingDates.map((date, idx) => {
+                                                const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                                const isSelected = selectedDate === dateStr;
+                                                const isAvailable = isDoctorAvailableOnDate(date);
+                                                
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => handleDateClick(date)}
+                                                        className={`relative flex flex-col items-center justify-center px-4 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
+                                                            isSelected
+                                                                ? 'bg-blue-500 text-white shadow-lg'
+                                                                : isAvailable
+                                                                ? 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400'
+                                                                : 'bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed'
+                                                        }`}
+                                                        disabled={!isAvailable}
+                                                    >
+                                                        <span className="text-sm">{daysOfWeek[date.getDay()]}</span>
+                                                        <span className="text-lg">{date.getDate()}</span>
+                                                        {!isAvailable && (
+                                                            <span className="absolute -top-1 -right-1 text-red-500 text-xl font-bold">×</span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
-                                    {/* Time Selection */}
-                                    <div>
-                                        <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
-                                        <div className="flex gap-3 flex-wrap">
-                                            {getTimeSlots().map((time) => (
-                                                <button
-                                                    key={time}
-                                                    type="button"
-                                                    onClick={() => setSelectedTime(time)}
-                                                    className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
-                                                        selectedTime === time
-                                                            ? 'bg-blue-500 text-white border-blue-500'
-                                                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                                                    }`}
-                                                >
-                                                    {format24to12Hours(time)}
-                                                </button>
-                                            ))}
+                                    {/* Time Selection - Only show when date is selected */}
+                                    {selectedDate && selectedDate.trim() !== "" && (
+                                        <div>
+                                            <label className="block text-gray-700 font-semibold mb-3">Select Time</label>
+                                            {getTimeSlots().length === 0 ? (
+                                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                                                    <p className="text-yellow-800 font-medium">
+                                                        Doctor is not available on the selected day
+                                                    </p>
+                                                    <p className="text-yellow-600 text-sm mt-1">
+                                                        Please select a different date where the doctor is available
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-3 flex-wrap">
+                                                    {getTimeSlots().map((time) => (
+                                                        <button
+                                                            key={time}
+                                                            type="button"
+                                                            onClick={() => setSelectedTime(time)}
+                                                            className={`px-6 py-2 rounded-full font-medium transition-all border-2 ${
+                                                                selectedTime === time
+                                                                    ? 'bg-blue-500 text-white border-blue-500'
+                                                                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                                            }`}
+                                                        >
+                                                            {format24to12Hours(time)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Symptoms Input */}
                                     <div>
@@ -295,6 +421,15 @@ export default function DoctorInfo() {
             </div>
 
             <Footer />
+            
+            {/* Success Modal */}
+            <SuccessModal 
+                isOpen={showSuccessModal}
+                onClose={handleModalClose}
+                title="Appointment Booked Successfully!"
+                message={doctor ? `Your appointment with Dr. ${doctor.name} has been confirmed for ${selectedDate} at ${selectedTime}. You will receive a confirmation shortly.` : "Your appointment has been booked successfully!"}
+                buttonText="View My Appointments"
+            />
         </div>
     );
 }

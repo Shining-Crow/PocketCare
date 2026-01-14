@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
 import ConsultationChatPanel from "../components/ConsultationChatPanel";
+import TimeSlotPicker from "../components/TimeSlotPicker";
+import ConfirmationModal from "../components/ConfirmationModal";
 import {
   User,
   Calendar,
@@ -31,14 +33,27 @@ function DoctorDashboard() {
     today_appointments: 0,
   });
   const [todayAppointments, setTodayAppointments] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [availabilitySlots, setAvailabilitySlots] = useState([
-    { day: "Monday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Tuesday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Wednesday", slots: ["09:00-12:00"] },
-    { day: "Thursday", slots: ["09:00-12:00", "14:00-17:00"] },
-    { day: "Friday", slots: ["09:00-12:00", "14:00-16:00"] },
+    { day: "Monday", slots: [] },
+    { day: "Tuesday", slots: [] },
+    { day: "Wednesday", slots: [] },
+    { day: "Thursday", slots: [] },
+    { day: "Friday", slots: [] },
+    { day: "Saturday", slots: [] },
+    { day: "Sunday", slots: [] },
   ]);
+  const [timeSlotPickerOpen, setTimeSlotPickerOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    appointmentId: null,
+    patientName: '',
+    loading: false,
+    action: 'cancel' // 'cancel', 'delete', or 'accept'
+  });
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -92,13 +107,20 @@ function DoctorDashboard() {
         console.log("Doctor stats response:", statsRes.data);
         setStats(statsRes.data);
 
-        // Fetch today's appointments
-        const today = new Date().toISOString().split("T")[0];
+        // Fetch today's appointments - use local date to avoid timezone issues
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        console.log("Fetching appointments for today:", today);
         const appointmentsRes = await api.get(
           `/doctor/appointments?date=${today}`
         );
         console.log("Doctor appointments response:", appointmentsRes.data);
         setTodayAppointments(appointmentsRes.data.appointments || []);
+
+        // Fetch all appointments for the doctor
+        const allAppointmentsRes = await api.get(`/doctor/appointments`);
+        console.log("All doctor appointments response:", allAppointmentsRes.data);
+        setAllAppointments(allAppointmentsRes.data.appointments || []);
       } catch (error) {
         console.error("Error fetching doctor data from API:", error);
         console.error("Error details:", error.response?.data);
@@ -119,6 +141,152 @@ function DoctorDashboard() {
     // Fetch data but don't block the UI
     fetchDoctorData();
   }, [navigate]);
+
+  // Load doctor availability on mount
+  useEffect(() => {
+    loadDoctorAvailability();
+  }, []);
+
+  // Auto-refresh today's appointments every 30 seconds
+  useEffect(() => {
+    const refreshAppointments = async () => {
+      try {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const appointmentsRes = await api.get(
+          `/doctor/appointments?date=${today}`
+        );
+        setTodayAppointments(appointmentsRes.data.appointments || []);
+      } catch (error) {
+        console.error("Error refreshing appointments:", error);
+      }
+    };
+
+    const interval = setInterval(refreshAppointments, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval); // Cleanup interval on component unmount
+  }, []);
+
+  const refreshTodaysAppointments = async () => {
+    try {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      console.log("Refreshing appointments for date:", today);
+      const appointmentsRes = await api.get(
+        `/doctor/appointments?date=${today}`
+      );
+      console.log("Refreshed appointments response:", appointmentsRes.data);
+      setTodayAppointments(appointmentsRes.data.appointments || []);
+    } catch (error) {
+      console.error("Error refreshing appointments:", error);
+    }
+  };
+
+  const debugAllAppointments = async () => {
+    try {
+      console.log("Fetching ALL appointments for debugging...");
+      const allAppointmentsRes = await api.get(`/doctor/appointments`);
+      console.log("ALL appointments response:", allAppointmentsRes.data);
+      
+      const appointments = allAppointmentsRes.data.appointments || [];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      
+      console.log("=== APPOINTMENT DETAILS ===");
+      console.log("Today's date for filtering:", today);
+      console.log("Total appointments found:", appointments.length);
+      
+      appointments.forEach((apt, index) => {
+        console.log(`Appointment ${index + 1}:`, {
+          id: apt.id,
+          date: apt.appointment_date,
+          time: apt.appointment_time,
+          patient: apt.patient_name,
+          isToday: apt.appointment_date === today,
+          status: apt.status
+        });
+        // Also log it separately for easier reading
+        console.log(`  - ${apt.patient_name}: ${apt.appointment_date} at ${apt.appointment_time}`);
+      });
+      
+      const todaysAppts = appointments.filter(apt => apt.appointment_date === today);
+      console.log("Today's appointments count:", todaysAppts.length);
+      console.log("Today's appointments:", todaysAppts);
+      
+      alert(`Found ${appointments.length} total appointments. Today (${today}): ${todaysAppts.length} appointments. Check console for details.`);
+    } catch (error) {
+      console.error("Error fetching all appointments:", error);
+      alert("Error fetching appointments. Check console for details.");
+    }
+  };
+
+  const openCancelModal = (appointmentId, patientName) => {
+    setConfirmModal({
+      isOpen: true,
+      appointmentId,
+      patientName,
+      loading: false,
+      action: 'cancel'
+    });
+  };
+
+  const openDeleteModal = (appointmentId, patientName) => {
+    setConfirmModal({
+      isOpen: true,
+      appointmentId,
+      patientName,
+      loading: false,
+      action: 'delete'
+    });
+  };
+
+  const openAcceptModal = (appointmentId, patientName) => {
+    setConfirmModal({
+      isOpen: true,
+      appointmentId,
+      patientName,
+      loading: false,
+      action: 'accept'
+    });
+  };
+
+  const closeModal = () => {
+    if (confirmModal.loading) return; // Prevent closing during operation
+    setConfirmModal({
+      isOpen: false,
+      appointmentId: null,
+      patientName: '',
+      loading: false,
+      action: 'cancel'
+    });
+  };
+
+  const confirmAction = async () => {
+    setConfirmModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      if (confirmModal.action === 'cancel') {
+        await api.put(`/appointments/${confirmModal.appointmentId}/cancel`);
+      } else if (confirmModal.action === 'delete') {
+        await api.delete(`/appointments/${confirmModal.appointmentId}`);
+      } else if (confirmModal.action === 'accept') {
+        await api.put(`/appointments/${confirmModal.appointmentId}/confirm`);
+      }
+      
+      // Refresh both appointment lists
+      await refreshTodaysAppointments();
+      
+      // Refresh all appointments
+      const allAppointmentsRes = await api.get(`/doctor/appointments`);
+      setAllAppointments(allAppointmentsRes.data.appointments || []);
+      
+      closeModal();
+    } catch (error) {
+      console.error(`Error ${confirmModal.action}ing appointment:`, error);
+      alert(error.response?.data?.error || `Failed to ${confirmModal.action} appointment`);
+      setConfirmModal(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const handleEditChange = (e) => {
     setEditForm({
@@ -180,14 +348,20 @@ function DoctorDashboard() {
   };
 
   const addTimeSlot = (day) => {
-    const newSlot = prompt("Enter time slot (e.g., 09:00-12:00):");
-    if (newSlot) {
-      setAvailabilitySlots(
-        availabilitySlots.map((slot) =>
-          slot.day === day ? { ...slot, slots: [...slot.slots, newSlot] } : slot
-        )
-      );
-    }
+    setSelectedDay(day);
+    setTimeSlotPickerOpen(true);
+  };
+
+  const handleSaveTimeSlots = (newSlots) => {
+    setAvailabilitySlots(
+      availabilitySlots.map((slot) =>
+        slot.day === selectedDay 
+          ? { ...slot, slots: [...slot.slots, ...newSlots] } 
+          : slot
+      )
+    );
+    // Auto-save after adding slots
+    saveAvailabilityToBackend();
   };
 
   const removeTimeSlot = (day, slotToRemove) => {
@@ -198,6 +372,73 @@ function DoctorDashboard() {
           : slot
       )
     );
+    // Auto-save after removing slot
+    saveAvailabilityToBackend();
+  };
+
+  const saveAvailabilityToBackend = async () => {
+    try {
+      setSaving(true);
+      
+      // Convert availability slots to day-specific format
+      const daySpecificAvailability = {};
+      availabilitySlots.forEach(daySlot => {
+        if (daySlot.slots.length > 0) {
+          daySpecificAvailability[daySlot.day] = daySlot.slots;
+        }
+      });
+
+      // For backward compatibility, also maintain the old format
+      const allSlots = availabilitySlots.flatMap(daySlot => daySlot.slots);
+      const availableDays = availabilitySlots
+        .filter(daySlot => daySlot.slots.length > 0)
+        .map(daySlot => daySlot.day);
+
+      await api.put("/doctor/profile", {
+        available_slots: JSON.stringify(allSlots), // Keep for backward compatibility
+        available_days: JSON.stringify(availableDays), // Keep for backward compatibility
+        day_specific_availability: JSON.stringify(daySpecificAvailability), // New format
+      });
+      
+      // Show success message briefly
+      setTimeout(() => setSaving(false), 1000);
+    } catch (error) {
+      console.error("Error saving availability:", error);
+      setSaving(false);
+    }
+  };
+
+  const loadDoctorAvailability = async () => {
+    try {
+      const response = await api.get("/doctor/profile");
+      const doctor = response.data.doctor;
+      
+      // Try to load from new day-specific format first
+      if (doctor.day_specific_availability) {
+        const daySpecificData = JSON.parse(doctor.day_specific_availability);
+        const updatedSlots = availabilitySlots.map(daySlot => ({
+          ...daySlot,
+          slots: daySpecificData[daySlot.day] || []
+        }));
+        setAvailabilitySlots(updatedSlots);
+      }
+      // Fallback to old format if new format doesn't exist
+      else if (doctor.available_slots && doctor.available_days) {
+        const slots = JSON.parse(doctor.available_slots);
+        const days = JSON.parse(doctor.available_days);
+        
+        // For now, assign the same slots to all available days
+        // In the future, this could be more sophisticated per-day scheduling
+        const updatedSlots = availabilitySlots.map(daySlot => ({
+          ...daySlot,
+          slots: days.includes(daySlot.day) ? [...slots] : []
+        }));
+        
+        setAvailabilitySlots(updatedSlots);
+      }
+    } catch (error) {
+      console.error("Error loading doctor availability:", error);
+    }
   };
 
   if (!doctor) {
@@ -484,10 +725,19 @@ function DoctorDashboard() {
 
               {/* Today's Appointments */}
               <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                  Today's Appointments ({stats.today_appointments})
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                    <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                    Today's Appointments ({stats.today_appointments})
+                  </h2>
+                  <button
+                    onClick={refreshTodaysAppointments}
+                    className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    title="Refresh appointments"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {loading ? (
                     <p className="text-gray-500 text-center py-4">Loading...</p>
@@ -520,6 +770,8 @@ function DoctorDashboard() {
                                   ? "bg-yellow-100 text-yellow-700"
                                   : apt.status === "completed"
                                   ? "bg-blue-100 text-blue-700"
+                                  : apt.status === "cancelled"
+                                  ? "bg-red-100 text-red-700"
                                   : "bg-gray-100 text-gray-700"
                               }`}
                             >
@@ -528,12 +780,187 @@ function DoctorDashboard() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium text-gray-900">
-                            {apt.appointment_time?.substring(0, 5) || apt.time}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium text-gray-900">
+                              {apt.appointment_time?.substring(0, 5) || apt.time}
+                            </p>
+                            {apt.status === 'cancelled' ? (
+                              <button
+                                onClick={() => openDeleteModal(apt.id, apt.patient_name)}
+                                className="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                title="Delete appointment"
+                              >
+                                Delete
+                              </button>
+                            ) : apt.status === 'pending' ? (
+                              <>
+                                <button
+                                  onClick={() => openAcceptModal(apt.id, apt.patient_name)}
+                                  className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
+                                  title="Accept appointment"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                  className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                  title="Cancel appointment"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                title="Cancel appointment"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))
+                  )}
+                </div>
+              </div>
+
+              {/* All Appointments */}
+              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-green-600" />
+                  All Appointments ({allAppointments.length})
+                </h2>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {loading ? (
+                    <p className="text-gray-500 text-center py-4">Loading...</p>
+                  ) : allAppointments.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">
+                      No appointments found
+                    </p>
+                  ) : (
+                    allAppointments.map((apt, idx) => {
+                      const appointmentDate = new Date(apt.appointment_date);
+                      const now = new Date();
+                      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                      const isToday = apt.appointment_date === today;
+                      const isPast = appointmentDate < now;
+                      
+                      return (
+                        <div
+                          key={apt.id || idx}
+                          className={`flex items-center justify-between p-4 rounded-lg border transition ${
+                            isToday 
+                              ? 'bg-blue-50 border-blue-300' 
+                              : isPast 
+                              ? 'bg-gray-50 border-gray-200' 
+                              : 'bg-green-50 border-green-200 hover:border-green-300'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              isToday 
+                                ? 'bg-blue-100' 
+                                : isPast 
+                                ? 'bg-gray-100' 
+                                : 'bg-green-100'
+                            }`}>
+                              <User className={`w-5 h-5 ${
+                                isToday 
+                                  ? 'text-blue-600' 
+                                  : isPast 
+                                  ? 'text-gray-600' 
+                                  : 'text-green-600'
+                              }`} />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {apt.patient_name}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {apt.symptoms || "General consultation"}
+                              </p>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <span className="text-xs text-gray-500">
+                                  {new Date(apt.appointment_date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    apt.status === "confirmed"
+                                      ? "bg-green-100 text-green-700"
+                                      : apt.status === "pending"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : apt.status === "completed"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : apt.status === "cancelled"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {apt.status}
+                                </span>
+                                {isToday && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                                    Today
+                                  </span>
+                                )}
+                                {isPast && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                                    Past
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium text-gray-900">
+                                {apt.appointment_time?.substring(0, 5) || apt.time}
+                              </p>
+                              {apt.status === 'cancelled' ? (
+                                <button
+                                  onClick={() => openDeleteModal(apt.id, apt.patient_name)}
+                                  className="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition-colors"
+                                  title="Delete appointment"
+                                >
+                                  Delete
+                                </button>
+                              ) : apt.status === 'pending' && !isPast ? (
+                                <>
+                                  <button
+                                    onClick={() => openAcceptModal(apt.id, apt.patient_name)}
+                                    className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
+                                    title="Accept appointment"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                    className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                    title="Cancel appointment"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : apt.status !== 'cancelled' && !isPast ? (
+                                <button
+                                  onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                  className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                  title="Cancel appointment"
+                                >
+                                  Cancel
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -627,8 +1054,19 @@ function DoctorDashboard() {
                   <Clock className="w-6 h-6 mr-2 text-blue-600" />
                   Set Your Availability
                 </h2>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
-                  Save Changes
+                <button 
+                  onClick={saveAvailabilityToBackend}
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition font-medium flex items-center space-x-2"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
 
@@ -692,6 +1130,51 @@ function DoctorDashboard() {
           </div>
         )}
       </div>
+
+      {/* Time Slot Picker Modal */}
+      <TimeSlotPicker
+        isOpen={timeSlotPickerOpen}
+        onClose={() => setTimeSlotPickerOpen(false)}
+        onSave={handleSaveTimeSlots}
+        day={selectedDay}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeModal}
+        onConfirm={confirmAction}
+        title={
+          confirmModal.action === 'cancel' 
+            ? "Cancel Appointment" 
+            : confirmModal.action === 'delete'
+            ? "Delete Appointment"
+            : "Accept Appointment"
+        }
+        message={
+          confirmModal.action === 'cancel' 
+            ? `Are you sure you want to cancel the appointment with ${confirmModal.patientName}? This action cannot be undone.`
+            : confirmModal.action === 'delete'
+            ? `Are you sure you want to permanently delete the cancelled appointment with ${confirmModal.patientName}? This will completely remove it from your records.`
+            : `Are you sure you want to accept and confirm the appointment with ${confirmModal.patientName}?`
+        }
+        confirmText={
+          confirmModal.action === 'cancel' 
+            ? "Cancel Appointment" 
+            : confirmModal.action === 'delete'
+            ? "Delete Permanently"
+            : "Accept Appointment"
+        }
+        cancelText={
+          confirmModal.action === 'cancel' 
+            ? "Keep Appointment" 
+            : confirmModal.action === 'delete'
+            ? "Keep in List"
+            : "Go Back"
+        }
+        type={confirmModal.action === 'accept' ? "info" : "danger"}
+        loading={confirmModal.loading}
+      />
     </div>
   );
 }

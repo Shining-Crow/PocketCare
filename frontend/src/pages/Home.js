@@ -38,7 +38,8 @@ function Home() {
     {
       icon: <FileText className="w-8 h-8" />,
       title: "Medical Reports",
-      description: "Upload and understand your lab reports with AI assistance"
+      description: "Upload and understand your lab reports with AI assistance",
+      link: "/reports",
     },
     {
       icon: <MessageSquare className="w-8 h-8" />,

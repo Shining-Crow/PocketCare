@@ -437,7 +437,7 @@ function Dashboard() {
                 desc: "Upload & analyze",
                 color: "from-blue-400 to-cyan-500",
                 bg: "bg-blue-500/10",
-                onClick: () => {},
+                onClick: () => navigate("/reports"),
               },
               {
                 icon: MessageSquare,

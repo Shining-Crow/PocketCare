@@ -18,6 +18,7 @@ import DoctorInfo from './pages/DoctorInfo';
 import AuthenticatedLayout from './components/AuthenticatedLayout';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import MedicalReports from './pages/MedicalReports';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -98,6 +99,7 @@ function App() {
           <Route path="/profile" element={<UserProfile />} />
           <Route path="/health-chat" element={<HealthChat />} />
           <Route path="/symptom-checker" element={<SymptomChecker />} />
+          <Route path="/reports" element={<MedicalReports />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/doctors" element={<DoctorSearch />} />
           <Route path="/doctor/:id" element={<DoctorInfo />} />

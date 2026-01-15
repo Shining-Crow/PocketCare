@@ -15,6 +15,12 @@ bcrypt==4.1.2
 # Environment Variables
 python-dotenv==1.0.0
 
+# OCR (Report uploads)
+# NOTE: keep Pillow unpinned/loosely pinned so it can pick a wheel compatible
+# with your Python version (Python 3.14+ often won't have wheels for older pins).
+Pillow>=10.2.0
+pytesseract==0.3.10
+
 # Input Validation
 email-validator==2.1.0
 

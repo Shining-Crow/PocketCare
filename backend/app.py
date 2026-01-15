@@ -32,10 +32,12 @@ def create_app(config_name='development'):
     from routes.auth import auth_bp
     from routes.doctors import doctors_bp
     from routes.chat import chat_bp
+    from routes.reports import reports_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(appointments_bp, url_prefix='/api')
     app.register_blueprint(doctors_bp, url_prefix='/api')
     app.register_blueprint(chat_bp, url_prefix='/api/chat')
+    app.register_blueprint(reports_bp, url_prefix='/api/reports')
     
     # Root endpoint
     @app.route('/')

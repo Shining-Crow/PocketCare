@@ -272,7 +272,24 @@ def get_profile():
         if user['date_of_birth']:
             user['date_of_birth'] = user['date_of_birth'].isoformat()
         
-        return jsonify({'user': user}), 200
+        # Get user stats
+        stats_query = """
+            SELECT COUNT(*) as appointments 
+            FROM appointments 
+            WHERE user_id = %s
+        """
+        appointments_count = execute_query(stats_query, (user_id,), fetch_one=True)
+        
+        stats = {
+            'appointments': appointments_count['appointments'] if appointments_count else 0,
+            'reports': 0,  # Placeholder for future feature
+            'day_streak': 0  # Placeholder for future feature
+        }
+        
+        return jsonify({
+            'user': user,
+            'stats': stats
+        }), 200
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch profile: {str(e)}'}), 500

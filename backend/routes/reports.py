@@ -9,11 +9,12 @@ from config import Config
 from utils.auth_utils import jwt_required_custom
 from utils.gemini_utils import simplify_ocr_text
 from utils.ocr_utils import extract_text_from_image_bytes
+from utils.pdf_utils import extract_text_from_pdf_bytes
 
 reports_bp = Blueprint("reports", __name__)
 
 
-_ALLOWED_IMAGE_EXTS = {"png", "jpg", "jpeg"}
+_ALLOWED_REPORT_EXTS = {"png", "jpg", "jpeg", "pdf"}
 
 
 @reports_bp.route("/ocr", methods=["POST"])
@@ -37,19 +38,11 @@ def ocr_report():
     filename = secure_filename(f.filename)
     ext = (Path(filename).suffix or "").lstrip(".").lower()
 
-    if ext == "pdf":
+    if ext not in _ALLOWED_REPORT_EXTS:
         return jsonify(
             {
                 "error": "Unsupported file type",
-                "message": "PDF OCR is not enabled yet. Please upload an image (png/jpg/jpeg) for now.",
-            }
-        ), 400
-
-    if ext not in _ALLOWED_IMAGE_EXTS:
-        return jsonify(
-            {
-                "error": "Unsupported file type",
-                "message": f"Allowed: {', '.join(sorted(_ALLOWED_IMAGE_EXTS))}",
+                "message": f"Allowed: {', '.join(sorted(_ALLOWED_REPORT_EXTS))}",
             }
         ), 400
 
@@ -65,7 +58,10 @@ def ocr_report():
         (base / filename).write_bytes(image_bytes)
 
     try:
-        text, confidence = extract_text_from_image_bytes(image_bytes)
+        if ext == "pdf":
+            text, confidence = extract_text_from_pdf_bytes(image_bytes)
+        else:
+            text, confidence = extract_text_from_image_bytes(image_bytes)
         return jsonify({"text": text, "confidence": confidence}), 200
     except Exception as exc:
         return jsonify({"error": "OCR failed", "message": str(exc)}), 500

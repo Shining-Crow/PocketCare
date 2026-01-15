@@ -24,12 +24,17 @@ function MedicalReports() {
   const [aiExplanation, setAiExplanation] = useState("");
 
   const fileLabel = useMemo(() => {
-    if (!file) return "Choose an image (png/jpg/jpeg)";
+    if (!file) return "Choose a file (png/jpg/jpeg/pdf)";
     return `${file.name} (${Math.round(file.size / 1024)} KB)`;
   }, [file]);
 
   useEffect(() => {
     if (!file) {
+      setPreviewUrl("");
+      return;
+    }
+
+    if ((file.type || "").toLowerCase() === "application/pdf") {
       setPreviewUrl("");
       return;
     }
@@ -83,7 +88,7 @@ function MedicalReports() {
 
   const runOcr = async () => {
     if (!file) {
-      setError("Please select a report image first.");
+      setError("Please select a report file first.");
       return;
     }
 
@@ -190,7 +195,7 @@ function MedicalReports() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-bold text-slate-900">1) Upload</h2>
-                    <div className="text-xs text-slate-500">Images only (png/jpg/jpeg)</div>
+                    <div className="text-xs text-slate-500">Images + PDFs (png/jpg/jpeg/pdf)</div>
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
@@ -199,18 +204,16 @@ function MedicalReports() {
                         <ImageIcon className="h-5 w-5" />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-sm font-semibold text-slate-800">
-                          Report image
-                        </label>
+                        <label className="block text-sm font-semibold text-slate-800">Report file</label>
                         <p className="mt-1 text-xs text-slate-500">{fileLabel}</p>
                         <input
                           type="file"
-                          accept="image/png,image/jpeg"
+                          accept="image/png,image/jpeg,application/pdf"
                           onChange={onPickFile}
                           className="mt-3 block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800"
                         />
                         <p className="mt-2 text-[11px] text-slate-500">
-                          PDFs are not enabled yet (image-only MVP).
+                          PDF pages are rendered and OCR'd (best-effort).
                         </p>
                       </div>
                     </div>

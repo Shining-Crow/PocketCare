@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { FileText, UploadCloud } from "lucide-react";
+import { FileText, Sparkles, UploadCloud } from "lucide-react";
 import api from "../utils/api";
 
 function MedicalReports() {
@@ -8,6 +8,9 @@ function MedicalReports() {
   const [ocrText, setOcrText] = useState("");
   const [confidence, setConfidence] = useState(null);
   const [error, setError] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiExplanation, setAiExplanation] = useState("");
 
   const fileLabel = useMemo(() => {
     if (!file) return "Choose an image (png/jpg/jpeg)";
@@ -18,6 +21,8 @@ function MedicalReports() {
     setError("");
     setOcrText("");
     setConfidence(null);
+    setAiError("");
+    setAiExplanation("");
 
     const picked = e.target.files?.[0] || null;
     setFile(picked);
@@ -33,6 +38,8 @@ function MedicalReports() {
     setError("");
     setOcrText("");
     setConfidence(null);
+    setAiError("");
+    setAiExplanation("");
 
     try {
       const form = new FormData();
@@ -53,6 +60,33 @@ function MedicalReports() {
       setError(msg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const runExplain = async () => {
+    if (!ocrText.trim()) {
+      setAiError("Please extract (or paste) some text first.");
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError("");
+    setAiExplanation("");
+
+    try {
+      const res = await api.post("/reports/explain", {
+        text: ocrText,
+      });
+      setAiExplanation(res.data?.explanation || "");
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "AI explanation failed";
+      setAiError(msg);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -126,6 +160,46 @@ function MedicalReports() {
               />
               <div className="mt-2 text-xs text-gray-500">
                 You can edit the text here before we add saving/analysis.
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row gap-3 sm:items-center">
+                <button
+                  type="button"
+                  onClick={runExplain}
+                  disabled={aiLoading || !ocrText.trim()}
+                  className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition border ${
+                    aiLoading || !ocrText.trim()
+                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-transparent hover:opacity-95"
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {aiLoading ? "Simplifying..." : "Simplify with AI"}
+                </button>
+                <p className="text-xs text-gray-500">
+                  Uses Gemini to convert OCR text into a simple explanation.
+                </p>
+              </div>
+
+              {aiError ? (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {aiError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-gray-900">Simple explanation</h2>
+              </div>
+              <textarea
+                value={aiExplanation}
+                readOnly
+                placeholder="AI summary will appear here..."
+                className="mt-3 w-full min-h-[220px] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <div className="mt-2 text-xs text-gray-500">
+                This is informational only and not a medical diagnosis.
               </div>
             </div>
           </div>

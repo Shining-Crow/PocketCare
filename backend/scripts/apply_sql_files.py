@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-import pymysql
+import mysql.connector
 from dotenv import load_dotenv
 
 
@@ -97,13 +97,45 @@ def _split_sql_statements(sql: str) -> list[str]:
     return statements
 
 
+def _drain_results(cursor) -> None:
+    """Consume any pending result sets to avoid 'Unread result found' on commit/close."""
+
+    while True:
+        try:
+            # Always attempt to consume rows. Some statements (e.g. EXECUTE of a
+            # prepared SELECT) may produce rows even if the original SQL text
+            # isn't a plain SELECT.
+            cursor.fetchall()
+        except Exception:
+            pass
+
+        try:
+            has_more = cursor.nextset()
+        except Exception:
+            has_more = None
+
+        if not has_more:
+            break
+
+
 def _exec_sql_file(cursor, file_path: Path) -> None:
     raw = file_path.read_text(encoding="utf-8", errors="ignore")
     raw = raw.lstrip("\ufeff")  # strip BOM if present
 
     statements = _split_sql_statements(raw)
-    for stmt in statements:
-        cursor.execute(stmt)
+    for idx, stmt in enumerate(statements, start=1):
+        stmt = stmt.strip()
+        if not stmt:
+            continue
+
+        try:
+            cursor.execute(stmt)
+            _drain_results(cursor)
+        except Exception as exc:
+            preview = (stmt[:200] + "...") if len(stmt) > 200 else stmt
+            raise RuntimeError(
+                f"Failed executing {file_path} statement #{idx}: {preview}"
+            ) from exc
 
 
 def main() -> int:
@@ -145,33 +177,45 @@ def main() -> int:
         return 2
 
     try:
-        conn = pymysql.connect(
+        conn = mysql.connector.connect(
             host=host,
             port=port,
             user=user,
             password=password,
             charset="utf8mb4",
             autocommit=False,
+            use_pure=True
         )
 
-        with conn:
-            with conn.cursor() as cursor:
-                print(f"Applying schema: {schema_path}")
-                _exec_sql_file(cursor, schema_path)
+        cursor = conn.cursor(buffered=True)
+        try:
+            print(f"Applying schema: {schema_path}")
+            _exec_sql_file(cursor, schema_path)
+            conn.commit()
+            print("Schema applied.")
+
+            if not args.no_seed:
+                print(f"Applying seed data: {seed_path}")
+                _exec_sql_file(cursor, seed_path)
                 conn.commit()
-                print("Schema applied.")
+                print("Seed data applied.")
 
-                if not args.no_seed:
-                    print(f"Applying seed data: {seed_path}")
-                    _exec_sql_file(cursor, seed_path)
-                    conn.commit()
-                    print("Seed data applied.")
-
-        print("Database update complete.")
-        return 0
+            print("Database update complete.")
+            return 0
+        finally:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     except Exception as exc:
         print(f"Database update failed: {exc}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 

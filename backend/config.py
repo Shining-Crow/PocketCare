@@ -3,7 +3,9 @@ from datetime import timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+# Use override=True so changes in backend/.env take effect even if a variable
+# was previously exported in the shell (common during development).
+load_dotenv(override=True)
 
 class Config:
     """Base configuration"""

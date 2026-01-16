@@ -22,6 +22,7 @@ import {
 function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [dailyTips, setDailyTips] = useState([]);
   const [sosHolding, setSosHolding] = useState(false);
   const [sosProgress, setSosProgress] = useState(0);
   const [stats, setStats] = useState({
@@ -37,28 +38,44 @@ function Dashboard() {
   const fetchRecentAppointments = async () => {
     try {
       setAppointmentsLoading(true);
-      const response = await api.get('/user/appointments');
+      const response = await api.get("/user/appointments");
       // Backend returns { appointments: [...] }
       const appointmentsData = response.data?.appointments || [];
-      const appointments = Array.isArray(appointmentsData) ? appointmentsData : [];
-      
+      const appointments = Array.isArray(appointmentsData)
+        ? appointmentsData
+        : [];
+
       // Get recent 3 appointments (upcoming first, then recent past)
-      const upcoming = appointments.filter(app => {
-        const appointmentDateTime = new Date(`${app.appointment_date} ${app.appointment_time}`);
-        const now = new Date();
-        return appointmentDateTime > now && app.status.toLowerCase() !== 'cancelled';
-      }).slice(0, 2);
-      
-      const past = appointments.filter(app => {
-        const appointmentDateTime = new Date(`${app.appointment_date} ${app.appointment_time}`);
-        const now = new Date();
-        return appointmentDateTime <= now || app.status.toLowerCase() === 'completed';
-      }).slice(0, 3 - upcoming.length);
-      
+      const upcoming = appointments
+        .filter((app) => {
+          const appointmentDateTime = new Date(
+            `${app.appointment_date} ${app.appointment_time}`
+          );
+          const now = new Date();
+          return (
+            appointmentDateTime > now &&
+            app.status.toLowerCase() !== "cancelled"
+          );
+        })
+        .slice(0, 2);
+
+      const past = appointments
+        .filter((app) => {
+          const appointmentDateTime = new Date(
+            `${app.appointment_date} ${app.appointment_time}`
+          );
+          const now = new Date();
+          return (
+            appointmentDateTime <= now ||
+            app.status.toLowerCase() === "completed"
+          );
+        })
+        .slice(0, 3 - upcoming.length);
+
       setRecentAppointments([...upcoming, ...past]);
-      setStats(prev => ({ ...prev, appointments: appointments.length }));
+      setStats((prev) => ({ ...prev, appointments: appointments.length }));
     } catch (error) {
-      console.error('Failed to fetch appointments:', error);
+      console.error("Failed to fetch appointments:", error);
       setRecentAppointments([]);
     } finally {
       setAppointmentsLoading(false);
@@ -76,10 +93,67 @@ function Dashboard() {
       fetchRecentAppointments();
       // Animate stats on load
       setTimeout(() => {
-        setStats(prev => ({ ...prev, reports: 5, streak: 7 }));
+        setStats((prev) => ({ ...prev, reports: 5, streak: 7 }));
       }, 300);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const pickRandom = (tips, count) => {
+      const arr = Array.isArray(tips) ? [...tips] : [];
+      // Fisher–Yates shuffle
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr.slice(0, count);
+    };
+
+    const loadTips = async () => {
+      try {
+        const res = await fetch("/healthTips.json", { cache: "no-store" });
+        if (!res.ok)
+          throw new Error(`Failed to load health tips (${res.status})`);
+        const data = await res.json();
+        const tips = data?.healthTips || [];
+        const chosen = pickRandom(tips, 3);
+        if (!cancelled) setDailyTips(chosen);
+      } catch (e) {
+        // Fallback: keep a few default tips if the JSON fetch fails
+        const fallback = pickRandom(
+          [
+            {
+              id: "fallback-1",
+              title: "💧 Stay Hydrated",
+              message:
+                "Drink at least 8 glasses of water daily. Proper hydration improves energy levels, skin health, and overall wellbeing.",
+            },
+            {
+              id: "fallback-2",
+              title: "😴 Prioritize Sleep",
+              message:
+                "Aim for 7–9 hours of quality sleep each night to support memory, mood, and immune function.",
+            },
+            {
+              id: "fallback-3",
+              title: "🚶‍♂️ Move Your Body",
+              message:
+                "Engage in at least 30 minutes of physical activity daily to improve cardiovascular health and reduce stress.",
+            },
+          ],
+          3
+        );
+        if (!cancelled) setDailyTips(fallback);
+      }
+    };
+
+    loadTips();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSOSActivate = useCallback(() => {
     const typeLabel = selectedEmergency || "general-emergency";
@@ -116,17 +190,19 @@ function Dashboard() {
         {/* Welcome Section with Stats */}
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
           {/* Welcome Card - Clickable Profile */}
-          <div 
-            onClick={() => navigate("/appointments")}
+          <div
+            onClick={() => navigate("/weight-management")}
             className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-white border border-gray-200 shadow-md p-8 cursor-pointer hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group"
           >
             <div className="relative z-10">
               <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <p className="text-blue-600 text-sm font-medium">Welcome back 👋</p>
+                    <p className="text-blue-600 text-sm font-medium">
+                      Welcome back 👋
+                    </p>
                     <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      View Profile →
+                      Weight Management →
                     </span>
                   </div>
                   <h1 className="text-4xl font-bold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">
@@ -139,7 +215,7 @@ function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-8">
-                <div 
+                <div
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate("/appointments");
@@ -448,12 +524,12 @@ function Dashboard() {
                 onClick: () => navigate("/health-chat"),
               },
               {
-                icon: User,
-                title: "My Profile",
-                desc: "View appointments",
-                color: "from-indigo-400 to-blue-500",
+                icon: TrendingUp,
+                title: "Weight Management",
+                desc: "Track BMI & goals",
+                color: "from-indigo-500 to-fuchsia-500",
                 bg: "bg-indigo-500/10",
-                onClick: () => navigate("/appointments"),
+                onClick: () => navigate("/weight-management"),
               },
             ].map((service, idx) => (
               <div
@@ -483,7 +559,7 @@ function Dashboard() {
         {/* My Profile - Recent Appointments */}
         <div className="mt-8 grid lg:grid-cols-2 gap-6">
           {/* My Profile - Clickable Card */}
-          <div 
+          <div
             onClick={() => navigate("/appointments")}
             className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all duration-300 cursor-pointer group"
           >
@@ -496,13 +572,23 @@ function Dashboard() {
                   <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
                     My Profile
                   </h3>
-                  <p className="text-sm text-gray-500">Manage your healthcare appointments</p>
+                  <p className="text-sm text-gray-500">
+                    Manage your healthcare appointments
+                  </p>
                 </div>
               </div>
               <div className="flex items-center text-indigo-600 group-hover:text-indigo-800">
                 <span className="text-sm font-medium mr-1">View All</span>
-                <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                <svg
+                  className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </div>
             </div>
@@ -510,42 +596,60 @@ function Dashboard() {
             {appointmentsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-                <span className="ml-3 text-gray-600 text-sm">Loading your appointments...</span>
+                <span className="ml-3 text-gray-600 text-sm">
+                  Loading your appointments...
+                </span>
               </div>
             ) : recentAppointments.length > 0 ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Recent Activity</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Recent Activity
+                  </span>
                   <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">
                     {recentAppointments.length} appointments
                   </span>
                 </div>
                 {recentAppointments.map((appointment, idx) => {
-                  const isUpcoming = new Date(`${appointment.appointment_date} ${appointment.appointment_time}`) > new Date();
+                  const isUpcoming =
+                    new Date(
+                      `${appointment.appointment_date} ${appointment.appointment_time}`
+                    ) > new Date();
                   return (
-                    <div key={idx} className="flex items-center p-4 bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors">
+                    <div
+                      key={idx}
+                      className="flex items-center p-4 bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors"
+                    >
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-semibold text-gray-800 text-sm">
                             Dr. {appointment.doctor_name}
                           </h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            isUpcoming && appointment.status.toLowerCase() !== 'cancelled' 
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : appointment.status.toLowerCase() === 'cancelled'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              isUpcoming &&
+                              appointment.status.toLowerCase() !== "cancelled"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : appointment.status.toLowerCase() ===
+                                  "cancelled"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
                             {appointment.status}
                           </span>
                         </div>
-                        <p className="text-gray-600 text-xs mb-2 font-medium">{appointment.doctor_specialty}</p>
+                        <p className="text-gray-600 text-xs mb-2 font-medium">
+                          {appointment.doctor_specialty}
+                        </p>
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="flex items-center bg-white px-2 py-1 rounded-md">
                             <Calendar className="w-3 h-3 mr-1 text-indigo-500" />
-                            {new Date(appointment.appointment_date).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
+                            {new Date(
+                              appointment.appointment_date
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
                             })}
                           </span>
                           <span className="flex items-center bg-white px-2 py-1 rounded-md">
@@ -555,15 +659,20 @@ function Dashboard() {
                         </div>
                       </div>
                       <div className="ml-3">
-                        {isUpcoming && appointment.status.toLowerCase() !== 'cancelled' ? (
+                        {isUpcoming &&
+                        appointment.status.toLowerCase() !== "cancelled" ? (
                           <div className="flex items-center">
                             <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mr-2"></div>
-                            <span className="text-emerald-600 text-xs font-semibold">Upcoming</span>
+                            <span className="text-emerald-600 text-xs font-semibold">
+                              Upcoming
+                            </span>
                           </div>
                         ) : (
                           <div className="flex items-center">
                             <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                            <span className="text-gray-500 text-xs font-medium">Past</span>
+                            <span className="text-gray-500 text-xs font-medium">
+                              Past
+                            </span>
                           </div>
                         )}
                       </div>
@@ -576,17 +685,29 @@ function Dashboard() {
                 <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Calendar className="w-8 h-8 text-indigo-600" />
                 </div>
-                <h4 className="text-lg font-semibold text-gray-800 mb-2">No appointments yet</h4>
-                <p className="text-gray-500 text-sm mb-4">Start your healthcare journey today</p>
-                <div 
+                <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                  No appointments yet
+                </h4>
+                <p className="text-gray-500 text-sm mb-4">
+                  Start your healthcare journey today
+                </p>
+                <div
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate("/doctors");
                   }}
                   className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   Book First Appointment
                 </div>
@@ -599,11 +720,25 @@ function Dashboard() {
               <HeartPulse className="w-5 h-5 mr-2 text-cyan-500 animate-pulse" />
               Daily Health Tip
             </h3>
-            <p className="text-gray-700 leading-relaxed">
-              💧 <strong>Stay Hydrated:</strong> Drink at least 8 glasses of
-              water daily. Proper hydration improves energy, skin health, and
-              overall wellbeing.
-            </p>
+            {dailyTips.length ? (
+              <div className="space-y-4">
+                {dailyTips.map((tip) => (
+                  <div
+                    key={tip.id}
+                    className="rounded-xl bg-blue-50/60 border border-blue-100 p-4"
+                  >
+                    <p className="text-gray-900 font-semibold mb-1">
+                      {tip.title}
+                    </p>
+                    <p className="text-gray-700 leading-relaxed text-sm">
+                      {tip.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-700 leading-relaxed">Loading tips…</p>
+            )}
           </div>
         </div>
       </div>

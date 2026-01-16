@@ -1,6 +1,83 @@
 import os
 
 
+def generate_weight_recommendations(
+    *,
+    weight_kg: float,
+    height_cm: float,
+    age_years: int | None,
+    bmi: float,
+    goal_target_weight_kg: float | None,
+    goal_target_date: str | None,
+    model: str = "gemini-3-flash-preview",
+) -> dict:
+    """Generate general diet/exercise suggestions based on weight history.
+
+    Returns a dict with either a parsed JSON payload or a fallback text payload.
+    """
+
+    from google import genai
+
+    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    client = genai.Client(api_key=api_key)
+
+    goal_bits = []
+    if goal_target_weight_kg is not None:
+        goal_bits.append(f"Target weight: {goal_target_weight_kg} kg")
+    if goal_target_date:
+        goal_bits.append(f"Target date: {goal_target_date}")
+    goal_text = " | ".join(goal_bits) if goal_bits else "No goal provided"
+
+    age_text = str(age_years) if age_years is not None else "unknown"
+
+    prompt = (
+        "You are a health and fitness assistant for a healthcare app. "
+        "Provide GENERAL, safe, non-diagnostic wellness advice. "
+        "Do NOT provide a medical diagnosis or medication guidance. "
+        "If any value seems concerning, recommend consulting a clinician.\n\n"
+        "User metrics:\n"
+        f"- Weight (kg): {weight_kg}\n"
+        f"- Height (cm): {height_cm}\n"
+        f"- Age (years): {age_text}\n"
+        f"- BMI: {bmi}\n"
+        f"- Goal: {goal_text}\n\n"
+        "Return STRICT JSON with this shape:\n"
+        "{\n"
+        "  \"summary\": [\"...\"],\n"
+        "  \"diet\": {\"principles\": [\"...\"], \"example_day\": [\"...\"]},\n"
+        "  \"exercise\": {\"weekly_plan\": [\"...\"], \"notes\": [\"...\"]},\n"
+        "  \"progress\": {\"how_to_track\": [\"...\"], \"weekly_targets\": [\"...\"]},\n"
+        "  \"safety\": [\"...\"],\n"
+        "  \"disclaimer\": \"...\"\n"
+        "}\n"
+    )
+
+    response = client.models.generate_content(model=model, contents=prompt)
+    text = getattr(response, "text", None)
+    if not text:
+        raise RuntimeError("Empty response from Gemini")
+
+    raw = text.strip()
+
+    # Best-effort JSON parsing (Gemini may wrap in markdown fences)
+    import json
+    cleaned = raw
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        # If it started with ```json, remove the leading 'json\n'
+        cleaned = cleaned.replace("json\n", "", 1)
+        cleaned = cleaned.strip()
+
+    try:
+        payload = json.loads(cleaned)
+        return {"ok": True, "payload": payload}
+    except Exception:
+        return {"ok": True, "payload": {"text": raw, "disclaimer": "General information only; not medical advice."}}
+
+
 def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -> str:
     if not (ocr_text or "").strip():
         raise ValueError("OCR text is empty")

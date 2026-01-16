@@ -1,0 +1,79 @@
+{
+  "healthTips": [
+    {
+      "id": 1,
+      "title": "💧 Stay Hydrated",
+      "message": "Drink at least 8 glasses of water daily. Proper hydration improves energy levels, skin health, and overall wellbeing."
+    },
+    {
+      "id": 2,
+      "title": "😴 Prioritize Sleep",
+      "message": "Aim for 7–9 hours of quality sleep each night to support memory, mood, and immune function."
+    },
+    {
+      "id": 3,
+      "title": "🚶‍♂️ Move Your Body",
+      "message": "Engage in at least 30 minutes of physical activity daily to improve cardiovascular health and reduce stress."
+    },
+    {
+      "id": 4,
+      "title": "🥗 Eat Balanced Meals",
+      "message": "Include vegetables, fruits, lean proteins, and whole grains in your meals to maintain steady energy throughout the day."
+    },
+    {
+      "id": 5,
+      "title": "🧘 Manage Stress",
+      "message": "Practice mindfulness, deep breathing, or meditation for a few minutes each day to keep stress levels in check."
+    },
+    {
+      "id": 6,
+      "title": "☀️ Get Sunlight",
+      "message": "Spend 10–20 minutes in natural sunlight daily to support vitamin D levels and improve mood."
+    },
+    {
+      "id": 7,
+      "title": "🪥 Maintain Oral Hygiene",
+      "message": "Brush twice a day and floss regularly to prevent dental issues and support overall health."
+    },
+    {
+      "id": 8,
+      "title": "📵 Take Screen Breaks",
+      "message": "Follow the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds to reduce eye strain."
+    },
+    {
+      "id": 9,
+      "title": "🍎 Snack Smart",
+      "message": "Choose healthy snacks like fruits, nuts, or yogurt instead of processed foods to maintain focus and energy."
+    },
+    {
+      "id": 10,
+      "title": "🧂 Limit Excess Salt",
+      "message": "Reducing salt intake helps maintain healthy blood pressure and supports heart health."
+    },
+    {
+      "id": 11,
+      "title": "🚰 Wash Your Hands",
+      "message": "Wash hands regularly with soap to reduce the spread of germs and prevent illness."
+    },
+    {
+      "id": 12,
+      "title": "📅 Maintain Routine",
+      "message": "Keeping a consistent daily routine can improve productivity, sleep quality, and mental clarity."
+    },
+    {
+      "id": 13,
+      "title": "🚭 Avoid Smoking",
+      "message": "Avoiding tobacco significantly lowers the risk of heart disease, lung disease, and cancer."
+    },
+    {
+      "id": 14,
+      "title": "🍵 Cut Back on Sugary Drinks",
+      "message": "Replace sugary beverages with water or unsweetened tea to reduce unnecessary calorie intake."
+    },
+    {
+      "id": 15,
+      "title": "🤝 Stay Socially Connected",
+      "message": "Regular social interaction supports mental health and reduces feelings of isolation."
+    }
+  ]
+}

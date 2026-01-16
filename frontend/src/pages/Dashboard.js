@@ -22,6 +22,7 @@ import {
 function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [dailyTips, setDailyTips] = useState([]);
   const [sosHolding, setSosHolding] = useState(false);
   const [sosProgress, setSosProgress] = useState(0);
   const [stats, setStats] = useState({
@@ -96,6 +97,63 @@ function Dashboard() {
       }, 300);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const pickRandom = (tips, count) => {
+      const arr = Array.isArray(tips) ? [...tips] : [];
+      // Fisher–Yates shuffle
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr.slice(0, count);
+    };
+
+    const loadTips = async () => {
+      try {
+        const res = await fetch("/healthTips.json", { cache: "no-store" });
+        if (!res.ok)
+          throw new Error(`Failed to load health tips (${res.status})`);
+        const data = await res.json();
+        const tips = data?.healthTips || [];
+        const chosen = pickRandom(tips, 3);
+        if (!cancelled) setDailyTips(chosen);
+      } catch (e) {
+        // Fallback: keep a few default tips if the JSON fetch fails
+        const fallback = pickRandom(
+          [
+            {
+              id: "fallback-1",
+              title: "💧 Stay Hydrated",
+              message:
+                "Drink at least 8 glasses of water daily. Proper hydration improves energy levels, skin health, and overall wellbeing.",
+            },
+            {
+              id: "fallback-2",
+              title: "😴 Prioritize Sleep",
+              message:
+                "Aim for 7–9 hours of quality sleep each night to support memory, mood, and immune function.",
+            },
+            {
+              id: "fallback-3",
+              title: "🚶‍♂️ Move Your Body",
+              message:
+                "Engage in at least 30 minutes of physical activity daily to improve cardiovascular health and reduce stress.",
+            },
+          ],
+          3
+        );
+        if (!cancelled) setDailyTips(fallback);
+      }
+    };
+
+    loadTips();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSOSActivate = useCallback(() => {
     const typeLabel = selectedEmergency || "general-emergency";
@@ -662,11 +720,25 @@ function Dashboard() {
               <HeartPulse className="w-5 h-5 mr-2 text-cyan-500 animate-pulse" />
               Daily Health Tip
             </h3>
-            <p className="text-gray-700 leading-relaxed">
-              💧 <strong>Stay Hydrated:</strong> Drink at least 8 glasses of
-              water daily. Proper hydration improves energy, skin health, and
-              overall wellbeing.
-            </p>
+            {dailyTips.length ? (
+              <div className="space-y-4">
+                {dailyTips.map((tip) => (
+                  <div
+                    key={tip.id}
+                    className="rounded-xl bg-blue-50/60 border border-blue-100 p-4"
+                  >
+                    <p className="text-gray-900 font-semibold mb-1">
+                      {tip.title}
+                    </p>
+                    <p className="text-gray-700 leading-relaxed text-sm">
+                      {tip.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-700 leading-relaxed">Loading tips…</p>
+            )}
           </div>
         </div>
       </div>

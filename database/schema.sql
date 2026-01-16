@@ -189,6 +189,39 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =========================================================================
+-- TABLE: weight_entries (weight/BMI history per user)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS weight_entries (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    entry_date DATE NOT NULL,
+    weight_kg DECIMAL(6,2) NOT NULL,
+    height_cm DECIMAL(6,2) NOT NULL,
+    age_years INT NULL,
+    bmi DECIMAL(6,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_weight_entries_user_date (user_id, entry_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
+-- TABLE: weight_goals (one active goal per user, enforced in code)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS weight_goals (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    start_weight_kg DECIMAL(6,2) NULL,
+    target_weight_kg DECIMAL(6,2) NOT NULL,
+    start_date DATE NULL,
+    target_date DATE NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_weight_goals_user_active (user_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =========================================================================
 -- TABLE: consultation_threads (doctor-user chats, per appointment)
 -- =========================================================================
 CREATE TABLE IF NOT EXISTS consultation_threads (

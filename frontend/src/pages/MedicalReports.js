@@ -8,17 +8,16 @@ import {
   Loader2,
   Sparkles,
   Trash2,
-  UploadCloud,
 } from "lucide-react";
 import api from "../utils/api";
 
 function MedicalReports() {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [ocrText, setOcrText] = useState("");
   const [confidence, setConfidence] = useState(null);
   const [error, setError] = useState("");
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [aiExplanation, setAiExplanation] = useState("");
@@ -47,10 +46,10 @@ function MedicalReports() {
   const resetAll = () => {
     setFile(null);
     setPreviewUrl("");
-    setIsLoading(false);
     setOcrText("");
     setConfidence(null);
     setError("");
+    setOcrLoading(false);
     setAiLoading(false);
     setAiError("");
     setAiExplanation("");
@@ -86,64 +85,58 @@ function MedicalReports() {
     setFile(picked);
   };
 
-  const runOcr = async () => {
+  const runSimplify = async () => {
     if (!file) {
       setError("Please select a report file first.");
       return;
     }
 
-    setIsLoading(true);
     setError("");
-    setOcrText("");
-    setConfidence(null);
     setAiError("");
     setAiExplanation("");
 
+    setOcrLoading(true);
+    setAiLoading(false);
+    setOcrText("");
+    setConfidence(null);
+
+    let stage = "ocr";
     try {
       const form = new FormData();
       form.append("file", file);
 
-      const res = await api.post("/reports/ocr", form);
+      const ocrRes = await api.post("/reports/ocr", form);
+      const extracted = (ocrRes.data?.text || "").toString();
+      const conf =
+        typeof ocrRes.data?.confidence === "number" ? ocrRes.data.confidence : null;
 
-      setOcrText(res.data?.text || "");
-      setConfidence(
-        typeof res.data?.confidence === "number" ? res.data.confidence : null
-      );
-    } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e?.message ||
-        "OCR failed";
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setOcrText(extracted);
+      setConfidence(conf);
 
-  const runExplain = async () => {
-    if (!ocrText.trim()) {
-      setAiError("Please extract (or paste) some text first.");
-      return;
-    }
+      if (!extracted.trim()) {
+        setAiError("OCR returned no readable text. Try a clearer image or a different file.");
+        return;
+      }
 
-    setAiLoading(true);
-    setAiError("");
-    setAiExplanation("");
+      setOcrLoading(false);
+      stage = "ai";
+      setAiLoading(true);
 
-    try {
-      const res = await api.post("/reports/explain", {
-        text: ocrText,
+      const explainRes = await api.post("/reports/explain", {
+        text: extracted,
       });
-      setAiExplanation(res.data?.explanation || "");
+      setAiExplanation(explainRes.data?.explanation || "");
     } catch (e) {
       const msg =
         e?.response?.data?.message ||
         e?.response?.data?.error ||
         e?.message ||
-        "AI explanation failed";
-      setAiError(msg);
+        "Simplify failed";
+
+      if (stage === "ocr") setError(msg);
+      else setAiError(msg);
     } finally {
+      setOcrLoading(false);
       setAiLoading(false);
     }
   };
@@ -173,7 +166,7 @@ function MedicalReports() {
                   Scan a report. Get a simple explanation.
                 </h1>
                 <p className="mt-2 text-sm sm:text-base text-slate-600 max-w-2xl">
-                  Upload an image, extract the raw text with Tesseract, then use Gemini to rewrite it into something easier to read.
+                  Upload an image or PDF and get a clean, easy-to-read summary generated with OCR + AI.
                 </p>
               </div>
 
@@ -228,37 +221,73 @@ function MedicalReports() {
                       </div>
                     ) : null}
                   </div>
+                </div>
 
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={runOcr}
-                      disabled={isLoading || !file}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                        isLoading || !file
-                          ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                          : "bg-gradient-to-r from-slate-900 to-violet-700 text-white shadow hover:opacity-95"
-                      }`}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-slate-900">2) Simplify with AI</h2>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      OCR + Gemini rewrite (no diagnosis)
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={runSimplify}
+                    disabled={ocrLoading || aiLoading || !file}
+                    className={`mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                      ocrLoading || aiLoading || !file
+                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                        : "bg-gradient-to-r from-slate-900 to-violet-700 text-white shadow hover:opacity-95"
+                    }`}
+                  >
+                    {ocrLoading || aiLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    {ocrLoading
+                      ? "Reading report…"
+                      : aiLoading
+                        ? "Simplifying…"
+                        : "Simplify with AI"}
+                  </button>
+
+                  <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-slate-800">OCR</span>
+                      {ocrLoading ? (
+                        <span className="inline-flex items-center gap-2 text-slate-600">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running
+                        </span>
+                      ) : ocrText.trim() ? (
+                        <span className="inline-flex items-center gap-2 text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                          {confidence !== null ? (
+                            <span className="text-slate-500">• {confidence.toFixed(1)}%</span>
+                          ) : null}
+                        </span>
                       ) : (
-                        <UploadCloud className="h-4 w-4" />
+                        <span className="inline-flex items-center gap-2 text-slate-500">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
+                        </span>
                       )}
-                      {isLoading ? "Extracting…" : "Extract Text"}
-                    </button>
+                    </div>
 
-                    <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-600 flex items-center gap-2">
-                      {ocrText.trim() ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          OCR ready{confidence !== null ? ` • ${confidence.toFixed(1)}% confidence` : ""}
-                        </>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-slate-800">AI summary</span>
+                      {aiLoading ? (
+                        <span className="inline-flex items-center gap-2 text-slate-600">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing
+                        </span>
+                      ) : aiExplanation.trim() ? (
+                        <span className="inline-flex items-center gap-2 text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Ready
+                        </span>
                       ) : (
-                        <>
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          Extract text to continue
-                        </>
+                        <span className="inline-flex items-center gap-2 text-slate-500">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
+                        </span>
                       )}
                     </div>
                   </div>
@@ -268,33 +297,6 @@ function MedicalReports() {
                       {error}
                     </div>
                   ) : null}
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-900">2) Simplify with AI</h2>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      Gemini rewrite (no diagnosis)
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={runExplain}
-                    disabled={aiLoading || !ocrText.trim()}
-                    className={`mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                      aiLoading || !ocrText.trim()
-                        ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                        : "bg-gradient-to-r from-violet-700 to-fuchsia-600 text-white shadow hover:opacity-95"
-                    }`}
-                  >
-                    {aiLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    {aiLoading ? "Simplifying…" : "Simplify"}
-                  </button>
 
                   {aiError ? (
                     <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -303,7 +305,7 @@ function MedicalReports() {
                   ) : null}
 
                   <div className="mt-4 text-[11px] text-slate-500">
-                    Tip: if OCR text is messy, edit it first on the right.
+                    Informational only — not a medical diagnosis.
                   </div>
                 </div>
               </div>
@@ -313,48 +315,9 @@ function MedicalReports() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900">Extracted text</h2>
-                      <p className="mt-1 text-xs text-slate-500">
-                        You can edit the text before simplifying.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {confidence !== null ? (
-                        <span className="hidden sm:inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                          Confidence: {confidence.toFixed(1)}%
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => copyText(ocrText)}
-                        disabled={!ocrText.trim()}
-                        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
-                          !ocrText.trim()
-                            ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                        title="Copy extracted text"
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span className="hidden sm:inline">Copy</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <textarea
-                    value={ocrText}
-                    onChange={(e) => setOcrText(e.target.value)}
-                    placeholder="OCR output will appear here…"
-                    className="mt-4 w-full min-h-[260px] rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
                       <h2 className="text-sm font-bold text-slate-900">Simple explanation</h2>
                       <p className="mt-1 text-xs text-slate-500">
-                        Informational only — not a medical diagnosis.
+                        A simplified summary based on the report text.
                       </p>
                     </div>
                     <button
@@ -377,8 +340,12 @@ function MedicalReports() {
                     value={aiExplanation}
                     readOnly
                     placeholder="AI explanation will appear here…"
-                    className="mt-4 w-full min-h-[220px] rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                    className="mt-4 w-full min-h-[520px] rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
+
+                  <div className="mt-4 text-[11px] text-slate-500">
+                    If anything looks wrong or concerning, consult a licensed clinician.
+                  </div>
                 </div>
               </div>
             </div>

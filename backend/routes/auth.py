@@ -418,3 +418,90 @@ def get_dashboard_stats():
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch statistics: {str(e)}'}), 500
+
+# Doctor Profile Endpoints
+@auth_bp.route('/doctor/profile', methods=['GET'])
+@jwt_required_custom
+def get_doctor_profile():
+    """Get doctor profile"""  
+    try:
+        doctor_id = get_jwt_identity()
+        
+        # Fetch doctor profile
+        query = """
+            SELECT id, name, email, phone, specialty, qualification, 
+                   experience, rating, consultation_fee, bio
+            FROM doctors 
+            WHERE id = %s
+        """
+        doctor = execute_query(query, (doctor_id,), fetch_one=True)
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+        
+        return jsonify({
+            'doctor': doctor
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch profile: {str(e)}'}), 500
+
+@auth_bp.route('/doctor/profile', methods=['PUT'])
+@jwt_required_custom
+def update_doctor_profile():
+    """Update doctor profile"""  
+    try:
+        doctor_id = get_jwt_identity()
+        data = request.get_json()
+        
+        # Check if doctor exists
+        check_query = "SELECT id FROM doctors WHERE id = %s"
+        doctor = execute_query(check_query, (doctor_id,), fetch_one=True)
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+        
+        # Build update query dynamically based on provided fields
+        update_fields = []
+        values = []
+        
+        # Editable fields (excluding email and rating)
+        editable_fields = ['name', 'phone', 'specialty', 'qualification', 'experience', 'consultation_fee', 'bio']
+        
+        for field in editable_fields:
+            if field in data:
+                update_fields.append(f"{field} = %s")
+                values.append(data[field])
+        
+        if not update_fields:
+            return jsonify({'error': 'No fields to update'}), 400
+        
+        # Add doctor_id to values for WHERE clause
+        values.append(doctor_id)
+        
+        # Update query
+        update_query = f"""
+            UPDATE doctors 
+            SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        
+        execute_query(update_query, tuple(values), commit=True)
+        
+        # Fetch updated profile
+        fetch_query = """
+            SELECT id, name, email, phone, specialty, qualification, 
+                   experience, rating, consultation_fee, bio
+            FROM doctors 
+            WHERE id = %s
+        """
+        updated_doctor = execute_query(fetch_query, (doctor_id,), fetch_one=True)
+        
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'doctor': updated_doctor
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500
+

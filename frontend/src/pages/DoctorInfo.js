@@ -18,6 +18,7 @@ export default function DoctorInfo() {
     const [symptoms, setSymptoms] = useState("");
     const [booking, setBooking] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [errorModal, setErrorModal] = useState({ show: false, message: "" });
 
     // Generate next 7 days with dates
     const generateDates = () => {
@@ -197,7 +198,11 @@ export default function DoctorInfo() {
             const userId = user?.id;
             
             if (!userId) {
-                alert("Please log in to book an appointment.");
+                setErrorModal({
+                    show: true,
+                    message: "Please log in to book an appointment."
+                });
+                setBooking(false);
                 return;
             }
             
@@ -216,8 +221,16 @@ export default function DoctorInfo() {
             // Show success modal instead of alert
             setShowSuccessModal(true);
         } catch (e) {
-            console.error("Failed to book appointment", e);
-            alert(e?.response?.data?.error || "Failed to book appointment.");
+            // Get error details from response (suppress error logging since we show modal)
+            const errorData = e?.response?.data;
+            const errorMessage = errorData?.error || "Failed to book appointment";
+            const additionalMessage = errorData?.message;
+            
+            // Show error modal instead of console error
+            setErrorModal({
+                show: true,
+                message: additionalMessage || errorMessage
+            });
         } finally {
             setBooking(false);
         }
@@ -430,6 +443,82 @@ export default function DoctorInfo() {
                 message={doctor ? `Your appointment with Dr. ${doctor.name} has been confirmed for ${selectedDate} at ${selectedTime}. You will receive a confirmation shortly.` : "Your appointment has been booked successfully!"}
                 buttonText="View My Appointments"
             />
+            
+            {/* Error Modal */}
+            {errorModal.show && (
+                <div 
+                    className="fixed inset-0 flex items-center justify-center p-4"
+                    style={{ 
+                        zIndex: 9999,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+                    }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setErrorModal({ show: false, message: "" });
+                        }
+                    }}
+                >
+                    <div 
+                        className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-10 relative"
+                        style={{ maxWidth: '400px' }}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={() => setErrorModal({ show: false, message: "" })}
+                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors"
+                            style={{ fontSize: '24px', lineHeight: '1' }}
+                        >
+                            ×
+                        </button>
+                        
+                        <div className="text-center">
+                            {/* Error Icon - Red circle with X */}
+                            <div className="mx-auto flex items-center justify-center mb-6" style={{ width: '80px', height: '80px' }}>
+                                <div className="rounded-full bg-red-100 flex items-center justify-center" style={{ width: '80px', height: '80px' }}>
+                                    <svg
+                                        className="text-red-600"
+                                        width="48"
+                                        height="48"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                            
+                            {/* Title */}
+                            <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontSize: '26px', fontWeight: '700' }}>
+                                Cannot Book Appointment
+                            </h3>
+                            
+                            {/* Message */}
+                            <p className="text-gray-600 mb-8" style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                {errorModal.message}
+                            </p>
+                            
+                            {/* OK Button */}
+                            <button
+                                onClick={() => setErrorModal({ show: false, message: "" })}
+                                className="w-full bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all"
+                                style={{ 
+                                    padding: '16px 24px',
+                                    fontSize: '16px',
+                                    borderRadius: '12px'
+                                }}
+                            >
+                                OK, I Understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

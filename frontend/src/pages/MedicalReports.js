@@ -9,6 +9,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import api from "../utils/api";
 
 function MedicalReports() {
@@ -26,6 +27,71 @@ function MedicalReports() {
     if (!file) return "Choose a file (png/jpg/jpeg/pdf)";
     return `${file.name} (${Math.round(file.size / 1024)} KB)`;
   }, [file]);
+
+  const formattedExplanation = useMemo(() => {
+    const raw = (aiExplanation || "").toString();
+    const text = raw.replace(/\r\n/g, "\n").trim();
+    if (!text) return "";
+
+    const toHeading = (label) => {
+      const clean = label
+        .trim()
+        .replace(/\s+/g, " ")
+        .replace(/\bai\b/i, "AI")
+        .replace(/\bocr\b/i, "OCR");
+      return `## ${clean}`;
+    };
+
+    const common = [
+      "Summary",
+      "Overview",
+      "Key points",
+      "Findings",
+      "Interpretation",
+      "What this means",
+      "Normal ranges",
+      "Possible causes",
+      "Recommendations",
+      "Next steps",
+      "When to seek help",
+      "Red flags",
+      "Disclaimer",
+    ];
+
+    const normalized = text
+      // Normalize bullets
+      .replace(/^[\t ]*[•·]\s+/gm, "- ")
+      // Improve spacing
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[\t ]+$/gm, "")
+      // Convert common section labels into headings
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) return "";
+
+        for (const label of common) {
+          const re = new RegExp(`^${label.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s*[:\\-]\\s*(.*)$`, "i");
+          const m = trimmed.match(re);
+          if (m) {
+            const rest = (m[1] || "").trim();
+            return rest ? `${toHeading(label)}\n${rest}` : toHeading(label);
+          }
+
+          // Handle labels that appear alone (e.g. "Summary")
+          if (trimmed.toLowerCase() === label.toLowerCase()) {
+            return toHeading(label);
+          }
+        }
+
+        return line;
+      })
+      .join("\n")
+      // Ensure a blank line after headings
+      .replace(/^(##\s.+)$/gm, "$1\n");
+
+    return normalized.trim();
+  }, [aiExplanation]);
 
   useEffect(() => {
     if (!file) {
@@ -142,31 +208,21 @@ function MedicalReports() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] bg-gradient-to-br from-slate-50 via-white to-violet-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-[0_10px_30px_-15px_rgba(2,6,23,0.25)] backdrop-blur">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-br from-violet-200/70 to-fuchsia-200/40 blur-2xl" />
-            <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-gradient-to-tr from-sky-200/70 to-blue-200/40 blur-2xl" />
-          </div>
-
-          <div className="relative p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white">
-                    <FileText className="h-3.5 w-3.5" />
-                  </span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-7 h-7 text-purple-700" />
                   Medical Reports
-                  <span className="ml-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
                     OCR + AI
                   </span>
-                </div>
-                <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                  Scan a report. Get a simple explanation.
                 </h1>
-                <p className="mt-2 text-sm sm:text-base text-slate-600 max-w-2xl">
-                  Upload an image or PDF and get a clean, easy-to-read summary generated with OCR + AI.
+                <p className="mt-2 text-sm text-gray-600 max-w-2xl">
+                  Upload a lab report image or PDF and get a clearer, simpler explanation. Informational only — not a medical diagnosis.
                 </p>
               </div>
 
@@ -174,7 +230,7 @@ function MedicalReports() {
                 <button
                   type="button"
                   onClick={resetAll}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   <Trash2 className="h-4 w-4" />
                   Clear
@@ -185,34 +241,32 @@ function MedicalReports() {
             <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Left: Upload + actions */}
               <div className="lg:col-span-5">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-900">1) Upload</h2>
-                    <div className="text-xs text-slate-500">Images + PDFs (png/jpg/jpeg/pdf)</div>
+                    <h2 className="text-sm font-bold text-gray-900">Upload</h2>
+                    <div className="text-xs text-gray-500">png / jpg / jpeg / pdf</div>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                  <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-white p-4">
                     <div className="flex items-start gap-3">
-                      <div className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
+                      <div className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white">
                         <ImageIcon className="h-5 w-5" />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-sm font-semibold text-slate-800">Report file</label>
-                        <p className="mt-1 text-xs text-slate-500">{fileLabel}</p>
+                        <label className="block text-sm font-semibold text-gray-800">Report file</label>
+                        <p className="mt-1 text-xs text-gray-500">{fileLabel}</p>
                         <input
                           type="file"
                           accept="image/png,image/jpeg,application/pdf"
                           onChange={onPickFile}
-                          className="mt-3 block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800"
+                          className="mt-3 block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white hover:file:opacity-95"
                         />
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          PDF pages are rendered and OCR'd (best-effort).
-                        </p>
+                        <p className="mt-2 text-[11px] text-gray-500">PDF pages are rendered and OCR’d (best-effort).</p>
                       </div>
                     </div>
 
                     {previewUrl ? (
-                      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
                         <img
                           src={previewUrl}
                           alt="Report preview"
@@ -223,10 +277,10 @@ function MedicalReports() {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-900">2) Simplify with AI</h2>
-                    <span className="text-[11px] font-semibold text-slate-500">
+                    <h2 className="text-sm font-bold text-gray-900">Simplify with AI</h2>
+                    <span className="text-[11px] font-semibold text-gray-500">
                       OCR + Gemini rewrite (no diagnosis)
                     </span>
                   </div>
@@ -238,7 +292,7 @@ function MedicalReports() {
                     className={`mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
                       ocrLoading || aiLoading || !file
                         ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                        : "bg-gradient-to-r from-slate-900 to-violet-700 text-white shadow hover:opacity-95"
+                        : "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm hover:opacity-95"
                     }`}
                   >
                     {ocrLoading || aiLoading ? (
@@ -253,31 +307,31 @@ function MedicalReports() {
                         : "Simplify with AI"}
                   </button>
 
-                  <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">
+                  <div className="mt-4 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-slate-800">OCR</span>
+                      <span className="font-semibold text-gray-800">OCR</span>
                       {ocrLoading ? (
-                        <span className="inline-flex items-center gap-2 text-slate-600">
+                        <span className="inline-flex items-center gap-2 text-gray-600">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running
                         </span>
                       ) : ocrText.trim() ? (
                         <span className="inline-flex items-center gap-2 text-emerald-700">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Done
                           {confidence !== null ? (
-                            <span className="text-slate-500">• {confidence.toFixed(1)}%</span>
+                            <span className="text-gray-500">• {confidence.toFixed(1)}%</span>
                           ) : null}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-2 text-slate-500">
+                        <span className="inline-flex items-center gap-2 text-gray-500">
                           <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-slate-800">AI summary</span>
+                      <span className="font-semibold text-gray-800">AI summary</span>
                       {aiLoading ? (
-                        <span className="inline-flex items-center gap-2 text-slate-600">
+                        <span className="inline-flex items-center gap-2 text-gray-600">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing
                         </span>
                       ) : aiExplanation.trim() ? (
@@ -285,7 +339,7 @@ function MedicalReports() {
                           <CheckCircle2 className="h-3.5 w-3.5" /> Ready
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-2 text-slate-500">
+                        <span className="inline-flex items-center gap-2 text-gray-500">
                           <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
                         </span>
                       )}
@@ -293,18 +347,18 @@ function MedicalReports() {
                   </div>
 
                   {error ? (
-                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                       {error}
                     </div>
                   ) : null}
 
                   {aiError ? (
-                    <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                       {aiError}
                     </div>
                   ) : null}
 
-                  <div className="mt-4 text-[11px] text-slate-500">
+                  <div className="mt-4 text-[11px] text-gray-500">
                     Informational only — not a medical diagnosis.
                   </div>
                 </div>
@@ -312,22 +366,22 @@ function MedicalReports() {
 
               {/* Right: Results */}
               <div className="lg:col-span-7">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900">Simple explanation</h2>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <h2 className="text-sm font-bold text-gray-900">Simple explanation</h2>
+                      <p className="mt-1 text-xs text-gray-500">
                         A simplified summary based on the report text.
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => copyText(aiExplanation)}
-                      disabled={!aiExplanation.trim()}
+                      onClick={() => copyText(formattedExplanation || aiExplanation)}
+                      disabled={!formattedExplanation.trim()}
                       className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
-                        !aiExplanation.trim()
-                          ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        !formattedExplanation.trim()
+                          ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                       }`}
                       title="Copy AI explanation"
                     >
@@ -336,14 +390,72 @@ function MedicalReports() {
                     </button>
                   </div>
 
-                  <textarea
-                    value={aiExplanation}
-                    readOnly
-                    placeholder="AI explanation will appear here…"
-                    className="mt-4 w-full min-h-[520px] rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-900 shadow-inner focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
+                  {!formattedExplanation.trim() ? (
+                    <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-600">
+                      <div className="font-semibold text-gray-900">No explanation yet</div>
+                      <div className="mt-1 text-gray-600">
+                        Upload a report and click <span className="font-semibold">Simplify with AI</span>.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-2xl border border-gray-200 bg-white shadow-inner">
+                      <div className="max-h-[520px] overflow-auto p-5">
+                        <ReactMarkdown
+                          components={{
+                            h2: ({ children }) => (
+                              <h2 className="mt-5 first:mt-0 text-base font-bold text-gray-900">
+                                {children}
+                              </h2>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="mt-4 text-sm font-bold text-gray-900">{children}</h3>
+                            ),
+                            p: ({ children }) => (
+                              <p className="mt-2 text-sm leading-relaxed text-gray-800">{children}</p>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="mt-2 space-y-1 pl-5 list-disc text-sm text-gray-800">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="mt-2 space-y-1 pl-5 list-decimal text-sm text-gray-800">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li className="leading-relaxed">{children}</li>
+                            ),
+                            strong: ({ children }) => (
+                              <strong className="font-semibold text-gray-900">{children}</strong>
+                            ),
+                            em: ({ children }) => (
+                              <em className="italic text-gray-800">{children}</em>
+                            ),
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-semibold text-blue-600 hover:underline"
+                              >
+                                {children}
+                              </a>
+                            ),
+                            code: ({ children }) => (
+                              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px] text-gray-900">
+                                {children}
+                              </code>
+                            ),
+                          }}
+                        >
+                          {formattedExplanation}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="mt-4 text-[11px] text-slate-500">
+                  <div className="mt-4 text-[11px] text-gray-500">
                     If anything looks wrong or concerning, consult a licensed clinician.
                   </div>
                 </div>

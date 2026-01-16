@@ -31,6 +31,8 @@ export default function ConsultationChatPanel({
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
+  const [canChat, setCanChat] = useState(true);
+  const [appointmentDateTime, setAppointmentDateTime] = useState(null);
   const messagesEndRef = useRef(null);
 
   const title = useMemo(() => {
@@ -61,28 +63,52 @@ export default function ConsultationChatPanel({
     }
   };
 
-  const loadMessages = async (appointmentId) => {
+  const loadMessages = async (appointmentId, isInitialLoad = false) => {
     if (!appointmentId) return;
     setError("");
-    setLoadingMessages(true);
+    // Only show loading indicator on initial load, not during background refreshes
+    if (isInitialLoad) {
+      setLoadingMessages(true);
+    }
     try {
       const res = await api.get(
         `${messagesEndpointBase}/${appointmentId}/messages`
       );
       setMessages(res.data?.messages || []);
+      setCanChat(res.data?.can_chat !== false);
+      
+      // Store appointment date/time for display
+      if (res.data?.appointment_date && res.data?.appointment_time) {
+        const dateStr = res.data.appointment_date.split('T')[0];
+        const timeStr = res.data.appointment_time;
+        setAppointmentDateTime(`${dateStr} ${timeStr}`);
+      }
     } catch (e) {
       const msg = e.response?.data?.message;
-      setError(
-        [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
-          "Failed to load messages"
-      );
+      // Only show errors on initial load to avoid spamming
+      if (isInitialLoad) {
+        setError(
+          [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
+            "Failed to load messages"
+        );
+      }
+      // If backend returns chat not available error, disable chat
+      if (e.response?.data?.can_chat === false) {
+        setCanChat(false);
+      }
     } finally {
-      setLoadingMessages(false);
+      if (isInitialLoad) {
+        setLoadingMessages(false);
+      }
     }
   };
 
   const sendMessage = async () => {
     if (!selected?.appointment_id) return;
+    if (!canChat) {
+      setError("Chat is not available until the appointment time");
+      return;
+    }
     const text = messageText.trim();
     if (!text) return;
 
@@ -95,13 +121,18 @@ export default function ConsultationChatPanel({
           message: text,
         }
       );
-      await Promise.all([loadMessages(selected.appointment_id), loadThreads()]);
+      // Silent refresh after sending message
+      await Promise.all([loadMessages(selected.appointment_id, false), loadThreads()]);
     } catch (e) {
       const msg = e.response?.data?.message;
       setError(
         [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
           "Failed to send message"
       );
+      // If time restriction error, disable chat
+      if (e.response?.data?.can_chat === false) {
+        setCanChat(false);
+      }
     }
   };
 
@@ -115,12 +146,14 @@ export default function ConsultationChatPanel({
       setMessages([]);
       return;
     }
-    loadMessages(selected.appointment_id);
+    // Initial load with loading indicator
+    loadMessages(selected.appointment_id, true);
 
+    // Background refresh every 20 seconds without loading indicator
     const interval = setInterval(() => {
-      loadMessages(selected.appointment_id);
+      loadMessages(selected.appointment_id, false);
       loadThreads();
-    }, 2500);
+    }, 20000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,6 +270,31 @@ export default function ConsultationChatPanel({
               </div>
             ) : loadingMessages ? (
               <p className="text-sm text-gray-500">Loading messages…</p>
+            ) : !canChat ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center bg-amber-50 border border-amber-200 rounded-2xl p-6 max-w-md">
+                  <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-8 h-8 text-amber-600" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 mb-2">
+                    Chat Not Available Yet
+                  </p>
+                  <p className="text-sm text-gray-600 mb-3">
+                    You can start messaging after your appointment time:
+                  </p>
+                  {appointmentDateTime && (
+                    <p className="text-sm font-medium text-amber-700 bg-amber-100 px-4 py-2 rounded-lg inline-block">
+                      {new Date(appointmentDateTime).toLocaleString('en-US', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      })}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-4">
+                    This ensures meaningful communication during and after your consultation.
+                  </p>
+                </div>
+              </div>
             ) : messages.length === 0 ? (
               <p className="text-sm text-gray-500">
                 No messages yet. Say hello.
@@ -275,21 +333,30 @@ export default function ConsultationChatPanel({
           </div>
 
           <div className="p-4 border-t border-gray-200 bg-gray-50">
+            {!canChat && selected && (
+              <div className="mb-3 text-center">
+                <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg inline-block">
+                  💬 Chat will be available after your appointment time
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               <input
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                disabled={!selected}
+                onKeyDown={(e) => e.key === "Enter" && canChat && sendMessage()}
+                disabled={!selected || !canChat}
                 placeholder={
-                  selected ? "Type a message…" : "Select a chat first"
+                  !selected ? "Select a chat first" :
+                  !canChat ? "Chat available after appointment time" :
+                  "Type a message…"
                 }
-                className="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />
               <button
                 type="button"
                 onClick={sendMessage}
-                disabled={!selected}
+                disabled={!selected || !canChat}
                 className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />

@@ -4,6 +4,7 @@ from utils.database import get_db_connection
 from flask_jwt_extended import get_jwt_identity, jwt_required
 import re
 import pymysql
+from datetime import datetime
 
 appointments_bp = Blueprint('appointments', __name__)
 
@@ -121,6 +122,24 @@ def create_appointment():
 
     if not (isinstance(appointment_time, str) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", appointment_time)):
         return jsonify({'error': 'Invalid appointment_time format', 'expected': 'HH:MM or HH:MM:SS or HH:MM-HH:MM'}), 400
+
+    # Validate that the appointment is not in the past
+    try:
+        # Parse the appointment date and time
+        appointment_datetime_str = f"{appointment_date} {appointment_time}"
+        appointment_datetime = datetime.strptime(appointment_datetime_str, "%Y-%m-%d %H:%M:%S")
+        
+        # Get current datetime
+        now = datetime.now()
+        
+        # Check if appointment is in the past
+        if appointment_datetime < now:
+            return jsonify({
+                'error': 'Cannot book appointments in the past',
+                'message': 'Please select a future date and time'
+            }), 400
+    except ValueError as e:
+        return jsonify({'error': f'Invalid date/time format: {str(e)}'}), 400
 
     conn = None
     cursor = None

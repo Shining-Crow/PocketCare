@@ -13,7 +13,13 @@ export default function BookAppointment() {
     const [selectedTime, setSelectedTime] = useState("");
     const [symptoms, setSymptoms] = useState("");
     const [loading, setLoading] = useState(true);
+    const [errorModal, setErrorModal] = useState({ show: false, message: "" });
     const userId = JSON.parse(localStorage.getItem("user"))?.id || 1;
+
+    // Debug: log when modal state changes
+    useEffect(() => {
+        console.log("Error modal state changed:", errorModal);
+    }, [errorModal]);
 
     // Generate next 7 days with dates
     const generateDates = () => {
@@ -188,15 +194,23 @@ export default function BookAppointment() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        console.log("BookAppointment handleSubmit v2.0 - Modal version");
 
         // Validation: Check if all fields are filled
         if (!selectedDate || !selectedTime || !symptoms.trim()) {
-            alert("Please fill in all fields: Date, Time, and Symptoms");
+            console.log("Setting error modal - missing fields");
+            setErrorModal({
+                show: true,
+                message: "Please fill in all fields: Date, Time, and Symptoms"
+            });
             return;
         }
 
         try {
             const convertedTime = convert12to24Hours(selectedTime);
+            console.log("Submitting appointment...", { selectedDate, convertedTime });
+            
             await api.post("/appointments", {
                 user_id: userId,
                 doctor_id: doctorId,
@@ -205,10 +219,25 @@ export default function BookAppointment() {
                 symptoms,
             });
 
-            alert("Appointment booked successfully!");
+            console.log("Appointment successful, navigating...");
+            // Success - navigate to appointments page
             navigate("/appointments");
         } catch (err) {
-            alert(err.response?.data?.error || "Failed to book appointment");
+            console.log("Appointment error caught:", err.response?.data);
+            
+            // Get error details from response
+            const errorData = err.response?.data;
+            const errorMessage = errorData?.error || "Failed to book appointment";
+            const additionalMessage = errorData?.message;
+            
+            const displayMessage = additionalMessage || errorMessage;
+            console.log("Showing error modal with message:", displayMessage);
+            
+            // Set the error modal to show
+            setErrorModal({
+                show: true,
+                message: displayMessage
+            });
         }
     };
 
@@ -397,6 +426,82 @@ export default function BookAppointment() {
                 </div>
             </div>
             <Footer />
+            
+            {/* Error Modal */}
+            {errorModal.show && (
+                <div 
+                    className="fixed inset-0 flex items-center justify-center p-4"
+                    style={{ 
+                        zIndex: 9999,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+                    }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setErrorModal({ show: false, message: "" });
+                        }
+                    }}
+                >
+                    <div 
+                        className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-10 relative"
+                        style={{ maxWidth: '400px' }}
+                    >
+                        {/* Close button */}
+                        <button
+                            onClick={() => setErrorModal({ show: false, message: "" })}
+                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors"
+                            style={{ fontSize: '24px', lineHeight: '1' }}
+                        >
+                            ×
+                        </button>
+                        
+                        <div className="text-center">
+                            {/* Error Icon - Red circle with X */}
+                            <div className="mx-auto flex items-center justify-center mb-6" style={{ width: '80px', height: '80px' }}>
+                                <div className="rounded-full bg-red-100 flex items-center justify-center" style={{ width: '80px', height: '80px' }}>
+                                    <svg
+                                        className="text-red-600"
+                                        width="48"
+                                        height="48"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </div>
+                            </div>
+                            
+                            {/* Title */}
+                            <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontSize: '26px', fontWeight: '700' }}>
+                                Cannot Book Appointment
+                            </h3>
+                            
+                            {/* Message */}
+                            <p className="text-gray-600 mb-8" style={{ fontSize: '15px', lineHeight: '1.6' }}>
+                                {errorModal.message}
+                            </p>
+                            
+                            {/* OK Button */}
+                            <button
+                                onClick={() => setErrorModal({ show: false, message: "" })}
+                                className="w-full bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all"
+                                style={{ 
+                                    padding: '16px 24px',
+                                    fontSize: '16px',
+                                    borderRadius: '12px'
+                                }}
+                            >
+                                OK, I Understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -81,8 +81,9 @@ function UserProfile() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await api.put('/auth/profile', editedData);
-      setProfile({ ...response.data.user, profile_picture: profile.profile_picture });
+      await api.put('/auth/profile', editedData);
+      // Refetch profile to ensure UI is in sync with backend
+      await fetchProfile();
       setEditing(false);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -135,10 +136,10 @@ function UserProfile() {
         <div className="max-w-6xl mx-auto">
           {/* Main Container with Background and Shadow */}
           <div className="bg-white rounded-3xl shadow-2xl p-8">
-            {/* Profile Picture and Name - First */}
-            <div className="flex flex-col items-center mb-8">
+            {/* Profile Picture */}
+            <div className="flex flex-col items-center justify-center mb-8">
               <div className="relative mb-4">
-                <div className="w-32 h-32 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-blue-200">
+                <div className="w-40 h-40 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-blue-200">
                   {profile.profile_picture ? (
                     <img
                       src={profile.profile_picture}
@@ -146,7 +147,7 @@ function UserProfile() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <User className="w-16 h-16 text-blue-600" />
+                    <User className="w-20 h-20 text-blue-600" />
                   )}
                 </div>
                 <label className="absolute bottom-0 right-0 bg-blue-600 p-3 rounded-full cursor-pointer hover:bg-blue-700 transition-all shadow-xl hover:scale-110">
@@ -159,8 +160,8 @@ function UserProfile() {
                   />
                 </label>
               </div>
-              <p className="text-xl text-gray-700 mt-2 font-semibold">{profile.name}</p>
-
+              <p className="text-2xl text-gray-800 font-bold">{profile.name}</p>
+              <p className="text-sm text-gray-500">{profile.email}</p>
             </div>
 
             {/* Stats Cards */}
@@ -244,6 +245,27 @@ function UserProfile() {
 
             {/* Profile Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Name */}
+              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
+                <div className="bg-indigo-100 p-3 rounded-xl shadow-sm">
+                  <User className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-500 mb-1 font-medium">Name</p>
+                  {editing ? (
+                    <input
+                      type="text"
+                      value={editedData.name || ''}
+                      onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
+                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      placeholder="Enter your name"
+                    />
+                  ) : (
+                    <p className="text-gray-900 font-semibold">{profile.name || 'Not set'}</p>
+                  )}
+                </div>
+              </div>
+
               {/* Email */}
               <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
                 <div className="bg-blue-100 p-3 rounded-xl shadow-sm">

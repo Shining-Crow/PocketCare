@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import HealthChat from "./pages/HealthChat";
+import Messages from "./pages/Messages";
 import SymptomChecker from "./pages/SymptomChecker";
 import UserProfile from "./pages/UserProfile";
 import { isAuthenticated, getCurrentUser } from "./utils/auth";
@@ -104,6 +105,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardController />} />
           <Route path="/profile" element={<UserProfile />} />
           <Route path="/health-chat" element={<HealthChat />} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/symptom-checker" element={<SymptomChecker />} />
           <Route path="/reports" element={<MedicalReports />} />
           <Route path="/appointments" element={<Appointments />} />

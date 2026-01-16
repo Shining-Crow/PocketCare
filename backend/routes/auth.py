@@ -4,8 +4,49 @@ from utils.database import execute_query
 from utils.auth_utils import hash_password, verify_password, jwt_required_custom
 from utils.validators import validate_email_format, validate_password_strength, validate_required_fields
 from datetime import datetime
+from datetime import date, timedelta
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _require_admin_identity():
+    identity = get_jwt_identity()
+    identity_s = str(identity or "")
+    if not identity_s.startswith("admin_"):
+        raise PermissionError("Admin access required")
+    return identity_s
+
+
+def _parse_range_days(value: str) -> int:
+    v = (value or "").strip().lower()
+    if v in {"7", "7d", "week", "1w"}:
+        return 7
+    if v in {"30", "30d", "month", "1m"}:
+        return 30
+    if v in {"90", "90d", "3m"}:
+        return 90
+    try:
+        n = int(v.replace("d", ""))
+        return max(1, min(n, 365))
+    except Exception:
+        return 30
+
+
+def _date_start(days: int) -> date:
+    days_i = max(1, min(int(days or 30), 365))
+    end = date.today()
+    return end - timedelta(days=days_i - 1)
+
+
+def _fill_daily_series(start: date, days: int, by_day: dict, factory: dict):
+    end = start + timedelta(days=days - 1)
+    series = []
+    cur = start
+    while cur <= end:
+        key = cur.isoformat()
+        series.append(by_day.get(key, {'day': key, **factory}))
+        cur += timedelta(days=1)
+    return series
 
 # User Registration
 @auth_bp.route('/register', methods=['POST'])
@@ -383,6 +424,8 @@ def admin_login():
 def get_dashboard_stats():
     """Get dashboard statistics for admin"""
     try:
+        _require_admin_identity()
+
         # Total users
         users_query = "SELECT COUNT(*) as count FROM users"
         users_count = execute_query(users_query, fetch_one=True)
@@ -415,9 +458,515 @@ def get_dashboard_stats():
             'total_reports': total_reports['count'],
             'chats_today': chats_today['count']
         }), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch statistics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/appointments', methods=['GET'])
+@jwt_required_custom
+def admin_appointments_analytics():
+    """Return appointment counts per day for charting (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+
+        rows = execute_query(
+            """
+            SELECT
+              DATE(created_at) AS day,
+              COUNT(*) AS total,
+              SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed,
+              SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+              SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+            FROM appointments
+            WHERE created_at >= %s
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        by_day = {}
+        for r in rows or []:
+            d = r.get('day')
+            if not d:
+                continue
+            try:
+                key = d.isoformat()
+            except Exception:
+                key = str(d)
+            by_day[key] = {
+                'day': key,
+                'total': int(r.get('total') or 0),
+                'pending': int(r.get('pending') or 0),
+                'confirmed': int(r.get('confirmed') or 0),
+                'completed': int(r.get('completed') or 0),
+                'cancelled': int(r.get('cancelled') or 0),
+            }
+
+        series = _fill_daily_series(
+            start,
+            days,
+            by_day,
+            {
+                'total': 0,
+                'pending': 0,
+                'confirmed': 0,
+                'completed': 0,
+                'cancelled': 0,
+            },
+        )
+
+        return jsonify({'range_days': days, 'series': series}), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/doctors/activity', methods=['GET'])
+@jwt_required_custom
+def admin_doctors_activity_analytics():
+    """Doctor activity stats: zero appointments + top performers (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+        limit = request.args.get('limit', '10')
+        try:
+            limit_i = max(1, min(int(limit), 50))
+        except Exception:
+            limit_i = 10
+
+        totals = execute_query('SELECT COUNT(*) AS count FROM doctors', fetch_one=True) or {}
+        active = execute_query(
+            """
+            SELECT COUNT(DISTINCT doctor_id) AS count
+            FROM appointments
+            WHERE created_at >= %s
+            """,
+            (start,),
+            fetch_one=True,
+        ) or {}
+
+        zero = execute_query(
+            """
+            SELECT COUNT(*) AS count
+            FROM doctors d
+            LEFT JOIN appointments a ON a.doctor_id = d.id
+            WHERE a.id IS NULL
+            """,
+            fetch_one=True,
+        ) or {}
+
+        top = execute_query(
+            """
+            SELECT d.id, d.name, d.specialty, COUNT(a.id) AS appointments
+            FROM doctors d
+            JOIN appointments a ON a.doctor_id = d.id
+            WHERE a.created_at >= %s
+            GROUP BY d.id, d.name, d.specialty
+            ORDER BY appointments DESC
+            LIMIT %s
+            """,
+            (start, limit_i),
+            fetch_all=True,
+        )
+
+        return jsonify(
+            {
+                'range_days': days,
+                'total_doctors': int((totals or {}).get('count') or 0),
+                'active_doctors': int((active or {}).get('count') or 0),
+                'doctors_with_zero_appointments': int((zero or {}).get('count') or 0),
+                'top_doctors': top or [],
+            }
+        ), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/specialties', methods=['GET'])
+@jwt_required_custom
+def admin_specialties_analytics():
+    """Specialty distribution and demand (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+
+        distribution = execute_query(
+            """
+            SELECT specialty, COUNT(*) AS doctors
+            FROM doctors
+            GROUP BY specialty
+            ORDER BY doctors DESC
+            LIMIT 20
+            """,
+            fetch_all=True,
+        )
+
+        demand = execute_query(
+            """
+            SELECT d.specialty AS specialty, COUNT(a.id) AS appointments
+            FROM appointments a
+            JOIN doctors d ON d.id = a.doctor_id
+            WHERE a.created_at >= %s
+            GROUP BY d.specialty
+            ORDER BY appointments DESC
+            LIMIT 20
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        return jsonify({'range_days': days, 'distribution': distribution or [], 'demand': demand or []}), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/chats', methods=['GET'])
+@jwt_required_custom
+def admin_chats_analytics():
+    """AI chat + consultation chat analytics (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+
+        ai_rows = execute_query(
+            """
+            SELECT DATE(created_at) AS day,
+                   COUNT(*) AS messages,
+                   COUNT(DISTINCT user_id) AS sessions
+            FROM chat_messages
+            WHERE created_at >= %s
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        consult_threads = execute_query(
+            """
+            SELECT DATE(created_at) AS day,
+                   COUNT(*) AS threads
+            FROM consultation_threads
+            WHERE created_at >= %s
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        consult_msgs = execute_query(
+            """
+            SELECT DATE(created_at) AS day,
+                   COUNT(*) AS messages
+            FROM consultation_messages
+            WHERE created_at >= %s
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        by_day = {}
+
+        for r in ai_rows or []:
+            d = r.get('day')
+            if not d:
+                continue
+            key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            by_day.setdefault(key, {'day': key, 'ai_sessions': 0, 'ai_messages': 0, 'consult_threads': 0, 'consult_messages': 0})
+            by_day[key]['ai_sessions'] = int(r.get('sessions') or 0)
+            by_day[key]['ai_messages'] = int(r.get('messages') or 0)
+
+        for r in consult_threads or []:
+            d = r.get('day')
+            if not d:
+                continue
+            key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            by_day.setdefault(key, {'day': key, 'ai_sessions': 0, 'ai_messages': 0, 'consult_threads': 0, 'consult_messages': 0})
+            by_day[key]['consult_threads'] = int(r.get('threads') or 0)
+
+        for r in consult_msgs or []:
+            d = r.get('day')
+            if not d:
+                continue
+            key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            by_day.setdefault(key, {'day': key, 'ai_sessions': 0, 'ai_messages': 0, 'consult_threads': 0, 'consult_messages': 0})
+            by_day[key]['consult_messages'] = int(r.get('messages') or 0)
+
+        series = _fill_daily_series(
+            start,
+            days,
+            by_day,
+            {'ai_sessions': 0, 'ai_messages': 0, 'consult_threads': 0, 'consult_messages': 0},
+        )
+
+        return jsonify({'range_days': days, 'series': series}), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/reports', methods=['GET'])
+@jwt_required_custom
+def admin_reports_analytics():
+    """Medical reports analytics (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+
+        daily_rows = execute_query(
+            """
+            SELECT DATE(uploaded_at) AS day,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN ocr_text IS NOT NULL AND LENGTH(TRIM(ocr_text)) > 0 THEN 1 ELSE 0 END) AS ocr_success,
+                   SUM(CASE WHEN ocr_text IS NULL OR LENGTH(TRIM(ocr_text)) = 0 THEN 1 ELSE 0 END) AS ocr_failed,
+                   SUM(CASE WHEN ai_interpretation IS NOT NULL AND LENGTH(TRIM(ai_interpretation)) > 0 THEN 1 ELSE 0 END) AS ai_simplified
+            FROM medical_reports
+            WHERE uploaded_at >= %s
+            GROUP BY DATE(uploaded_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        by_day = {}
+        for r in daily_rows or []:
+            d = r.get('day')
+            if not d:
+                continue
+            key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            by_day[key] = {
+                'day': key,
+                'total': int(r.get('total') or 0),
+                'ocr_success': int(r.get('ocr_success') or 0),
+                'ocr_failed': int(r.get('ocr_failed') or 0),
+                'ai_simplified': int(r.get('ai_simplified') or 0),
+            }
+
+        series = _fill_daily_series(
+            start,
+            days,
+            by_day,
+            {'total': 0, 'ocr_success': 0, 'ocr_failed': 0, 'ai_simplified': 0},
+        )
+
+        names = execute_query(
+            """
+            SELECT file_name
+            FROM medical_reports
+            WHERE uploaded_at >= %s
+            LIMIT 5000
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        ext_counts = {}
+        for row in names or []:
+            name = (row.get('file_name') or '').strip().lower()
+            ext = 'unknown'
+            if '.' in name:
+                ext = name.rsplit('.', 1)[-1]
+                if len(ext) > 8:
+                    ext = 'unknown'
+            ext_counts[ext] = ext_counts.get(ext, 0) + 1
+
+        file_types = [
+            {'type': k, 'count': v}
+            for k, v in sorted(ext_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        ]
+
+        return jsonify({'range_days': days, 'series': series, 'file_types': file_types}), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/symptoms', methods=['GET'])
+@jwt_required_custom
+def admin_symptoms_analytics():
+    """Symptom checker analytics (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '30d'))
+        start = _date_start(days)
+
+        daily_rows = execute_query(
+            """
+            SELECT DATE(created_at) AS day,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN urgency_level = 'low' THEN 1 ELSE 0 END) AS low,
+                   SUM(CASE WHEN urgency_level = 'medium' THEN 1 ELSE 0 END) AS medium,
+                   SUM(CASE WHEN urgency_level = 'high' THEN 1 ELSE 0 END) AS high
+            FROM symptom_logs
+            WHERE created_at >= %s
+            GROUP BY DATE(created_at)
+            ORDER BY day ASC
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        by_day = {}
+        for r in daily_rows or []:
+            d = r.get('day')
+            if not d:
+                continue
+            key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+            by_day[key] = {
+                'day': key,
+                'total': int(r.get('total') or 0),
+                'low': int(r.get('low') or 0),
+                'medium': int(r.get('medium') or 0),
+                'high': int(r.get('high') or 0),
+            }
+
+        series = _fill_daily_series(start, days, by_day, {'total': 0, 'low': 0, 'medium': 0, 'high': 0})
+
+        rows = execute_query(
+            """
+            SELECT symptoms
+            FROM symptom_logs
+            WHERE created_at >= %s
+            LIMIT 5000
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        counts = {}
+        for r in rows or []:
+            raw = (r.get('symptoms') or '').strip().lower()
+            if not raw:
+                continue
+            parts = [p.strip() for p in raw.replace('\n', ',').replace(';', ',').split(',')]
+            parts = [p for p in parts if p]
+            if not parts:
+                continue
+            for p in parts[:10]:
+                counts[p] = counts.get(p, 0) + 1
+
+        top = [
+            {'symptom': k, 'count': v}
+            for k, v in sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:12]
+        ]
+
+        return jsonify({'range_days': days, 'series': series, 'top_symptoms': top}), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/analytics/weight', methods=['GET'])
+@jwt_required_custom
+def admin_weight_analytics():
+    """Weight management engagement analytics (admin only)."""
+
+    try:
+        _require_admin_identity()
+        days = _parse_range_days(request.args.get('range', '90d'))
+        start = _date_start(days)
+
+        active_goals = execute_query(
+            """
+            SELECT COUNT(*) AS count
+            FROM weight_goals
+            WHERE is_active = TRUE
+            """,
+            fetch_one=True,
+        ) or {}
+
+        entries = execute_query(
+            """
+            SELECT user_id, entry_date
+            FROM weight_entries
+            WHERE entry_date >= %s
+            """,
+            (start,),
+            fetch_all=True,
+        )
+
+        by_week = {}
+        users_set = set()
+
+        for r in entries or []:
+            user_id = r.get('user_id')
+            dt = r.get('entry_date')
+            if user_id is not None:
+                users_set.add(int(user_id))
+            if not dt:
+                continue
+            try:
+                iso_year, iso_week, _ = dt.isocalendar()
+                key = f"{iso_year}-W{int(iso_week):02d}"
+            except Exception:
+                key = str(dt)
+            bucket = by_week.setdefault(key, {'week': key, 'entries': 0, 'users': set()})
+            bucket['entries'] += 1
+            if user_id is not None:
+                bucket['users'].add(int(user_id))
+
+        week_series = []
+        for key in sorted(by_week.keys()):
+            b = by_week[key]
+            week_series.append({'week': b['week'], 'entries': int(b['entries']), 'users': int(len(b['users']))})
+
+        total_entries = sum(b['entries'] for b in by_week.values())
+        distinct_users = len(users_set)
+        weeks = max(1, int((days + 6) / 7))
+        avg_checkins = 0.0
+        if distinct_users > 0:
+            avg_checkins = float(total_entries) / float(distinct_users * weeks)
+
+        return jsonify(
+            {
+                'range_days': days,
+                'active_goals': int(active_goals.get('count') or 0),
+                'avg_checkins_per_user_per_week': round(avg_checkins, 3),
+                'weekly': week_series,
+            }
+        ), 200
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
 
 # Doctor Profile Endpoints
 @auth_bp.route('/doctor/profile', methods=['GET'])

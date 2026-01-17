@@ -218,6 +218,11 @@ export default function Appointments() {
                                 >
                                   {appointment.status}
                                 </span>
+                                {appointment.is_emergency && (
+                                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                    🚨 Emergency
+                                  </span>
+                                )}
                               </div>
                               <p className="text-gray-600 mb-2">
                                 {appointment.doctor_specialty}
@@ -316,6 +321,11 @@ export default function Appointments() {
                                 >
                                   {appointment.status}
                                 </span>
+                                {appointment.is_emergency && (
+                                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                    🚨 Emergency
+                                  </span>
+                                )}
                               </div>
                               <p className="text-gray-600 mb-2">
                                 {appointment.doctor_specialty}

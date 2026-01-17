@@ -14,7 +14,7 @@ def get_doctor(id):
     cursor = conn.cursor()
     cursor.execute("""SELECT id, name, email, phone, specialty, qualification, 
                       experience, rating, consultation_fee, bio, available_slots, 
-                      available_days, day_specific_availability, created_at FROM doctors WHERE id=%s""", (id,))
+                      available_days, day_specific_availability, is_available, created_at FROM doctors WHERE id=%s""", (id,))
     doctor = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -32,7 +32,7 @@ def get_doctor_profile():
         query = """
             SELECT id, name, email, phone, specialty, specialty_id, specialties, qualification, 
                    experience, rating, consultation_fee, bio, available_slots,
-                   available_days, day_specific_availability, created_at
+                   available_days, day_specific_availability, is_available, created_at
             FROM doctors 
             WHERE id = %s
         """
@@ -319,3 +319,31 @@ def get_doctor_appointments():
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch appointments: {str(e)}'}), 500
+
+
+# Toggle doctor availability
+@doctors_bp.route('/doctor/availability', methods=['PUT'])
+@jwt_required_custom
+def toggle_doctor_availability():
+    """Toggle doctor's availability status"""
+    try:
+        doctor_id = get_jwt_identity()
+        data = request.get_json() or {}
+        
+        is_available = data.get('is_available')
+        
+        if is_available is None:
+            return jsonify({'error': 'is_available field is required'}), 400
+        
+        # Update doctor availability
+        query = "UPDATE doctors SET is_available = %s WHERE id = %s"
+        execute_query(query, (bool(is_available), doctor_id), commit=True)
+        
+        status_text = "available" if is_available else "unavailable"
+        return jsonify({
+            'message': f'Availability set to {status_text}',
+            'is_available': bool(is_available)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update availability: {str(e)}'}), 500

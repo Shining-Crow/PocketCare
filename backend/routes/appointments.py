@@ -82,6 +82,7 @@ def get_doctors():
             'bio',
             'available_slots',
             'available_days',
+            'is_available',
         ]
 
         cursor.execute('SELECT DATABASE() AS db')
@@ -169,6 +170,7 @@ def create_appointment():
 
     appointment_date = data.get('appointment_date')
     appointment_time = data.get('appointment_time')
+    is_emergency = data.get('is_emergency', False)
 
     if isinstance(appointment_time, str) and '-' in appointment_time:
         appointment_time = appointment_time.split('-', 1)[0].strip()
@@ -213,11 +215,39 @@ def create_appointment():
         if not cursor.fetchone():
             return jsonify({'error': 'Doctor not found'}), 404
 
+        # Check timeslot capacity (max 5 confirmed/pending appointments per slot)
+        # Only check for non-emergency appointments
+        if not is_emergency:
+            cursor.execute(
+                """
+                SELECT COUNT(*) as count 
+                FROM appointments 
+                WHERE doctor_id = %s 
+                AND appointment_date = %s 
+                AND appointment_time = %s 
+                AND status IN ('pending', 'confirmed')
+                """,
+                (int(doctor_id), appointment_date, appointment_time)
+            )
+            result = cursor.fetchone()
+            slot_count = result['count'] if result else 0
+            
+            if slot_count >= 5:
+                return jsonify({
+                    'error': 'Timeslot is full',
+                    'message': 'This timeslot already has 5 appointments. If this is an emergency, please select the emergency option.',
+                    'slot_full': True
+                }), 400
+
+        # For emergency appointments, always require doctor approval (pending status)
+        # For normal appointments, auto-confirm if slot is available
+        status = 'pending' if is_emergency else 'confirmed'
+
         cursor.execute(
             """
             INSERT INTO appointments 
-            (user_id, doctor_id, appointment_date, appointment_time, symptoms)
-            VALUES (%s, %s, %s, %s, %s)
+            (user_id, doctor_id, appointment_date, appointment_time, symptoms, status)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 user_id,
@@ -225,10 +255,17 @@ def create_appointment():
                 appointment_date,
                 appointment_time,
                 data.get('symptoms'),
+                status,
             ),
         )
         conn.commit()
-        return jsonify({"message": "Appointment booked"}), 201
+        
+        message = "Emergency appointment request sent to doctor" if is_emergency else "Appointment confirmed automatically"
+        return jsonify({
+            "message": message,
+            "status": status,
+            "is_emergency": is_emergency
+        }), 201
     except (ValueError, TypeError):
         return jsonify({'error': 'doctor_id must be an integer'}), 400
     except pymysql.MySQLError as e:

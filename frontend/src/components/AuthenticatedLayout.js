@@ -21,8 +21,6 @@ function AuthenticatedLayout() {
     navigate("/login");
   };
 
-  const onDashboard = location.pathname === "/dashboard";
-
   return (
     <div className="min-h-screen">
       {isDoctor ? <DoctorNavbar handleLogout={handleLogout} /> : <UserNavbar />}

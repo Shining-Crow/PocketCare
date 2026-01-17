@@ -445,7 +445,7 @@ function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      My Profile
+                      Recent Activity
                     </h3>
                     <p className="text-sm text-gray-500">
                       Manage your healthcare appointments

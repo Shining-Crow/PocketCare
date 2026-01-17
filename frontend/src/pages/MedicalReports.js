@@ -12,6 +12,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import api from "../utils/api";
 import ConfirmationModal from "../components/ConfirmationModal";
+import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function MedicalReports() {
   const [file, setFile] = useState(null);
@@ -79,7 +80,13 @@ function MedicalReports() {
         if (!trimmed) return "";
 
         for (const label of common) {
-          const re = new RegExp(`^${label.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s*[:\\-]\\s*(.*)$`, "i");
+          const re = new RegExp(
+            `^${label.replace(
+              /[-/\\^$*+?.()|[\]{}]/g,
+              "\\$&"
+            )}\\s*[:\\-]\\s*(.*)$`,
+            "i"
+          );
           const m = trimmed.match(re);
           if (m) {
             const rest = (m[1] || "").trim();
@@ -206,7 +213,8 @@ function MedicalReports() {
 
       const res = await api.post("/reports/simplify", form);
       const extracted = (res.data?.text || "").toString();
-      const conf = typeof res.data?.confidence === "number" ? res.data.confidence : null;
+      const conf =
+        typeof res.data?.confidence === "number" ? res.data.confidence : null;
       const explanation = (res.data?.explanation || "").toString();
       const reportId = res.data?.report_id;
 
@@ -282,15 +290,19 @@ function MedicalReports() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-start justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex items-center gap-2">
-              <FileText className="w-8 h-8 text-purple-700" />
-              Medical Reports
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                OCR + AI
-              </span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <BackToDashboardButton className="shrink-0" />
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex items-center gap-2">
+                <FileText className="w-8 h-8 text-purple-700" />
+                Medical Reports
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                  OCR + AI
+                </span>
+              </h1>
+            </div>
             <p className="text-sm text-gray-600 mt-1">
-              Upload a lab report image or PDF and get a clearer, simpler explanation. Informational only — not a medical diagnosis.
+              Upload a lab report image or PDF and get a clearer, simpler
+              explanation. Informational only — not a medical diagnosis.
             </p>
           </div>
 
@@ -308,43 +320,55 @@ function MedicalReports() {
           {/* Main: Upload + Run + Results */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Upload & Simplify</h2>
-              <div className="text-xs text-gray-500">png / jpg / jpeg / pdf</div>
+              <h2 className="text-lg font-bold text-gray-900">
+                Upload & Simplify
+              </h2>
+              <div className="text-xs text-gray-500">
+                png / jpg / jpeg / pdf
+              </div>
             </div>
 
-                  <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                        <ImageIcon className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-semibold text-gray-800">Report file</label>
-                        <p className="mt-1 text-xs text-gray-500">{fileLabel}</p>
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,application/pdf"
-                          onChange={onPickFile}
-                          className="mt-3 block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white hover:file:opacity-95"
-                        />
-                        <p className="mt-2 text-[11px] text-gray-500">PDF pages are rendered and OCR’d (best-effort).</p>
-                      </div>
-                    </div>
+            <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-white p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Report file
+                  </label>
+                  <p className="mt-1 text-xs text-gray-500">{fileLabel}</p>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,application/pdf"
+                    onChange={onPickFile}
+                    className="mt-3 block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white hover:file:opacity-95"
+                  />
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    PDF pages are rendered and OCR’d (best-effort).
+                  </p>
+                </div>
+              </div>
 
-                    {previewUrl ? (
-                      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
-                        <img
-                          src={previewUrl}
-                          alt="Report preview"
-                          className="h-44 w-full object-cover"
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+              {previewUrl ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+                  <img
+                    src={previewUrl}
+                    alt="Report preview"
+                    className="h-44 w-full object-cover"
+                  />
+                </div>
+              ) : null}
+            </div>
 
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-gray-900">Simplify with AI</h2>
-                <span className="text-[11px] font-semibold text-gray-500">OCR + Gemini rewrite (no diagnosis)</span>
+                <h2 className="text-sm font-bold text-gray-900">
+                  Simplify with AI
+                </h2>
+                <span className="text-[11px] font-semibold text-gray-500">
+                  OCR + Gemini rewrite (no diagnosis)
+                </span>
               </div>
 
               <button
@@ -357,8 +381,16 @@ function MedicalReports() {
                     : "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm hover:opacity-95"
                 }`}
               >
-                {ocrLoading || aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {ocrLoading ? "Reading report…" : aiLoading ? "Simplifying…" : "Simplify with AI"}
+                {ocrLoading || aiLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {ocrLoading
+                  ? "Reading report…"
+                  : aiLoading
+                  ? "Simplifying…"
+                  : "Simplify with AI"}
               </button>
 
               <div className="mt-4 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
@@ -371,17 +403,24 @@ function MedicalReports() {
                   ) : ocrText.trim() ? (
                     <span className="inline-flex items-center gap-2 text-emerald-700">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Done
-                      {confidence !== null ? <span className="text-gray-500">• {confidence.toFixed(1)}%</span> : null}
+                      {confidence !== null ? (
+                        <span className="text-gray-500">
+                          • {confidence.toFixed(1)}%
+                        </span>
+                      ) : null}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-2 text-gray-500">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />{" "}
+                      Pending
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-gray-800">AI summary</span>
+                  <span className="font-semibold text-gray-800">
+                    AI summary
+                  </span>
                   {aiLoading ? (
                     <span className="inline-flex items-center gap-2 text-gray-600">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing
@@ -392,33 +431,46 @@ function MedicalReports() {
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-2 text-gray-500">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Pending
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />{" "}
+                      Pending
                     </span>
                   )}
                 </div>
               </div>
 
               {error ? (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
               ) : null}
 
               {aiError ? (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{aiError}</div>
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {aiError}
+                </div>
               ) : null}
 
-              <div className="mt-4 text-[11px] text-gray-500">Informational only — not a medical diagnosis.</div>
+              <div className="mt-4 text-[11px] text-gray-500">
+                Informational only — not a medical diagnosis.
+              </div>
             </div>
 
             {/* Result */}
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900">Simple explanation</h2>
-                  <p className="mt-1 text-xs text-gray-500">A simplified summary based on the report text.</p>
+                  <h2 className="text-sm font-bold text-gray-900">
+                    Simple explanation
+                  </h2>
+                  <p className="mt-1 text-xs text-gray-500">
+                    A simplified summary based on the report text.
+                  </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyText(formattedExplanation || aiExplanation)}
+                  onClick={() =>
+                    copyText(formattedExplanation || aiExplanation)
+                  }
                   disabled={!formattedExplanation.trim()}
                   className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
                     !formattedExplanation.trim()
@@ -434,9 +486,12 @@ function MedicalReports() {
 
               {!formattedExplanation.trim() ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-600">
-                  <div className="font-semibold text-gray-900">No explanation yet</div>
+                  <div className="font-semibold text-gray-900">
+                    No explanation yet
+                  </div>
                   <div className="mt-1 text-gray-600">
-                    Upload a report and click <span className="font-semibold">Simplify with AI</span>.
+                    Upload a report and click{" "}
+                    <span className="font-semibold">Simplify with AI</span>.
                   </div>
                 </div>
               ) : (
@@ -445,30 +500,55 @@ function MedicalReports() {
                     <ReactMarkdown
                       components={{
                         h2: ({ children }) => (
-                          <h2 className="mt-5 first:mt-0 text-base font-bold text-gray-900">{children}</h2>
+                          <h2 className="mt-5 first:mt-0 text-base font-bold text-gray-900">
+                            {children}
+                          </h2>
                         ),
                         h3: ({ children }) => (
-                          <h3 className="mt-4 text-sm font-bold text-gray-900">{children}</h3>
+                          <h3 className="mt-4 text-sm font-bold text-gray-900">
+                            {children}
+                          </h3>
                         ),
                         p: ({ children }) => (
-                          <p className="mt-2 text-sm leading-relaxed text-gray-800">{children}</p>
+                          <p className="mt-2 text-sm leading-relaxed text-gray-800">
+                            {children}
+                          </p>
                         ),
                         ul: ({ children }) => (
-                          <ul className="mt-2 space-y-1 pl-5 list-disc text-sm text-gray-800">{children}</ul>
+                          <ul className="mt-2 space-y-1 pl-5 list-disc text-sm text-gray-800">
+                            {children}
+                          </ul>
                         ),
                         ol: ({ children }) => (
-                          <ol className="mt-2 space-y-1 pl-5 list-decimal text-sm text-gray-800">{children}</ol>
+                          <ol className="mt-2 space-y-1 pl-5 list-decimal text-sm text-gray-800">
+                            {children}
+                          </ol>
                         ),
-                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                        em: ({ children }) => <em className="italic text-gray-800">{children}</em>,
+                        li: ({ children }) => (
+                          <li className="leading-relaxed">{children}</li>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-gray-900">
+                            {children}
+                          </strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic text-gray-800">{children}</em>
+                        ),
                         a: ({ href, children }) => (
-                          <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-blue-600 hover:underline">
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold text-blue-600 hover:underline"
+                          >
                             {children}
                           </a>
                         ),
                         code: ({ children }) => (
-                          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px] text-gray-900">{children}</code>
+                          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px] text-gray-900">
+                            {children}
+                          </code>
                         ),
                       }}
                     >
@@ -478,7 +558,10 @@ function MedicalReports() {
                 </div>
               )}
 
-              <div className="mt-4 text-[11px] text-gray-500">If anything looks wrong or concerning, consult a licensed clinician.</div>
+              <div className="mt-4 text-[11px] text-gray-500">
+                If anything looks wrong or concerning, consult a licensed
+                clinician.
+              </div>
             </div>
           </div>
 
@@ -487,12 +570,16 @@ function MedicalReports() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">History</h2>
-                <p className="text-xs text-gray-500 mt-1">Your recent simplified reports</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Your recent simplified reports
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setClearHistoryOpen(true)}
-                disabled={historyClearing || historyLoading || history.length === 0}
+                disabled={
+                  historyClearing || historyLoading || history.length === 0
+                }
                 className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
                   historyClearing || historyLoading || history.length === 0
                     ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
@@ -506,7 +593,9 @@ function MedicalReports() {
             </div>
 
             {historyError ? (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{historyError}</div>
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {historyError}
+              </div>
             ) : null}
 
             <div className="mt-4">
@@ -522,13 +611,19 @@ function MedicalReports() {
                     const isActive = activeHistoryId === h.id;
                     const title = (h.file_name || "Report").toString();
                     const when = formatWhenShort(h.uploaded_at);
-                    const preview = (h.ai_interpretation || "").toString().replace(/\r\n/g, "\n").trim();
+                    const preview = (h.ai_interpretation || "")
+                      .toString()
+                      .replace(/\r\n/g, "\n")
+                      .trim();
                     const previewPlain = preview
                       .replace(/[*_`>#~]/g, "")
                       .replace(/\n+/g, " ")
                       .replace(/\s{2,}/g, " ")
                       .trim();
-                    const short = previewPlain.length > 110 ? `${previewPlain.slice(0, 107)}…` : previewPlain;
+                    const short =
+                      previewPlain.length > 110
+                        ? `${previewPlain.slice(0, 107)}…`
+                        : previewPlain;
 
                     return (
                       <button
@@ -543,12 +638,22 @@ function MedicalReports() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
-                            {when ? <div className="mt-0.5 text-[11px] text-gray-500">{when}</div> : null}
+                            <div className="text-sm font-semibold text-gray-900 truncate">
+                              {title}
+                            </div>
+                            {when ? (
+                              <div className="mt-0.5 text-[11px] text-gray-500">
+                                {when}
+                              </div>
+                            ) : null}
                             {short ? (
-                              <div className="mt-1 text-xs text-gray-600 truncate">{short}</div>
+                              <div className="mt-1 text-xs text-gray-600 truncate">
+                                {short}
+                              </div>
                             ) : (
-                              <div className="mt-1 text-xs text-gray-500">(No text)</div>
+                              <div className="mt-1 text-xs text-gray-500">
+                                (No text)
+                              </div>
                             )}
                           </div>
                           <div className="shrink-0 pt-0.5">
@@ -568,7 +673,9 @@ function MedicalReports() {
 
             <ConfirmationModal
               isOpen={clearHistoryOpen}
-              onClose={() => (historyClearing ? null : setClearHistoryOpen(false))}
+              onClose={() =>
+                historyClearing ? null : setClearHistoryOpen(false)
+              }
               onConfirm={clearHistory}
               title="Clear report history?"
               message="This will permanently remove all your saved OCR medical reports and AI explanations."

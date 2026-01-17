@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "../utils/api";
-import { 
-  MessageSquare, 
-  Send, 
-  Clock, 
-  CheckCheck, 
+import {
+  MessageSquare,
+  Send,
+  Clock,
+  CheckCheck,
   Search,
   Smile,
   Paperclip,
@@ -13,8 +13,9 @@ import {
   Info,
   Star,
   Calendar,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
+import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function formatTime(isoString) {
   if (!isoString) return "";
@@ -33,13 +34,13 @@ function formatDate(isoString) {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (d.toDateString() === today.toDateString()) {
       return "Today";
     } else if (d.toDateString() === yesterday.toDateString()) {
       return "Yesterday";
     } else {
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return d.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   } catch {
     return "";
@@ -59,6 +60,8 @@ export default function Messages() {
   const [appointmentDateTime, setAppointmentDateTime] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState("");
   const messagesEndRef = useRef(null);
+  const suppressMessageAnimationsRef = useRef(true);
+  const seenMessageIdsRef = useRef(new Set());
 
   const loadThreads = async () => {
     setError("");
@@ -88,14 +91,23 @@ export default function Messages() {
       setLoadingMessages(true);
     }
     try {
-      const res = await api.get(
-        `/user/doctor-chats/${appointmentId}/messages`
-      );
-      setMessages(res.data?.messages || []);
+      const res = await api.get(`/user/doctor-chats/${appointmentId}/messages`);
+      const nextMessages = res.data?.messages || [];
+
+      // On initial load, render everything instantly (no stagger/animation),
+      // then only animate truly new messages on subsequent updates.
+      if (isInitialLoad) {
+        seenMessageIdsRef.current = new Set(
+          nextMessages.map((m) => m?.id).filter(Boolean)
+        );
+        suppressMessageAnimationsRef.current = false;
+      }
+
+      setMessages(nextMessages);
       setCanChat(res.data?.can_chat === true);
-      
+
       if (res.data?.appointment_date && res.data?.appointment_time) {
-        const dateStr = res.data.appointment_date.split('T')[0];
+        const dateStr = res.data.appointment_date.split("T")[0];
         const timeStr = res.data.appointment_time;
         setAppointmentDateTime(`${dateStr} ${timeStr}`);
       }
@@ -129,13 +141,13 @@ export default function Messages() {
     setMessageText("");
     setError("");
     try {
-      await api.post(
-        `/user/doctor-chats/${selected.appointment_id}/messages`,
-        {
-          message: text,
-        }
-      );
-      await Promise.all([loadMessages(selected.appointment_id, false), loadThreads()]);
+      await api.post(`/user/doctor-chats/${selected.appointment_id}/messages`, {
+        message: text,
+      });
+      await Promise.all([
+        loadMessages(selected.appointment_id, false),
+        loadThreads(),
+      ]);
     } catch (e) {
       const msg = e.response?.data?.message;
       setError(
@@ -158,6 +170,10 @@ export default function Messages() {
       setMessages([]);
       return;
     }
+
+    // New thread selected: suppress animations for the initial paint.
+    suppressMessageAnimationsRef.current = true;
+    seenMessageIdsRef.current = new Set();
     loadMessages(selected.appointment_id, true);
 
     const interval = setInterval(() => {
@@ -172,6 +188,12 @@ export default function Messages() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    for (const m of messages) {
+      if (m?.id) seenMessageIdsRef.current.add(m.id);
+    }
+  }, [messages]);
 
   // Timer effect for appointment countdown
   useEffect(() => {
@@ -191,7 +213,9 @@ export default function Messages() {
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
@@ -216,15 +240,16 @@ export default function Messages() {
   }, [appointmentDateTime, canChat]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex overflow-hidden">
+    <div className="w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex overflow-hidden h-[calc(100vh-4rem)]">
       {/* Left Sidebar - Doctor List (Instagram-like) */}
       <div className="w-full md:w-96 border-r border-white/50 flex flex-col bg-white/80 backdrop-blur-xl shadow-xl h-full">
         {/* Header */}
         <div className="px-6 py-6 border-b border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-blue-600">
-              Messages
-            </h1>
+            <div className="flex items-center gap-3">
+              <BackToDashboardButton className="shrink-0" />
+              <h1 className="text-2xl font-bold text-blue-600">Messages</h1>
+            </div>
           </div>
           {/* Search Bar */}
           <div className="relative">
@@ -234,89 +259,119 @@ export default function Messages() {
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm transition-all duration-300"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm transition-all duration-300"
             />
           </div>
         </div>
 
         {/* Doctor List */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-300 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-transparent">
           {loadingThreads ? (
             <div className="p-6 text-center">
-              <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
-              <p className="text-sm text-gray-600 mt-3 font-medium">Loading chats...</p>
+              <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+              <p className="text-sm text-gray-600 mt-3 font-medium">
+                Loading chats...
+              </p>
             </div>
-          ) : threads.filter(thread => {
-            const doctorName = thread.doctor_name || "Doctor";
-            return doctorName.toLowerCase().includes(searchQuery.toLowerCase());
-          }).length === 0 ? (
+          ) : threads.filter((thread) => {
+              const doctorName = thread.doctor_name || "Doctor";
+              return doctorName
+                .toLowerCase()
+                .includes(searchQuery.toLowerCase());
+            }).length === 0 ? (
             <div className="p-8 text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100 flex items-center justify-center">
-                <MessageSquare className="w-10 h-10 text-purple-500" />
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center">
+                <MessageSquare className="w-10 h-10 text-blue-600" />
               </div>
               <p className="font-semibold text-gray-800 mb-2 text-lg">
                 {searchQuery ? "No results found" : "No messages yet"}
               </p>
               <p className="text-sm text-gray-500">
-                {searchQuery ? `No doctors matching "${searchQuery}"` : "Book an appointment to start chatting with your doctor"}
+                {searchQuery
+                  ? `No doctors matching "${searchQuery}"`
+                  : "Book an appointment to start chatting with your doctor"}
               </p>
             </div>
           ) : (
             <div className="p-2">
-              {threads.filter(thread => {
-                const doctorName = thread.doctor_name || "Doctor";
-                return doctorName.toLowerCase().includes(searchQuery.toLowerCase());
-              }).map((thread) => {
-                const isActive = selected?.appointment_id === thread.appointment_id;
-                const doctorName = thread.doctor_name || "Doctor";
-                const lastMessage = thread.last_message || "No messages yet";
-                const lastMessageTime = thread.last_message_at;
+              {threads
+                .filter((thread) => {
+                  const doctorName = thread.doctor_name || "Doctor";
+                  return doctorName
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase());
+                })
+                .map((thread) => {
+                  const isActive =
+                    selected?.appointment_id === thread.appointment_id;
+                  const doctorName = thread.doctor_name || "Doctor";
+                  const lastMessage = thread.last_message || "No messages yet";
+                  const lastMessageTime = thread.last_message_at;
 
-                return (
-                  <button
-                    key={thread.appointment_id}
-                    type="button"
-                    onClick={() => setSelected(thread)}
-                    className={`w-full text-left px-4 py-3 mb-2 flex items-center gap-3 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] ${
-                      isActive 
-                        ? "bg-gradient-to-r from-purple-100 via-blue-100 to-pink-100 shadow-lg border-2 border-purple-300" 
-                        : "hover:bg-white/50 border-2 border-transparent"
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      <div className="w-14 h-14 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-lg ring-4 ring-white">
-                        {doctorName.charAt(0).toUpperCase()}
+                  return (
+                    <button
+                      key={thread.appointment_id}
+                      type="button"
+                      onClick={() => setSelected(thread)}
+                      className={`w-full text-left px-4 py-3 mb-2 flex items-center gap-3 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-300 to-purple-500 text-white shadow-sm"
+                          : "hover:bg-white/50 border-2 border-transparent"
+                      }`}
+                    >
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-sm ring-4 ring-white">
+                          {doctorName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full ring-2 ring-white"></div>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full ring-2 ring-white"></div>
-                    </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-gray-900 truncate text-sm flex items-center gap-1">
-                          {doctorName}
-                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                        </h3>
-                        {lastMessageTime && (
-                          <span className="text-xs font-medium text-purple-600 ml-2 flex-shrink-0">
-                            {formatTime(lastMessageTime)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-600 truncate font-medium">
-                        {lastMessage}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Calendar className="w-3 h-3 text-gray-400" />
-                        <p className="text-[10px] text-gray-400">
-                          Appt #{thread.appointment_id}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3
+                            className={`font-bold truncate text-sm flex items-center gap-1 ${
+                              isActive ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {doctorName}
+                          </h3>
+                          {lastMessageTime && (
+                            <span
+                              className={`text-xs font-medium ml-2 flex-shrink-0 ${
+                                isActive ? "text-white/90" : "text-blue-600"
+                              }`}
+                            >
+                              {formatTime(lastMessageTime)}
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`text-xs truncate font-medium ${
+                            isActive ? "text-white/80" : "text-gray-600"
+                          }`}
+                        >
+                          {lastMessage}
                         </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Calendar
+                            className={`w-3 h-3 ${
+                              isActive ? "text-white/70" : "text-gray-400"
+                            }`}
+                          />
+                          <p
+                            className={`text-[10px] ${
+                              isActive ? "text-white/70" : "text-gray-400"
+                            }`}
+                          >
+                            Appt #{thread.appointment_id}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
             </div>
           )}
         </div>
@@ -328,9 +383,9 @@ export default function Messages() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-md px-6">
               <div className="relative w-32 h-32 mx-auto mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400 via-blue-400 to-pink-400 rounded-full animate-pulse opacity-20"></div>
-                <div className="relative w-32 h-32 rounded-full border-4 border-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center bg-white shadow-2xl">
-                  <MessageSquare className="w-16 h-16 text-purple-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-full animate-pulse opacity-20"></div>
+                <div className="relative w-32 h-32 rounded-full border-4 border-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center bg-white shadow-2xl">
+                  <MessageSquare className="w-16 h-16 text-blue-600" />
                 </div>
                 <Sparkles className="absolute -top-2 -right-2 w-8 h-8 text-yellow-400 animate-bounce" />
               </div>
@@ -347,7 +402,7 @@ export default function Messages() {
             {/* Chat Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-4 bg-white/90 backdrop-blur-xl shadow-sm">
               <div className="relative">
-                <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold shadow-lg ring-4 ring-purple-100">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm ring-4 ring-blue-100">
                   {(selected.doctor_name || "D").charAt(0).toUpperCase()}
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
@@ -359,15 +414,17 @@ export default function Messages() {
                 </h2>
                 <p className="text-xs text-gray-500 flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block"></span>
-                  {selected.appointment_date ? `Appointment: ${formatDate(selected.appointment_date)}` : "Active now"}
+                  {selected.appointment_date
+                    ? `Appointment: ${formatDate(selected.appointment_date)}`
+                    : "Active now"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button className="p-2.5 rounded-xl bg-blue-100 hover:bg-blue-200 transition-all duration-300 transform hover:scale-110">
                   <Phone className="w-5 h-5 text-blue-600" />
                 </button>
-                <button className="p-2.5 rounded-xl bg-purple-100 hover:bg-purple-200 transition-all duration-300 transform hover:scale-110">
-                  <Video className="w-5 h-5 text-purple-600" />
+                <button className="p-2.5 rounded-xl bg-gradient-to-r from-blue-100 to-purple-100 hover:opacity-95 transition-all duration-300 transform hover:scale-110">
+                  <Video className="w-5 h-5 text-blue-700" />
                 </button>
                 <button className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 transition-all duration-300 transform hover:scale-110">
                   <Info className="w-5 h-5 text-gray-600" />
@@ -376,10 +433,10 @@ export default function Messages() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 bg-gradient-to-br from-purple-50/30 via-blue-50/30 to-pink-50/30 scrollbar-thin scrollbar-thumb-purple-300 scrollbar-track-transparent min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 py-6 bg-gradient-to-br from-blue-50/30 via-indigo-50/30 to-purple-50/30 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-transparent min-h-0">
               {loadingMessages ? (
                 <div className="flex justify-center py-8">
-                  <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
+                  <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
                 </div>
               ) : !canChat ? (
                 <div className="flex items-center justify-center h-full">
@@ -395,7 +452,9 @@ export default function Messages() {
                     </p>
                     {timeRemaining && (
                       <div className="mb-4">
-                        <p className="text-xs text-gray-500 mb-2 font-medium">Time remaining:</p>
+                        <p className="text-xs text-gray-500 mb-2 font-medium">
+                          Time remaining:
+                        </p>
                         <div className="bg-gray-100 border-2 border-gray-300 rounded-2xl px-6 py-4 shadow-sm">
                           <p className="text-3xl font-bold tracking-wider text-gray-700">
                             {timeRemaining}
@@ -410,10 +469,13 @@ export default function Messages() {
                           Appointment scheduled for:
                         </p>
                         <p className="text-sm font-bold text-amber-900">
-                          {new Date(appointmentDateTime).toLocaleString('en-US', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short'
-                          })}
+                          {new Date(appointmentDateTime).toLocaleString(
+                            "en-US",
+                            {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }
+                          )}
                         </p>
                       </div>
                     )}
@@ -422,39 +484,54 @@ export default function Messages() {
               ) : messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-100 via-blue-100 to-pink-100 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <MessageSquare className="w-10 h-10 text-purple-500" />
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 flex items-center justify-center mx-auto mb-4 shadow-sm">
+                      <MessageSquare className="w-10 h-10 text-blue-600" />
                     </div>
-                    <p className="text-sm text-gray-600 font-semibold">No messages yet</p>
-                    <p className="text-xs text-gray-500 mt-1">Start the conversation 💬</p>
+                    <p className="text-sm text-gray-600 font-semibold">
+                      No messages yet
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Start the conversation 💬
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {messages.map((msg, index) => {
                     const isMine = msg.sender_role === "user";
+                    const shouldAnimate =
+                      !suppressMessageAnimationsRef.current &&
+                      msg?.id &&
+                      !seenMessageIdsRef.current.has(msg.id);
                     return (
                       <div
                         key={msg.id}
-                        className={`flex ${isMine ? "justify-end" : "justify-start"} animate-fade-in`}
-                        style={{animationDelay: `${index * 0.05}s`}}
+                        className={`flex ${
+                          isMine ? "justify-end" : "justify-start"
+                        } ${shouldAnimate ? "animate-fade-in" : ""}`}
                       >
                         {!isMine && (
-                          <div className="w-9 h-9 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm mr-2 flex-shrink-0 shadow-lg ring-2 ring-white">
-                            {(selected.doctor_name || "D").charAt(0).toUpperCase()}
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm mr-2 flex-shrink-0 shadow-sm ring-2 ring-white">
+                            {(selected.doctor_name || "D")
+                              .charAt(0)
+                              .toUpperCase()}
                           </div>
                         )}
                         <div
-                          className={`max-w-[70%] rounded-3xl px-5 py-3 shadow-lg transform transition-all duration-300 hover:scale-[1.02] ${
+                          className={`max-w-[70%] rounded-3xl px-5 py-3 transform transition-all duration-300 hover:scale-[1.02] ${
                             isMine
-                              ? "bg-purple-600 text-white"
-                              : "bg-white border-2 border-gray-100 text-gray-900"
+                              ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm"
+                              : "bg-white border-2 border-gray-100 text-gray-900 shadow-sm"
                           }`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
                             {msg.message}
                           </p>
-                          <div className={`flex items-center gap-1.5 mt-2 ${isMine ? "justify-end" : ""}`}>
+                          <div
+                            className={`flex items-center gap-1.5 mt-2 ${
+                              isMine ? "justify-end" : ""
+                            }`}
+                          >
                             <p
                               className={`text-xs font-medium ${
                                 isMine ? "text-blue-100" : "text-gray-500"
@@ -486,7 +563,10 @@ export default function Messages() {
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <button className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-300 transform hover:scale-110 disabled:opacity-50" disabled={!canChat}>
+                <button
+                  className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-300 transform hover:scale-110 disabled:opacity-50"
+                  disabled={!canChat}
+                >
                   <Paperclip className="w-5 h-5 text-gray-600" />
                 </button>
                 <div className="flex-1 relative">
@@ -506,24 +586,29 @@ export default function Messages() {
                         ? "Chat available after appointment time"
                         : "Type a message..."
                     }
-                    className="w-full px-6 py-3.5 rounded-full border-2 border-gray-200 focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-100 disabled:bg-gray-100 disabled:text-gray-500 text-sm transition-all duration-300 bg-gray-50"
+                    className="w-full px-6 py-3.5 rounded-full border-2 border-gray-200 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100 disabled:text-gray-500 text-sm transition-all duration-300 bg-gray-50"
                   />
                 </div>
-                <button className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-300 transform hover:scale-110 disabled:opacity-50" disabled={!canChat}>
+                <button
+                  className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-300 transform hover:scale-110 disabled:opacity-50"
+                  disabled={!canChat}
+                >
                   <Smile className="w-5 h-5 text-gray-600" />
                 </button>
                 <button
                   type="button"
                   onClick={sendMessage}
                   disabled={!messageText.trim() || !canChat}
-                  className="w-12 h-12 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 shadow-lg transform hover:scale-110 active:scale-95"
+                  className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm hover:opacity-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 transform hover:scale-110 active:scale-95"
                   aria-label="Send message"
                 >
                   <Send className="w-5 h-5" />
                 </button>
               </div>
               {error && (
-                <p className="text-xs text-red-600 mt-2 text-center font-medium bg-red-50 px-3 py-2 rounded-full inline-block">{error}</p>
+                <p className="text-xs text-red-600 mt-2 text-center font-medium bg-red-50 px-3 py-2 rounded-full inline-block">
+                  {error}
+                </p>
               )}
             </div>
           </>

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     phone VARCHAR(20),
     specialty VARCHAR(100) NOT NULL,
     specialty_id INT NULL,
+    specialties JSON NULL COMMENT 'Store multiple selected specialties as an array of strings',
     qualification VARCHAR(255),
     experience INT COMMENT 'Years of experience',
     rating DECIMAL(2,1) DEFAULT 0.0,

@@ -5,22 +5,32 @@ import api from '../utils/api';
 const DoctorRegister = () => {
     const navigate = useNavigate();
     const [specialties, setSpecialties] = useState([]);
-    const [selectedSpecialtyId, setSelectedSpecialtyId] = useState('');
-    const [specialtyOther, setSpecialtyOther] = useState('');
+    const [specialtyQuery, setSpecialtyQuery] = useState('');
+    const [specialtyDropdownOpen, setSpecialtyDropdownOpen] = useState(false);
+    const [selectedSpecialties, setSelectedSpecialties] = useState([]); // [{ id?: number, name: string }]
 
-    const otherSpecialtyId = useMemo(() => {
-        const other = specialties.find((s) => (s?.name || '').toLowerCase() === 'other');
-        return other ? String(other.id) : '';
-    }, [specialties]);
+    const filteredSpecialties = useMemo(() => {
+        const q = (specialtyQuery || '').trim().toLowerCase();
+        const base = Array.isArray(specialties) ? specialties : [];
+        if (!q) return base.slice(0, 8);
+        return base
+            .filter((s) => (s?.name || '').toLowerCase().includes(q))
+            .slice(0, 8);
+    }, [specialties, specialtyQuery]);
 
-    const showOtherInput = selectedSpecialtyId && otherSpecialtyId && selectedSpecialtyId === otherSpecialtyId;
+    const canAddCustom = useMemo(() => {
+        const q = (specialtyQuery || '').trim();
+        if (!q) return false;
+        const existsInSelected = selectedSpecialties.some((x) => (x?.name || '').toLowerCase() === q.toLowerCase());
+        const existsInList = specialties.some((s) => (s?.name || '').toLowerCase() === q.toLowerCase());
+        return !existsInSelected && !existsInList;
+    }, [specialtyQuery, selectedSpecialties, specialties]);
 
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
         phone: '',
-        specialty: '',
         qualification: '',
         experience: '',
         consultation_fee: '',
@@ -32,11 +42,6 @@ const DoctorRegister = () => {
                     const res = await api.get('/specialties');
                     const list = Array.isArray(res.data?.specialties) ? res.data.specialties : [];
                     setSpecialties(list);
-
-                    // Default select the first item if available
-                    if (list.length && !selectedSpecialtyId) {
-                        setSelectedSpecialtyId(String(list[0].id));
-                    }
                 } catch {
                     // If specialties API fails, fallback to old free-text input behavior.
                     setSpecialties([]);
@@ -45,6 +50,22 @@ const DoctorRegister = () => {
             fetchSpecialties();
             // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []);
+
+    const addSpecialty = (item) => {
+        const name = (item?.name || '').trim();
+        if (!name) return;
+        const exists = selectedSpecialties.some((x) => (x?.name || '').toLowerCase() === name.toLowerCase());
+        if (exists) return;
+
+        const next = [...selectedSpecialties, { id: item?.id, name }];
+        setSelectedSpecialties(next);
+        setSpecialtyQuery('');
+        setSpecialtyDropdownOpen(false);
+    };
+
+    const removeSpecialty = (name) => {
+        setSelectedSpecialties((prev) => prev.filter((x) => (x?.name || '').toLowerCase() !== (name || '').toLowerCase()));
+    };
 
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -61,17 +82,20 @@ const DoctorRegister = () => {
         try {
             const payload = { ...formData };
 
-            if (specialties.length && selectedSpecialtyId) {
-                payload.specialty_id = Number(selectedSpecialtyId);
-                if (showOtherInput) {
-                    payload.specialty_other = specialtyOther;
-                    // keep specialty for backward compatibility
-                    payload.specialty = specialtyOther;
-                } else {
-                    const selected = specialties.find((s) => String(s.id) === String(selectedSpecialtyId));
-                    payload.specialty = selected?.name || payload.specialty;
-                }
+            if (!selectedSpecialties.length) {
+                setError('Please select at least one specialty.');
+                setLoading(false);
+                return;
             }
+
+            const names = selectedSpecialties.map((s) => s.name).filter(Boolean);
+            const ids = selectedSpecialties.map((s) => s.id).filter((x) => typeof x === 'number');
+            payload.specialties = names;
+            payload.specialty_ids = ids;
+
+            // Backward compatibility: set primary
+            payload.specialty = names[0];
+            if (ids.length) payload.specialty_id = ids[0];
 
             const response = await api.post('/auth/doctor/register', payload);
             if (response.data.access_token) {
@@ -176,48 +200,79 @@ const DoctorRegister = () => {
                             <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">
                                 Specialty
                             </label>
-                            {specialties.length ? (
-                                <>
-                                    <select
-                                        id="specialty"
-                                        name="specialty"
-                                        required
-                                        className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                        value={selectedSpecialtyId}
-                                        onChange={(e) => {
-                                            setSelectedSpecialtyId(e.target.value);
-                                            setSpecialtyOther('');
-                                        }}
-                                    >
-                                        {specialties.map((s) => (
-                                            <option key={s.id} value={String(s.id)}>
+                            <div className="mt-1">
+                                {!!selectedSpecialties.length && (
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {selectedSpecialties.map((s) => (
+                                            <span
+                                                key={s.name}
+                                                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-sm"
+                                            >
                                                 {s.name}
-                                            </option>
+                                                <button
+                                                    type="button"
+                                                    className="text-blue-700 hover:text-blue-900"
+                                                    onClick={() => removeSpecialty(s.name)}
+                                                    aria-label={`Remove ${s.name}`}
+                                                >
+                                                    ×
+                                                </button>
+                                            </span>
                                         ))}
-                                    </select>
+                                    </div>
+                                )}
 
-                                    {showOtherInput && (
-                                        <input
-                                            className="mt-2 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                            placeholder="Type your specialty (e.g., Allergy & Immunology)"
-                                            value={specialtyOther}
-                                            onChange={(e) => setSpecialtyOther(e.target.value)}
-                                            required
-                                        />
+                                <div className="relative">
+                                    <input
+                                        id="specialty"
+                                        type="text"
+                                        className="appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                        placeholder="Select specialties (search and pick multiple)"
+                                        value={specialtyQuery}
+                                        onChange={(e) => {
+                                            setSpecialtyQuery(e.target.value);
+                                            setSpecialtyDropdownOpen(true);
+                                        }}
+                                        onFocus={() => setSpecialtyDropdownOpen(true)}
+                                    />
+
+                                    {specialtyDropdownOpen && (
+                                        <div
+                                            className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-auto"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            {filteredSpecialties.map((s) => (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                                                    onClick={() => addSpecialty({ id: Number(s.id), name: s.name })}
+                                                >
+                                                    {s.name}
+                                                </button>
+                                            ))}
+
+                                            {canAddCustom && (
+                                                <button
+                                                    type="button"
+                                                    className="w-full text-left px-3 py-2 hover:bg-gray-50 text-blue-700"
+                                                    onClick={() => addSpecialty({ name: specialtyQuery })}
+                                                >
+                                                    Add “{specialtyQuery.trim()}”
+                                                </button>
+                                            )}
+
+                                            {!filteredSpecialties.length && !canAddCustom && (
+                                                <div className="px-3 py-2 text-sm text-gray-500">No matches</div>
+                                            )}
+                                        </div>
                                     )}
-                                </>
-                            ) : (
-                                <input
-                                    id="specialty"
-                                    name="specialty"
-                                    type="text"
-                                    required
-                                    className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                    placeholder="Cardiology"
-                                    value={formData.specialty}
-                                    onChange={handleChange}
-                                />
-                            )}
+                                </div>
+
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Pick from the list, or search and add your own. You can select multiple.
+                                </p>
+                            </div>
                         </div>
 
                         <div>

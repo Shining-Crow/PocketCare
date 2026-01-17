@@ -4,6 +4,7 @@ from utils.database import execute_query
 from utils.auth_utils import hash_password, verify_password, jwt_required_custom
 from utils.validators import validate_email_format, validate_password_strength, validate_required_fields
 from datetime import datetime
+import json
 from datetime import date, timedelta
 
 auth_bp = Blueprint('auth', __name__)
@@ -131,6 +132,10 @@ def register_doctor():
         specialty = (data.get('specialty') or '').strip()
         specialty_other = (data.get('specialty_other') or '').strip()
         specialty_id = data.get('specialty_id')
+
+        # New (multi-select) payload shape from frontend
+        specialties_input = data.get('specialties')
+        specialty_ids_input = data.get('specialty_ids')
         qualification = data.get('qualification', '').strip()
         experience = int(data.get('experience') or 0)
         hospital_id = int(data.get('hospital_id') or 0)
@@ -138,11 +143,83 @@ def register_doctor():
         phone = data.get('phone', '').strip()
         bio = data.get('bio', '').strip()
 
-        # Resolve specialty (predefined dropdown + Other)
+        # Resolve specialty (supports both single-select and multi-select)
         resolved_specialty = None
         resolved_specialty_id = None
+        resolved_specialties = []
 
-        if specialty_id is not None and str(specialty_id).strip() != '':
+        def _normalize_specialty_name(value: str) -> str:
+            return (value or '').strip()
+
+        def _add_resolved(name: str):
+            name = _normalize_specialty_name(name)
+            if not name:
+                return
+            lowered = name.lower()
+            if lowered not in {s.lower() for s in resolved_specialties}:
+                resolved_specialties.append(name)
+
+        # If frontend sent a list, treat it as the source of truth.
+        if isinstance(specialties_input, list) and specialties_input:
+            cleaned = [_normalize_specialty_name(x) for x in specialties_input if isinstance(x, str)]
+            cleaned = [x for x in cleaned if x]
+            if not cleaned:
+                return jsonify({'error': 'Specialties must be a non-empty list of strings'}), 400
+
+            # Optional ids list (best-effort)
+            ids = []
+            if isinstance(specialty_ids_input, list):
+                for x in specialty_ids_input:
+                    try:
+                        ids.append(int(x))
+                    except (TypeError, ValueError):
+                        pass
+
+            # Resolve ids to names first
+            if ids:
+                placeholders = ','.join(['%s'] * len(ids))
+                rows = execute_query(
+                    f'SELECT id, name FROM specialties WHERE id IN ({placeholders})',
+                    tuple(ids),
+                    fetch_all=True,
+                ) or []
+                by_id = {int(r['id']): r.get('name') for r in rows if r and r.get('id') is not None}
+                for sid in ids:
+                    name = by_id.get(int(sid))
+                    if name and (name or '').lower() != 'other':
+                        _add_resolved(name)
+
+            # Resolve names (canonicalize if they match DB)
+            for name in cleaned:
+                match = execute_query(
+                    'SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1',
+                    (name,),
+                    fetch_one=True,
+                )
+                if match and (match.get('name') or '').lower() != 'other':
+                    _add_resolved(match.get('name'))
+                else:
+                    # Treat unknown as custom "Other" specialty
+                    _add_resolved(name)
+
+            # Choose primary specialty
+            resolved_specialty = resolved_specialties[0] if resolved_specialties else None
+            if resolved_specialty:
+                primary_match = execute_query(
+                    'SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1',
+                    (resolved_specialty,),
+                    fetch_one=True,
+                )
+                if primary_match and (primary_match.get('name') or '').lower() != 'other':
+                    resolved_specialty_id = primary_match.get('id')
+                else:
+                    other_row = execute_query(
+                        'SELECT id FROM specialties WHERE LOWER(name) = "other" LIMIT 1',
+                        fetch_one=True,
+                    )
+                    resolved_specialty_id = other_row.get('id') if other_row else None
+
+        elif specialty_id is not None and str(specialty_id).strip() != '':
             try:
                 resolved_specialty_id = int(specialty_id)
             except (TypeError, ValueError):
@@ -192,6 +269,9 @@ def register_doctor():
         if not resolved_specialty:
             return jsonify({'error': 'Specialty is required'}), 400
 
+        if not resolved_specialties:
+            _add_resolved(resolved_specialty)
+
         # Validate email and password
         is_valid, error = validate_email_format(email)
         if not is_valid:
@@ -210,16 +290,28 @@ def register_doctor():
         # Hash password
         hashed_password = hash_password(password)
 
-        # Insert into DB
+        specialties_json = json.dumps(resolved_specialties, ensure_ascii=False)
+
+        # Insert into DB (try with multi-specialty column, fallback if DB hasn't been migrated)
         insert_query = """
-        INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, qualification, experience, hospital_id, consultation_fee, bio, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, specialties, qualification, experience, hospital_id, consultation_fee, bio, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """
-        doctor_id = execute_query(
-            insert_query,
-            (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, qualification, experience, hospital_id, consultation_fee, bio, datetime.now()),
-            commit=True
-        )
+        params = (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, specialties_json, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
+
+        try:
+            doctor_id = execute_query(insert_query, params, commit=True)
+        except Exception as e:
+            # Unknown column 'specialties' (older DB) -> retry without it
+            if 'Unknown column' in str(e) and 'specialties' in str(e):
+                fallback_query = """
+                INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, qualification, experience, hospital_id, consultation_fee, bio, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """
+                fallback_params = (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
+                doctor_id = execute_query(fallback_query, fallback_params, commit=True)
+            else:
+                raise
 
         # JWT token
         access_token = create_access_token(identity=str(doctor_id))
@@ -231,6 +323,7 @@ def register_doctor():
                 'email': email,
                 'name': name,
                 'specialty': resolved_specialty,
+                'specialties': resolved_specialties,
                 'role': 'doctor'
             },
             'access_token': access_token

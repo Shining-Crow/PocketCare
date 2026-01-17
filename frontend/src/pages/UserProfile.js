@@ -13,9 +13,7 @@ import {
   Save,
   X,
   TrendingUp,
-  FileText,
   CalendarCheck,
-  Award,
 } from "lucide-react";
 import Footer from "../components/Footer";
 import BackToDashboardButton from "../components/BackToDashboardButton";
@@ -37,8 +35,6 @@ function UserProfile() {
   });
   const [stats, setStats] = useState({
     appointments: 0,
-    reports: 0,
-    day_streak: 0,
   });
   const [editedData, setEditedData] = useState({});
 
@@ -61,9 +57,9 @@ function UserProfile() {
       }
 
       setProfile(userData);
-      setStats(
-        response.data.stats || { appointments: 0, reports: 0, day_streak: 0 }
-      );
+      setStats({
+        appointments: Number(response.data?.stats?.appointments || 0),
+      });
       setEditedData(userData);
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -178,7 +174,7 @@ function UserProfile() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
               {/* Appointments */}
               <div
                 onClick={() => navigate("/appointments")}
@@ -198,38 +194,6 @@ function UserProfile() {
                 <p className="text-gray-600 text-sm font-medium">
                   Appointments
                 </p>
-              </div>
-
-              {/* Reports */}
-              <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                <div className="absolute top-4 right-4">
-                  <TrendingUp className="w-5 h-5 text-cyan-600 opacity-50" />
-                </div>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6 text-cyan-600" />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">
-                  {stats.reports}
-                </h2>
-                <p className="text-gray-600 text-sm font-medium">Reports</p>
-              </div>
-
-              {/* Day Streak */}
-              <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                <div className="absolute top-4 right-4">
-                  <Award className="w-5 h-5 text-yellow-600 opacity-50" />
-                </div>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                    <Award className="w-6 h-6 text-yellow-600" />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">
-                  {stats.day_streak}
-                </h2>
-                <p className="text-gray-600 text-sm font-medium">Day Streak</p>
               </div>
             </div>
 

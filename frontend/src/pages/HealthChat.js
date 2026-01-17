@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { Bot, Send, Sparkles } from "lucide-react";
 import api from "../utils/api";
 import ChatMessage from "../components/ChatMessage";
 import BackToDashboardButton from "../components/BackToDashboardButton";
@@ -83,7 +83,7 @@ function HealthChat() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center w-full">
-        <div className="max-w-5xl w-full flex flex-col px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-32px)]">
+        <div className="max-w-5xl w-full flex flex-col px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-80px)]">
           {/* Header */}
           <div className="mb-4">
             <div className="flex items-center justify-between gap-4">
@@ -120,8 +120,8 @@ function HealthChat() {
                 {loading && (
                   <div className="flex justify-start">
                     <div className="flex items-start gap-3 max-w-[85%]">
-                      <div className="w-9 h-9 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold">
-                        AI
+                      <div className="w-9 h-9 shrink-0 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold">
+                        <Bot className="w-5 h-5" aria-hidden="true" />
                       </div>
                       <div className="px-4 py-3 rounded-2xl bg-white border border-gray-200 text-gray-700 shadow-sm">
                         <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
@@ -23,6 +23,10 @@ import {
 function DoctorDashboard() {
   const navigate = useNavigate();
   const [doctor, setDoctor] = useState(null);
+  const [specialties, setSpecialties] = useState([]);
+  const [specialtyQuery, setSpecialtyQuery] = useState("");
+  const [specialtyDropdownOpen, setSpecialtyDropdownOpen] = useState(false);
+  const [selectedSpecialties, setSelectedSpecialties] = useState([]); // [{ id?: number, name: string }]
   const doctorSpecialtiesText = useMemo(() => {
     if (!doctor) return "";
     const raw = doctor.specialties;
@@ -91,6 +95,103 @@ function DoctorDashboard() {
     action: 'cancel' // 'cancel', 'delete', or 'accept'
   });
 
+  const filteredSpecialties = useMemo(() => {
+    const q = (specialtyQuery || "").trim().toLowerCase();
+    const base = Array.isArray(specialties) ? specialties : [];
+    if (!q) return base.slice(0, 8);
+    return base
+      .filter((s) => (s?.name || "").toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [specialties, specialtyQuery]);
+
+  const canAddCustom = useMemo(() => {
+    const q = (specialtyQuery || "").trim();
+    if (!q) return false;
+    const existsInSelected = selectedSpecialties.some(
+      (x) => (x?.name || "").toLowerCase() === q.toLowerCase()
+    );
+    const existsInList = (Array.isArray(specialties) ? specialties : []).some(
+      (s) => (s?.name || "").toLowerCase() === q.toLowerCase()
+    );
+    return !existsInSelected && !existsInList;
+  }, [specialtyQuery, selectedSpecialties, specialties]);
+
+  const setSelectedSpecialtiesFromDoctor = (doc) => {
+    if (!doc) {
+      setSelectedSpecialties([]);
+      return;
+    }
+
+    const raw = doc.specialties;
+    let list = [];
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (typeof raw === "string" && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+        else list = [raw];
+      } catch {
+        list = [raw];
+      }
+    } else if (doc.specialty) {
+      list = [doc.specialty];
+    }
+
+    const cleaned = list
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean);
+
+    const seen = new Set();
+    const uniq = [];
+    for (const s of cleaned) {
+      const key = s.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniq.push(s);
+      }
+    }
+
+    setSelectedSpecialties(uniq.map((name) => ({ name })));
+  };
+
+  const addSpecialty = (item) => {
+    const name = (item?.name || "").trim();
+    if (!name) return;
+    const exists = selectedSpecialties.some(
+      (x) => (x?.name || "").toLowerCase() === name.toLowerCase()
+    );
+    if (exists) return;
+
+    const next = [...selectedSpecialties, { id: item?.id, name }];
+    setSelectedSpecialties(next);
+    setSpecialtyQuery("");
+    setSpecialtyDropdownOpen(false);
+  };
+
+  const removeSpecialty = (name) => {
+    setSelectedSpecialties((prev) =>
+      prev.filter(
+        (x) => (x?.name || "").toLowerCase() !== (name || "").toLowerCase()
+      )
+    );
+  };
+
+  useEffect(() => {
+    const fetchSpecialties = async () => {
+      try {
+        const res = await api.get("/specialties");
+        const list = Array.isArray(res.data?.specialties)
+          ? res.data.specialties
+          : [];
+        setSpecialties(list);
+      } catch {
+        setSpecialties([]);
+      }
+    };
+    fetchSpecialties();
+  }, []);
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -107,6 +208,7 @@ function DoctorDashboard() {
 
     // Immediately set doctor from localStorage to show dashboard
     setDoctor(currentUser);
+    setSelectedSpecialtiesFromDoctor(currentUser);
     setEditForm({
       name: currentUser.name || "",
       specialty: currentUser.specialty || "",
@@ -128,6 +230,7 @@ function DoctorDashboard() {
         console.log("Doctor profile response:", profileRes.data);
         const doctorData = profileRes.data.doctor;
         setDoctor(doctorData);
+        setSelectedSpecialtiesFromDoctor(doctorData);
         setEditForm({
           name: doctorData.name || "",
           specialty: doctorData.specialty || "",
@@ -178,10 +281,42 @@ function DoctorDashboard() {
     fetchDoctorData();
   }, [navigate]);
 
+  const loadDoctorAvailability = useCallback(async () => {
+    try {
+      const response = await api.get("/doctor/profile");
+      const doctor = response.data.doctor;
+
+      // Try to load from new day-specific format first
+      if (doctor.day_specific_availability) {
+        const daySpecificData = JSON.parse(doctor.day_specific_availability);
+        setAvailabilitySlots((prev) =>
+          prev.map((daySlot) => ({
+            ...daySlot,
+            slots: daySpecificData[daySlot.day] || [],
+          }))
+        );
+      }
+      // Fallback to old format if new format doesn't exist
+      else if (doctor.available_slots && doctor.available_days) {
+        const slots = JSON.parse(doctor.available_slots);
+        const days = JSON.parse(doctor.available_days);
+
+        setAvailabilitySlots((prev) =>
+          prev.map((daySlot) => ({
+            ...daySlot,
+            slots: days.includes(daySlot.day) ? [...slots] : [],
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error loading doctor availability:", error);
+    }
+  }, []);
+
   // Load doctor availability on mount
   useEffect(() => {
     loadDoctorAvailability();
-  }, []);
+  }, [loadDoctorAvailability]);
 
   // Auto-refresh today's appointments every 30 seconds
   useEffect(() => {
@@ -218,43 +353,7 @@ function DoctorDashboard() {
     }
   };
 
-  const debugAllAppointments = async () => {
-    try {
-      console.log("Fetching ALL appointments for debugging...");
-      const allAppointmentsRes = await api.get(`/doctor/appointments`);
-      console.log("ALL appointments response:", allAppointmentsRes.data);
-      
-      const appointments = allAppointmentsRes.data.appointments || [];
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      
-      console.log("=== APPOINTMENT DETAILS ===");
-      console.log("Today's date for filtering:", today);
-      console.log("Total appointments found:", appointments.length);
-      
-      appointments.forEach((apt, index) => {
-        console.log(`Appointment ${index + 1}:`, {
-          id: apt.id,
-          date: apt.appointment_date,
-          time: apt.appointment_time,
-          patient: apt.patient_name,
-          isToday: apt.appointment_date === today,
-          status: apt.status
-        });
-        // Also log it separately for easier reading
-        console.log(`  - ${apt.patient_name}: ${apt.appointment_date} at ${apt.appointment_time}`);
-      });
-      
-      const todaysAppts = appointments.filter(apt => apt.appointment_date === today);
-      console.log("Today's appointments count:", todaysAppts.length);
-      console.log("Today's appointments:", todaysAppts);
-      
-      alert(`Found ${appointments.length} total appointments. Today (${today}): ${todaysAppts.length} appointments. Check console for details.`);
-    } catch (error) {
-      console.error("Error fetching all appointments:", error);
-      alert("Error fetching appointments. Check console for details.");
-    }
-  };
+  
 
   const openCancelModal = (appointmentId, patientName) => {
     setConfirmModal({
@@ -333,17 +432,44 @@ function DoctorDashboard() {
 
   const handleSaveProfile = async () => {
     try {
-      console.log("Updating profile with:", editForm);
-      const response = await api.put("/doctor/profile", editForm);
+      const names = selectedSpecialties.map((s) => s.name).filter(Boolean);
+      if (!names.length) {
+        alert("Please select at least one specialty.");
+        return;
+      }
+      const ids = selectedSpecialties
+        .map((s) => s.id)
+        .filter((x) => typeof x === "number");
+
+      const payload = {
+        ...editForm,
+        specialties: names,
+        specialty_ids: ids,
+        // keep legacy field consistent
+        specialty: names[0],
+      };
+
+      console.log("Updating profile with:", payload);
+      const response = await api.put("/doctor/profile", payload);
       console.log("Update response:", response.data);
 
       // Update local state
-      const updatedDoctor = { ...doctor, ...editForm };
+      const updatedDoctor = {
+        ...doctor,
+        ...editForm,
+        specialty: names[0],
+        specialties: names,
+      };
       setDoctor(updatedDoctor);
 
       // Update localStorage to keep user data in sync
       const currentUser = getCurrentUser();
-      const updatedUser = { ...currentUser, ...editForm };
+      const updatedUser = {
+        ...currentUser,
+        ...editForm,
+        specialty: names[0],
+        specialties: names,
+      };
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
       setIsEditing(false);
@@ -380,6 +506,9 @@ function DoctorDashboard() {
       phone: doctor.phone || "",
       bio: doctor.bio || "",
     });
+    setSelectedSpecialtiesFromDoctor(doctor);
+    setSpecialtyQuery("");
+    setSpecialtyDropdownOpen(false);
     setIsEditing(false);
   };
 
@@ -441,39 +570,6 @@ function DoctorDashboard() {
     } catch (error) {
       console.error("Error saving availability:", error);
       setSaving(false);
-    }
-  };
-
-  const loadDoctorAvailability = async () => {
-    try {
-      const response = await api.get("/doctor/profile");
-      const doctor = response.data.doctor;
-      
-      // Try to load from new day-specific format first
-      if (doctor.day_specific_availability) {
-        const daySpecificData = JSON.parse(doctor.day_specific_availability);
-        const updatedSlots = availabilitySlots.map(daySlot => ({
-          ...daySlot,
-          slots: daySpecificData[daySlot.day] || []
-        }));
-        setAvailabilitySlots(updatedSlots);
-      }
-      // Fallback to old format if new format doesn't exist
-      else if (doctor.available_slots && doctor.available_days) {
-        const slots = JSON.parse(doctor.available_slots);
-        const days = JSON.parse(doctor.available_days);
-        
-        // For now, assign the same slots to all available days
-        // In the future, this could be more sophisticated per-day scheduling
-        const updatedSlots = availabilitySlots.map(daySlot => ({
-          ...daySlot,
-          slots: days.includes(daySlot.day) ? [...slots] : []
-        }));
-        
-        setAvailabilitySlots(updatedSlots);
-      }
-    } catch (error) {
-      console.error("Error loading doctor availability:", error);
     }
   };
 
@@ -647,13 +743,80 @@ function DoctorDashboard() {
                         Specialty
                       </label>
                       {isEditing ? (
-                        <input
-                          type="text"
-                          name="specialty"
-                          value={editForm.specialty}
-                          onChange={handleEditChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
+                        <div>
+                          {!!selectedSpecialties.length && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {selectedSpecialties.map((s) => (
+                                <span
+                                  key={s.name}
+                                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-sm"
+                                >
+                                  {s.name}
+                                  <button
+                                    type="button"
+                                    className="text-blue-700 hover:text-blue-900"
+                                    onClick={() => removeSpecialty(s.name)}
+                                    aria-label={`Remove ${s.name}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Select specialties (search and pick multiple)"
+                              value={specialtyQuery}
+                              onChange={(e) => {
+                                setSpecialtyQuery(e.target.value);
+                                setSpecialtyDropdownOpen(true);
+                              }}
+                              onFocus={() => setSpecialtyDropdownOpen(true)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+
+                            {specialtyDropdownOpen && (
+                              <div
+                                className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-auto"
+                                onMouseDown={(e) => e.preventDefault()}
+                              >
+                                {filteredSpecialties.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-50"
+                                    onClick={() =>
+                                      addSpecialty({ id: Number(s.id), name: s.name })
+                                    }
+                                  >
+                                    {s.name}
+                                  </button>
+                                ))}
+
+                                {canAddCustom && (
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 hover:bg-gray-50 text-blue-700"
+                                    onClick={() =>
+                                      addSpecialty({ name: specialtyQuery })
+                                    }
+                                  >
+                                    Add “{specialtyQuery.trim()}”
+                                  </button>
+                                )}
+
+                                {!filteredSpecialties.length && !canAddCustom && (
+                                  <div className="px-3 py-2 text-sm text-gray-500">
+                                    No matches
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         <p className="text-gray-900 font-medium">
                           {doctorSpecialtiesText || doctor.specialty}

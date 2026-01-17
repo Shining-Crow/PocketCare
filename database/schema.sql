@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     available_slots JSON COMMENT 'Store available time slots',
     available_days JSON COMMENT 'Store available days (e.g., ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])',
     day_specific_availability JSON COMMENT 'Store day-specific time slots (e.g., {"Monday": ["09:00-10:00", "10:00-11:00"], "Tuesday": [...]})',
+    is_available BOOLEAN DEFAULT TRUE COMMENT 'Doctor availability toggle - TRUE for available, FALSE for unavailable',
     bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_specialty (specialty),

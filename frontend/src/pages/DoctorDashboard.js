@@ -591,11 +591,44 @@ function DoctorDashboard() {
         {/* Welcome Banner */}
         <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg p-8">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-          <div className="relative z-10">
-            <h1 className="text-3xl font-bold mb-2">
-              Welcome, Dr. {doctor.name}
-            </h1>
-            <p className="text-blue-100">{doctorSpecialtiesText || doctor.specialty}</p>
+          <div className="relative z-10 flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">
+                Welcome, Dr. {doctor.name}
+              </h1>
+              <p className="text-blue-100">{doctorSpecialtiesText || doctor.specialty}</p>
+            </div>
+            
+            {/* Availability Toggle */}
+            <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4">
+              <div className="text-right">
+                <p className="text-sm text-blue-100 mb-1">Status</p>
+                <p className="text-lg font-bold">
+                  {doctor?.is_available ? "Available" : "Unavailable"}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const newStatus = !doctor.is_available;
+                    await api.put("/doctor/availability", { is_available: newStatus });
+                    setDoctor({ ...doctor, is_available: newStatus });
+                  } catch (error) {
+                    console.error("Failed to toggle availability:", error);
+                    alert("Failed to update availability");
+                  }
+                }}
+                className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                  doctor?.is_available ? "bg-green-500" : "bg-gray-400"
+                }`}
+              >
+                <span
+                  className={`inline-block h-8 w-8 transform rounded-full bg-white transition-transform ${
+                    doctor?.is_available ? "translate-x-11" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -961,21 +994,28 @@ function DoctorDashboard() {
                             <p className="text-sm text-gray-600">
                               {apt.symptoms || "General consultation"}
                             </p>
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full mt-1 inline-block ${
-                                apt.status === "confirmed"
-                                  ? "bg-green-100 text-green-700"
-                                  : apt.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : apt.status === "completed"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : apt.status === "cancelled"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {apt.status}
-                            </span>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span
+                                className={`text-xs px-2 py-1 rounded-full ${
+                                  apt.status === "confirmed"
+                                    ? "bg-green-100 text-green-700"
+                                    : apt.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : apt.status === "completed"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : apt.status === "cancelled"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {apt.status}
+                              </span>
+                              {apt.is_emergency && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+                                  🚨 Emergency
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
@@ -1103,6 +1143,11 @@ function DoctorDashboard() {
                                 >
                                   {apt.status}
                                 </span>
+                                {apt.is_emergency && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-semibold">
+                                    🚨 Emergency
+                                  </span>
+                                )}
                                 {isToday && (
                                   <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
                                     Today

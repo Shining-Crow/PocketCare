@@ -25,8 +25,16 @@ export default function DoctorCard({ doctor, onClick }) {
             <div className="w-full p-4">
                 {/* Availability Status */}
                 <div className="flex items-center justify-center gap-2 mb-3">
-                    <span className="w-2 h-2 bg-green-500 rounded-full group-hover:scale-125 transition-transform duration-300"></span>
-                    <span className="text-green-600 text-sm font-semibold group-hover:text-green-700 transition-colors duration-300">Available</span>
+                    <span className={`w-2 h-2 rounded-full group-hover:scale-125 transition-transform duration-300 ${
+                        doctor.is_available ? 'bg-green-500' : 'bg-red-500'
+                    }`}></span>
+                    <span className={`text-sm font-semibold transition-colors duration-300 ${
+                        doctor.is_available 
+                            ? 'text-green-600 group-hover:text-green-700' 
+                            : 'text-red-600 group-hover:text-red-700'
+                    }`}>
+                        {doctor.is_available ? 'Available' : 'Unavailable'}
+                    </span>
                 </div>
 
                 {/* Name */}

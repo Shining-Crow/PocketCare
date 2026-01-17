@@ -15,6 +15,7 @@ export default function BookAppointment() {
   const [symptoms, setSymptoms] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorModal, setErrorModal] = useState({ show: false, message: "" });
+  const [slotFullModal, setSlotFullModal] = useState({ show: false });
   const userId = JSON.parse(localStorage.getItem("user"))?.id || 1;
 
   // Debug: log when modal state changes
@@ -219,10 +220,10 @@ export default function BookAppointment() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, isEmergency = false) => {
     e.preventDefault();
 
-    console.log("BookAppointment handleSubmit v2.0 - Modal version");
+    console.log("BookAppointment handleSubmit v3.0 - Emergency support");
 
     // Validation: Check if all fields are filled
     if (!selectedDate || !selectedTime || !symptoms.trim()) {
@@ -236,17 +237,18 @@ export default function BookAppointment() {
 
     try {
       const convertedTime = convert12to24Hours(selectedTime);
-      console.log("Submitting appointment...", { selectedDate, convertedTime });
+      console.log("Submitting appointment...", { selectedDate, convertedTime, isEmergency });
 
-      await api.post("/appointments", {
+      const response = await api.post("/appointments", {
         user_id: userId,
         doctor_id: doctorId,
         appointment_date: selectedDate,
         appointment_time: convertedTime,
         symptoms,
+        is_emergency: isEmergency,
       });
 
-      console.log("Appointment successful, navigating...");
+      console.log("Appointment successful:", response.data);
       // Success - navigate to appointments page
       navigate("/appointments");
     } catch (err) {
@@ -256,6 +258,16 @@ export default function BookAppointment() {
       const errorData = err.response?.data;
       const errorMessage = errorData?.error || "Failed to book appointment";
       const additionalMessage = errorData?.message;
+      const slotFull = errorData?.slot_full;
+
+      // If slot is full and not an emergency booking attempt, show emergency option
+      if (slotFull && !isEmergency) {
+        console.log("Slot full, showing emergency option");
+        setSlotFullModal({
+          show: true,
+        });
+        return;
+      }
 
       const displayMessage = additionalMessage || errorMessage;
       console.log("Showing error modal with message:", displayMessage);
@@ -490,6 +502,111 @@ export default function BookAppointment() {
         </div>
       </div>
       <Footer />
+
+      {/* Slot Full Modal with Emergency Option */}
+      {slotFullModal.show && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSlotFullModal({ show: false });
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-10 relative"
+            style={{ maxWidth: "450px" }}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setSlotFullModal({ show: false })}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors"
+              style={{ fontSize: "24px", lineHeight: "1" }}
+            >
+              ×
+            </button>
+
+            <div className="text-center">
+              {/* Warning Icon */}
+              <div
+                className="mx-auto flex items-center justify-center mb-6"
+                style={{ width: "80px", height: "80px" }}
+              >
+                <div
+                  className="rounded-full bg-yellow-100 flex items-center justify-center"
+                  style={{ width: "80px", height: "80px" }}
+                >
+                  <svg
+                    className="text-yellow-600"
+                    width="48"
+                    height="48"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Title */}
+              <h3
+                className="text-2xl font-bold text-gray-900 mb-4"
+                style={{ fontSize: "26px", fontWeight: "700" }}
+              >
+                Time Slot is Full
+              </h3>
+
+              {/* Message */}
+              <p
+                className="text-gray-600 mb-6"
+                style={{ fontSize: "15px", lineHeight: "1.6" }}
+              >
+                This time slot already has 5 appointments. If this is an
+                emergency, you can send a request to the doctor for approval.
+              </p>
+
+              {/* Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={(e) => {
+                    setSlotFullModal({ show: false });
+                    handleSubmit(e, true); // Submit as emergency
+                  }}
+                  className="w-full bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition-all"
+                  style={{
+                    padding: "16px 24px",
+                    fontSize: "16px",
+                    borderRadius: "12px",
+                  }}
+                >
+                  🚨 Book as Emergency
+                </button>
+
+                <button
+                  onClick={() => setSlotFullModal({ show: false })}
+                  className="w-full bg-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-300 transition-all"
+                  style={{
+                    padding: "16px 24px",
+                    fontSize: "16px",
+                    borderRadius: "12px",
+                  }}
+                >
+                  Choose Another Time
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Modal */}
       {errorModal.show && (

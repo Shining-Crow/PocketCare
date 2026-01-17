@@ -90,7 +90,7 @@ export default function DoctorSearch() {
             <select
               value={specialty}
               onChange={(e) => setSpecialty(e.target.value)}
-              className="border p-2 rounded"
+              className="border p-2 rounded w-full md:w-48"
             >
               <option value="">All Specialties</option>
               {specialties.length ? (
@@ -119,7 +119,7 @@ export default function DoctorSearch() {
             <select
               value={feeRange}
               onChange={(e) => setFeeRange(e.target.value)}
-              className="border p-2 rounded"
+              className="border p-2 rounded w-full md:w-48"
             >
               <option value="">All Fees</option>
               <option value="low">Below ৳500</option>

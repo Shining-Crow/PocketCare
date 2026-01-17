@@ -37,6 +37,7 @@ def create_app(config_name='development'):
     from routes.specialties import specialties_bp
     from routes.reports import reports_bp
     from routes.weight_management import weight_management_bp
+    from routes.activity import activity_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(appointments_bp, url_prefix='/api')
     app.register_blueprint(doctors_bp, url_prefix='/api')
@@ -46,6 +47,7 @@ def create_app(config_name='development'):
     app.register_blueprint(specialties_bp, url_prefix='/api')
     app.register_blueprint(reports_bp, url_prefix='/api/reports')
     app.register_blueprint(weight_management_bp, url_prefix='/api')
+    app.register_blueprint(activity_bp, url_prefix='/api/activity')
     
     # Root endpoint
     @app.route('/')

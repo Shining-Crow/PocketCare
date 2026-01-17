@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Chart from "chart.js/auto";
 import api from "../utils/api";
 import { Target, TrendingUp } from "lucide-react";
@@ -23,8 +22,6 @@ function computeBmi(weightKg, heightCm) {
 }
 
 export default function WeightManagement() {
-  const navigate = useNavigate();
-
   const [entries, setEntries] = useState([]);
   const [goal, setGoal] = useState(null);
   const [loading, setLoading] = useState(true);

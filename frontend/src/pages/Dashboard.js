@@ -26,52 +26,106 @@ function Dashboard() {
   const [sosProgress, setSosProgress] = useState(0);
   const [selectedEmergency, setSelectedEmergency] = useState(null);
   const [emergencyNote, setEmergencyNote] = useState("");
-  const [recentAppointments, setRecentAppointments] = useState([]);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(true);
 
-  const fetchRecentAppointments = async () => {
+  const fetchRecentActivity = async () => {
     try {
-      setAppointmentsLoading(true);
-      const response = await api.get("/user/appointments");
-      // Backend returns { appointments: [...] }
-      const appointmentsData = response.data?.appointments || [];
-      const appointments = Array.isArray(appointmentsData)
-        ? appointmentsData
-        : [];
-
-      // Get recent 3 appointments (upcoming first, then recent past)
-      const upcoming = appointments
-        .filter((app) => {
-          const appointmentDateTime = new Date(
-            `${app.appointment_date} ${app.appointment_time}`
-          );
-          const now = new Date();
-          return (
-            appointmentDateTime > now &&
-            app.status.toLowerCase() !== "cancelled"
-          );
-        })
-        .slice(0, 2);
-
-      const past = appointments
-        .filter((app) => {
-          const appointmentDateTime = new Date(
-            `${app.appointment_date} ${app.appointment_time}`
-          );
-          const now = new Date();
-          return (
-            appointmentDateTime <= now ||
-            app.status.toLowerCase() === "completed"
-          );
-        })
-        .slice(0, 3 - upcoming.length);
-
-      setRecentAppointments([...upcoming, ...past]);
+      setActivityLoading(true);
+      const response = await api.get("/activity/recent", {
+        params: { limit: 3 },
+      });
+      const items = response.data?.activities || [];
+      setRecentActivity(Array.isArray(items) ? items : []);
     } catch (error) {
-      console.error("Failed to fetch appointments:", error);
-      setRecentAppointments([]);
+      console.error("Failed to fetch recent activity:", error);
+      setRecentActivity([]);
     } finally {
-      setAppointmentsLoading(false);
+      setActivityLoading(false);
+    }
+  };
+
+  const formatActivityTime = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getActivityStyle = (type) => {
+    switch (type) {
+      case "appointment":
+        return {
+          Icon: Calendar,
+          badge: "bg-indigo-100 text-indigo-700",
+          iconBg: "bg-gradient-to-br from-indigo-500 to-purple-600",
+        };
+      case "symptom_analysis":
+        return {
+          Icon: Activity,
+          badge: "bg-emerald-100 text-emerald-700",
+          iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600",
+        };
+      case "report":
+        return {
+          Icon: FileText,
+          badge: "bg-blue-100 text-blue-700",
+          iconBg: "bg-gradient-to-br from-blue-500 to-cyan-600",
+        };
+      case "weight_entry":
+        return {
+          Icon: TrendingUp,
+          badge: "bg-orange-100 text-orange-700",
+          iconBg: "bg-gradient-to-br from-orange-500 to-amber-600",
+        };
+      case "weight_goal":
+        return {
+          Icon: Zap,
+          badge: "bg-purple-100 text-purple-700",
+          iconBg: "bg-gradient-to-br from-purple-500 to-fuchsia-600",
+        };
+      case "chat":
+        return {
+          Icon: MessageSquare,
+          badge: "bg-gray-100 text-gray-700",
+          iconBg: "bg-gradient-to-br from-gray-600 to-slate-700",
+        };
+      default:
+        return {
+          Icon: Clock,
+          badge: "bg-gray-100 text-gray-700",
+          iconBg: "bg-gradient-to-br from-gray-500 to-gray-700",
+        };
+    }
+  };
+
+  const handleActivityClick = (item) => {
+    const t = (item?.type || "").toString();
+    switch (t) {
+      case "appointment":
+        navigate("/appointments");
+        return;
+      case "symptom_analysis":
+        navigate("/symptom-checker");
+        return;
+      case "report":
+        navigate("/reports");
+        return;
+      case "weight_entry":
+      case "weight_goal":
+        navigate("/weight-management");
+        return;
+      case "chat":
+        navigate("/health-chat");
+        return;
+      default:
+        navigate("/dashboard");
+        return;
     }
   };
 
@@ -83,7 +137,7 @@ function Dashboard() {
       navigate("/login");
     } else {
       setUser(currentUser);
-      fetchRecentAppointments();
+      fetchRecentActivity();
     }
   }, [navigate]);
 
@@ -434,10 +488,7 @@ function Dashboard() {
           {/* My Profile - Recent Appointments */}
           <div className="mt-8 grid lg:grid-cols-2 gap-6">
             {/* My Profile - Clickable Card */}
-            <div
-              onClick={() => navigate("/appointments")}
-              className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all duration-300 cursor-pointer group"
-            >
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform shadow-md">
@@ -448,107 +499,63 @@ function Dashboard() {
                       Recent Activity
                     </h3>
                     <p className="text-sm text-gray-500">
-                      Manage your healthcare appointments
+                      Your latest actions across PocketCare
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center text-indigo-600 group-hover:text-indigo-800">
-                  <span className="text-sm font-medium mr-1">View All</span>
-                  <svg
-                    className="w-4 h-4 transform group-hover:translate-x-1 transition-transform"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
               </div>
 
-              {appointmentsLoading ? (
+              {activityLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
                   <span className="ml-3 text-gray-600 text-sm">
-                    Loading your appointments...
+                    Loading your recent activity...
                   </span>
                 </div>
-              ) : recentAppointments.length > 0 ? (
+              ) : recentActivity.length > 0 ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium text-gray-700">
                       Recent Activity
                     </span>
                     <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      {recentAppointments.length} appointments
+                      Last {recentActivity.length}
                     </span>
                   </div>
-                  {recentAppointments.map((appointment, idx) => {
-                    const isUpcoming =
-                      new Date(
-                        `${appointment.appointment_date} ${appointment.appointment_time}`
-                      ) > new Date();
+                  {recentActivity.map((item, idx) => {
+                    const { Icon, badge } = getActivityStyle(item.type);
+                    const tsLabel = formatActivityTime(item.timestamp);
+                    const badgeText = (item.type || "activity")
+                      .toString()
+                      .replaceAll("_", " ");
+
                     return (
                       <div
-                        key={idx}
-                        className="flex items-center p-4 bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors"
+                        key={item?.meta?.appointment_id || item?.meta?.report_id || item?.meta?.symptom_log_id || item?.meta?.weight_entry_id || item?.meta?.weight_goal_id || item?.meta?.chat_message_id || idx}
+                        onClick={() => handleActivityClick(item)}
+                        className="flex items-start gap-4 p-4 bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors cursor-pointer"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-gray-800 text-sm">
-                              Dr. {appointment.doctor_name}
-                            </h4>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${isUpcoming &&
-                                  appointment.status.toLowerCase() !== "cancelled"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : appointment.status.toLowerCase() ===
-                                    "cancelled"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-blue-100 text-blue-700"
-                                }`}
-                            >
-                              {appointment.status}
-                            </span>
-                          </div>
-                          <p className="text-gray-600 text-xs mb-2 font-medium">
-                            {appointment.doctor_specialty}
-                          </p>
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span className="flex items-center bg-white px-2 py-1 rounded-md">
-                              <Calendar className="w-3 h-3 mr-1 text-indigo-500" />
-                              {new Date(
-                                appointment.appointment_date
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </span>
-                            <span className="flex items-center bg-white px-2 py-1 rounded-md">
-                              <Clock className="w-3 h-3 mr-1 text-indigo-500" />
-                              {appointment.appointment_time.substring(0, 5)}
-                            </span>
-                          </div>
+                        <div className="w-10 h-10 bg-white rounded-xl border border-gray-100 flex items-center justify-center shadow-sm">
+                          <Icon className="w-5 h-5 text-indigo-600" />
                         </div>
-                        <div className="ml-3">
-                          {isUpcoming &&
-                            appointment.status.toLowerCase() !== "cancelled" ? (
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mr-2"></div>
-                              <span className="text-emerald-600 text-xs font-semibold">
-                                Upcoming
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                              <span className="text-gray-500 text-xs font-medium">
-                                Past
-                              </span>
-                            </div>
-                          )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1 flex-wrap">
+                            <h4 className="font-semibold text-gray-800 text-sm truncate">
+                              {item.title || "Activity"}
+                            </h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge}`}>
+                              {badgeText}
+                            </span>
+                            {tsLabel ? (
+                              <span className="text-xs text-gray-500">{tsLabel}</span>
+                            ) : null}
+                          </div>
+                          {item.subtitle ? (
+                            <p className="text-gray-600 text-xs font-medium break-words">
+                              {item.subtitle}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -560,14 +567,13 @@ function Dashboard() {
                     <Calendar className="w-8 h-8 text-indigo-600" />
                   </div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-2">
-                    No appointments yet
+                    No activity yet
                   </h4>
                   <p className="text-gray-500 text-sm mb-4">
-                    Start your healthcare journey today
+                    Book an appointment, analyze symptoms, or upload a report
                   </p>
                   <div
                     onClick={(e) => {
-                      e.stopPropagation();
                       navigate("/doctors");
                     }}
                     className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
@@ -583,7 +589,7 @@ function Dashboard() {
                         clipRule="evenodd"
                       />
                     </svg>
-                    Book First Appointment
+                    Get Started
                   </div>
                 </div>
               )}

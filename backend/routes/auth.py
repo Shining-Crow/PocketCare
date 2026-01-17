@@ -128,7 +128,7 @@ def register_doctor():
 
         email = data.get('email').lower().strip()
         password = data.get('password')
-        name = data.get('name').strip()
+        doctor_name = data.get('name').strip()
         specialty = (data.get('specialty') or '').strip()
         specialty_other = (data.get('specialty_other') or '').strip()
         specialty_id = data.get('specialty_id')
@@ -185,22 +185,22 @@ def register_doctor():
                 ) or []
                 by_id = {int(r['id']): r.get('name') for r in rows if r and r.get('id') is not None}
                 for sid in ids:
-                    name = by_id.get(int(sid))
-                    if name and (name or '').lower() != 'other':
-                        _add_resolved(name)
+                    spec_name = by_id.get(int(sid))
+                    if spec_name and (spec_name or '').lower() != 'other':
+                        _add_resolved(spec_name)
 
             # Resolve names (canonicalize if they match DB)
-            for name in cleaned:
+            for spec in cleaned:
                 match = execute_query(
                     'SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1',
-                    (name,),
+                    (spec,),
                     fetch_one=True,
                 )
                 if match and (match.get('name') or '').lower() != 'other':
                     _add_resolved(match.get('name'))
                 else:
                     # Treat unknown as custom "Other" specialty
-                    _add_resolved(name)
+                    _add_resolved(spec)
 
             # Choose primary specialty
             resolved_specialty = resolved_specialties[0] if resolved_specialties else None
@@ -297,7 +297,7 @@ def register_doctor():
         INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, specialties, qualification, experience, hospital_id, consultation_fee, bio, created_at)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """
-        params = (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, specialties_json, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
+        params = (doctor_name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, specialties_json, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
 
         try:
             doctor_id = execute_query(insert_query, params, commit=True)
@@ -308,7 +308,7 @@ def register_doctor():
                 INSERT INTO doctors (name, email, password_hash, phone, specialty, specialty_id, qualification, experience, hospital_id, consultation_fee, bio, created_at)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """
-                fallback_params = (name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
+                fallback_params = (doctor_name, email, hashed_password, phone, resolved_specialty, resolved_specialty_id, qualification, experience, hospital_id, consultation_fee, bio, datetime.now())
                 doctor_id = execute_query(fallback_query, fallback_params, commit=True)
             else:
                 raise
@@ -321,7 +321,7 @@ def register_doctor():
             'user': {
                 'id': doctor_id,
                 'email': email,
-                'name': name,
+                'name': doctor_name,
                 'specialty': resolved_specialty,
                 'specialties': resolved_specialties,
                 'role': 'doctor'

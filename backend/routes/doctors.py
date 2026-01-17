@@ -1,4 +1,6 @@
 
+import json
+
 from flask import Blueprint, jsonify, request
 from utils.database import get_db_connection, execute_query
 from utils.auth_utils import jwt_required_custom
@@ -56,16 +58,128 @@ def update_doctor_profile():
     """Update logged-in doctor's profile"""
     try:
         doctor_id = get_jwt_identity()
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+
+        def _normalize_specialty_name(value: str) -> str:
+            return (value or "").strip()
+
+        def _resolve_specialties(payload):
+            """Resolve multi-specialty payload into (specialties_list, primary_name, primary_id)."""
+
+            specialties_input = payload.get("specialties")
+            specialty_ids_input = payload.get("specialty_ids")
+
+            if not (isinstance(specialties_input, list) and specialties_input):
+                return None
+
+            cleaned = [_normalize_specialty_name(x) for x in specialties_input if isinstance(x, str)]
+            cleaned = [x for x in cleaned if x]
+            if not cleaned:
+                raise ValueError("Specialties must be a non-empty list of strings")
+
+            resolved_specialties = []
+
+            def _add_resolved(spec_name: str):
+                spec_name = _normalize_specialty_name(spec_name)
+                if not spec_name:
+                    return
+                lowered = spec_name.lower()
+                if lowered not in {s.lower() for s in resolved_specialties}:
+                    resolved_specialties.append(spec_name)
+
+            # Optional ids list (best-effort)
+            ids = []
+            if isinstance(specialty_ids_input, list):
+                for x in specialty_ids_input:
+                    try:
+                        ids.append(int(x))
+                    except (TypeError, ValueError):
+                        pass
+
+            # Resolve ids to names first
+            if ids:
+                placeholders = ",".join(["%s"] * len(ids))
+                rows = execute_query(
+                    f"SELECT id, name FROM specialties WHERE id IN ({placeholders})",
+                    tuple(ids),
+                    fetch_all=True,
+                ) or []
+                by_id = {int(r["id"]): r.get("name") for r in rows if r and r.get("id") is not None}
+                for sid in ids:
+                    spec_name = by_id.get(int(sid))
+                    if spec_name and (spec_name or "").lower() != "other":
+                        _add_resolved(spec_name)
+
+            # Resolve names (canonicalize if they match DB)
+            for spec in cleaned:
+                match = execute_query(
+                    "SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+                    (spec,),
+                    fetch_one=True,
+                )
+                if match and (match.get("name") or "").lower() != "other":
+                    _add_resolved(match.get("name"))
+                else:
+                    _add_resolved(spec)
+
+            if not resolved_specialties:
+                raise ValueError("Specialties must be a non-empty list of strings")
+
+            primary_name = resolved_specialties[0]
+            primary_id = None
+            primary_match = execute_query(
+                "SELECT id, name FROM specialties WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+                (primary_name,),
+                fetch_one=True,
+            )
+            if primary_match and (primary_match.get("name") or "").lower() != "other":
+                primary_id = primary_match.get("id")
+            else:
+                other_row = execute_query(
+                    'SELECT id FROM specialties WHERE LOWER(name) = "other" LIMIT 1',
+                    fetch_one=True,
+                )
+                primary_id = other_row.get("id") if other_row else None
+
+            return resolved_specialties, primary_name, primary_id
+
+        resolved = None
+        try:
+            resolved = _resolve_specialties(data)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         
         # Fields that can be updated
-        allowed_fields = ['name', 'phone', 'specialty', 'qualification', 
-                         'experience', 'consultation_fee', 'bio', 'available_slots', 'available_days', 'day_specific_availability']
+        allowed_fields = [
+            'name',
+            'phone',
+            'specialty',
+            'qualification',
+            'experience',
+            'consultation_fee',
+            'bio',
+            'available_slots',
+            'available_days',
+            'day_specific_availability',
+        ]
         update_fields = []
         update_values = []
-        
+
+        # If a multi-specialty payload is provided, it becomes the source of truth.
+        if resolved is not None:
+            resolved_specialties, primary_name, primary_id = resolved
+            update_fields.append("specialty = %s")
+            update_values.append(primary_name)
+            update_fields.append("specialty_id = %s")
+            update_values.append(primary_id)
+            update_fields.append("specialties = %s")
+            update_values.append(json.dumps(resolved_specialties, ensure_ascii=False))
+
         for field in allowed_fields:
             if field in data:
+                # When multi-specialty is provided, ignore incoming single specialty to avoid conflict.
+                if resolved is not None and field == "specialty":
+                    continue
                 update_fields.append(f"{field} = %s")
                 update_values.append(data[field])
         
@@ -75,7 +189,25 @@ def update_doctor_profile():
         update_values.append(doctor_id)
         
         query = f"UPDATE doctors SET {', '.join(update_fields)} WHERE id = %s"
-        execute_query(query, tuple(update_values), commit=True)
+
+        try:
+            execute_query(query, tuple(update_values), commit=True)
+        except Exception as e:
+            # Older DB may not have the specialties column.
+            if resolved is not None and 'Unknown column' in str(e) and 'specialties' in str(e):
+                # Remove the specialties JSON update and retry.
+                filtered = []
+                filtered_values = []
+                for f, v in zip(update_fields, update_values):
+                    if f.strip().lower().startswith('specialties'):
+                        continue
+                    filtered.append(f)
+                    filtered_values.append(v)
+                filtered_values.append(doctor_id)
+                retry_query = f"UPDATE doctors SET {', '.join(filtered)} WHERE id = %s"
+                execute_query(retry_query, tuple(filtered_values), commit=True)
+            else:
+                raise
         
         return jsonify({'message': 'Profile updated successfully'}), 200
         

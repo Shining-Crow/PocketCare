@@ -100,7 +100,11 @@ const DoctorRegister = () => {
             const response = await api.post('/auth/doctor/register', payload);
             if (response.data.access_token) {
                 localStorage.setItem('token', response.data.access_token);
-                localStorage.setItem('doctor', JSON.stringify(response.data.doctor));
+                // Keep auth storage consistent across the app:
+                // DashboardController / getCurrentUser() reads from `user`.
+                if (response.data.user) {
+                    localStorage.setItem('user', JSON.stringify(response.data.user));
+                }
             }
             navigate('/dashboard'); // or doctor dashboard
         } catch (err) {

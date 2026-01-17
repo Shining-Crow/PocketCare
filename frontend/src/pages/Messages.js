@@ -292,7 +292,7 @@ export default function Messages() {
                       onClick={() => setSelected(thread)}
                       className={`w-full text-left px-4 py-3 mb-2 flex items-center gap-3 rounded-2xl transition-all duration-300 transform hover:scale-[1.02] ${
                         isActive
-                          ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm"
+                          ? "bg-gradient-to-r from-blue-300 to-purple-500 text-white shadow-sm"
                           : "hover:bg-white/50 border-2 border-transparent"
                       }`}
                     >
@@ -313,7 +313,6 @@ export default function Messages() {
                             }`}
                           >
                             {doctorName}
-                            <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                           </h3>
                           {lastMessageTime && (
                             <span

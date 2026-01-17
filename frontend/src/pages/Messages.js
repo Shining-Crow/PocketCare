@@ -60,6 +60,8 @@ export default function Messages() {
   const [appointmentDateTime, setAppointmentDateTime] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState("");
   const messagesEndRef = useRef(null);
+  const suppressMessageAnimationsRef = useRef(true);
+  const seenMessageIdsRef = useRef(new Set());
 
   const loadThreads = async () => {
     setError("");
@@ -90,7 +92,18 @@ export default function Messages() {
     }
     try {
       const res = await api.get(`/user/doctor-chats/${appointmentId}/messages`);
-      setMessages(res.data?.messages || []);
+      const nextMessages = res.data?.messages || [];
+
+      // On initial load, render everything instantly (no stagger/animation),
+      // then only animate truly new messages on subsequent updates.
+      if (isInitialLoad) {
+        seenMessageIdsRef.current = new Set(
+          nextMessages.map((m) => m?.id).filter(Boolean)
+        );
+        suppressMessageAnimationsRef.current = false;
+      }
+
+      setMessages(nextMessages);
       setCanChat(res.data?.can_chat === true);
 
       if (res.data?.appointment_date && res.data?.appointment_time) {
@@ -157,6 +170,10 @@ export default function Messages() {
       setMessages([]);
       return;
     }
+
+    // New thread selected: suppress animations for the initial paint.
+    suppressMessageAnimationsRef.current = true;
+    seenMessageIdsRef.current = new Set();
     loadMessages(selected.appointment_id, true);
 
     const interval = setInterval(() => {
@@ -171,6 +188,12 @@ export default function Messages() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    for (const m of messages) {
+      if (m?.id) seenMessageIdsRef.current.add(m.id);
+    }
+  }, [messages]);
 
   // Timer effect for appointment countdown
   useEffect(() => {
@@ -217,7 +240,7 @@ export default function Messages() {
   }, [appointmentDateTime, canChat]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex overflow-hidden">
+    <div className="w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex overflow-hidden h-[calc(100vh-4rem)]">
       {/* Left Sidebar - Doctor List (Instagram-like) */}
       <div className="w-full md:w-96 border-r border-white/50 flex flex-col bg-white/80 backdrop-blur-xl shadow-xl h-full">
         {/* Header */}
@@ -476,13 +499,16 @@ export default function Messages() {
                 <div className="space-y-4">
                   {messages.map((msg, index) => {
                     const isMine = msg.sender_role === "user";
+                    const shouldAnimate =
+                      !suppressMessageAnimationsRef.current &&
+                      msg?.id &&
+                      !seenMessageIdsRef.current.has(msg.id);
                     return (
                       <div
                         key={msg.id}
                         className={`flex ${
                           isMine ? "justify-end" : "justify-start"
-                        } animate-fade-in`}
-                        style={{ animationDelay: `${index * 0.05}s` }}
+                        } ${shouldAnimate ? "animate-fade-in" : ""}`}
                       >
                         {!isMine && (
                           <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm mr-2 flex-shrink-0 shadow-sm ring-2 ring-white">

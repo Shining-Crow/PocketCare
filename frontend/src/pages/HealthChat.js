@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Send, Sparkles } from "lucide-react";
 import api from "../utils/api";
 import ChatMessage from "../components/ChatMessage";
+import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function HealthChat() {
   const [messages, setMessages] = useState([]);
@@ -24,7 +25,11 @@ function HealthChat() {
     const fetchHistory = async () => {
       try {
         const res = await api.get("/chat/history");
-        if (res.data && Array.isArray(res.data.history) && res.data.history.length) {
+        if (
+          res.data &&
+          Array.isArray(res.data.history) &&
+          res.data.history.length
+        ) {
           const sorted = res.data.history
             .map((msg) => ({
               sender: msg.sender,
@@ -65,7 +70,10 @@ function HealthChat() {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { sender: "ai", text: "There was an error connecting to the AI service." },
+        {
+          sender: "ai",
+          text: "There was an error connecting to the AI service.",
+        },
       ]);
     }
     setInput("");
@@ -79,17 +87,20 @@ function HealthChat() {
           {/* Header */}
           <div className="mb-4">
             <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <span>Health Chat</span>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI Assistant
-                  </span>
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Ask symptoms, medications, or general health questions.
-                </p>
+              <div className="flex items-start gap-3">
+                <BackToDashboardButton className="shrink-0" />
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                    <span>Health Chat</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      AI Assistant
+                    </span>
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Ask symptoms, medications, or general health questions.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -151,7 +162,8 @@ function HealthChat() {
                       />
                     </div>
                     <p className="text-[11px] text-gray-500 mt-2">
-                      This AI is for informational purposes only and not a substitute for professional medical advice.
+                      This AI is for informational purposes only and not a
+                      substitute for professional medical advice.
                     </p>
                   </div>
 

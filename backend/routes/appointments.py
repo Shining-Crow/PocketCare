@@ -58,35 +58,91 @@ def get_user_appointments():
 # GET all doctors
 @appointments_bp.route('/doctors', methods=['GET', 'OPTIONS'])
 def get_doctors():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    name = request.args.get('name')
-    specialty = request.args.get('specialty')
-    min_fee = request.args.get('min_fee')
-    max_fee = request.args.get('max_fee')
+        name = request.args.get('name')
+        specialty = request.args.get('specialty')
+        min_fee = request.args.get('min_fee')
+        max_fee = request.args.get('max_fee')
 
-    query = "SELECT id, name, specialty, qualification, experience, rating, consultation_fee, bio, available_slots, available_days FROM doctors WHERE 1=1"
-    params = []
+        # Only select non-sensitive columns. Some deployments may have an older
+        # doctors table missing optional columns, so detect which ones exist.
+        desired_columns = [
+            'id',
+            'name',
+            'specialty',
+            'qualification',
+            'experience',
+            'rating',
+            'consultation_fee',
+            'bio',
+            'available_slots',
+            'available_days',
+        ]
 
-    if name:
-        query += " AND name LIKE %s"
-        params.append(f"%{name}%")
+        cursor.execute('SELECT DATABASE() AS db')
+        row = cursor.fetchone() or {}
+        db_name = row.get('db')
 
-    if specialty:
-        query += " AND specialty=%s"
-        params.append(specialty)
+        existing_columns = set()
+        if db_name:
+            cursor.execute(
+                """
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'doctors'
+                """,
+                (db_name,),
+            )
+            existing_columns = {r.get('COLUMN_NAME') for r in (cursor.fetchall() or []) if r.get('COLUMN_NAME')}
 
-    if min_fee and max_fee:
-        query += " AND consultation_fee BETWEEN %s AND %s"
-        params.extend([min_fee, max_fee])
+        selected_columns = [c for c in desired_columns if (not existing_columns) or (c in existing_columns)]
+        # Safety: always include minimal identifiers
+        if 'id' not in selected_columns:
+            selected_columns.insert(0, 'id')
+        if 'name' not in selected_columns:
+            selected_columns.insert(1, 'name')
+        if 'specialty' not in selected_columns:
+            selected_columns.insert(2, 'specialty')
 
-    cursor.execute(query, params)
-    doctors = cursor.fetchall()
-    cursor.close()
-    conn.close()
+        query = f"SELECT {', '.join(selected_columns)} FROM doctors WHERE 1=1"
+        params = []
 
-    return jsonify(doctors)
+        if name:
+            query += " AND name LIKE %s"
+            params.append(f"%{name}%")
+
+        if specialty:
+            query += " AND specialty=%s"
+            params.append(specialty)
+
+        if min_fee is not None and max_fee is not None:
+            try:
+                min_v = float(min_fee)
+                max_v = float(max_fee)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'min_fee and max_fee must be numbers'}), 400
+            query += " AND consultation_fee BETWEEN %s AND %s"
+            params.extend([min_v, max_v])
+
+        cursor.execute(query, params)
+        doctors = cursor.fetchall()
+        return jsonify(doctors), 200
+    except pymysql.MySQLError as e:
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch doctors: {str(e)}'}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        finally:
+            if conn:
+                conn.close()
 
 from flask_jwt_extended import jwt_required
 

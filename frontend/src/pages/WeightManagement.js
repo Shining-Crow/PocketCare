@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Chart from "chart.js/auto";
 import api from "../utils/api";
-import { ArrowLeft, Target, TrendingUp } from "lucide-react";
+import { Target, TrendingUp } from "lucide-react";
+import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function bmiCategory(bmi) {
   if (!Number.isFinite(bmi)) return { label: "—", color: "text-gray-600" };
@@ -340,14 +341,7 @@ export default function WeightManagement() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:shadow transition"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </button>
+            <BackToDashboardButton />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               Weight Management
             </h1>

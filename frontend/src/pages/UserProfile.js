@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../utils/api";
 import {
   User,
   Mail,
@@ -15,9 +15,10 @@ import {
   TrendingUp,
   FileText,
   CalendarCheck,
-  Award
-} from 'lucide-react';
-import Footer from '../components/Footer';
+  Award,
+} from "lucide-react";
+import Footer from "../components/Footer";
+import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -25,19 +26,19 @@ function UserProfile() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    date_of_birth: '',
-    gender: '',
-    blood_group: '',
-    address: '',
-    profile_picture: ''
+    name: "",
+    email: "",
+    phone: "",
+    date_of_birth: "",
+    gender: "",
+    blood_group: "",
+    address: "",
+    profile_picture: "",
   });
   const [stats, setStats] = useState({
     appointments: 0,
     reports: 0,
-    day_streak: 0
+    day_streak: 0,
   });
   const [editedData, setEditedData] = useState({});
 
@@ -48,21 +49,25 @@ function UserProfile() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/auth/profile');
+      const response = await api.get("/auth/profile");
       const userData = response.data.user;
 
       // Load profile picture from localStorage
-      const savedPicture = localStorage.getItem(`profilePicture_${userData.id}`);
+      const savedPicture = localStorage.getItem(
+        `profilePicture_${userData.id}`
+      );
       if (savedPicture) {
         userData.profile_picture = savedPicture;
       }
 
       setProfile(userData);
-      setStats(response.data.stats || { appointments: 0, reports: 0, day_streak: 0 });
+      setStats(
+        response.data.stats || { appointments: 0, reports: 0, day_streak: 0 }
+      );
       setEditedData(userData);
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      alert(error.response?.data?.error || 'Failed to load profile');
+      console.error("Error fetching profile:", error);
+      alert(error.response?.data?.error || "Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -81,13 +86,13 @@ function UserProfile() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await api.put('/auth/profile', editedData);
+      await api.put("/auth/profile", editedData);
       // Refetch profile to ensure UI is in sync with backend
       await fetchProfile();
       setEditing(false);
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert(error.response?.data?.error || 'Failed to update profile');
+      console.error("Error updating profile:", error);
+      alert(error.response?.data?.error || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -99,7 +104,7 @@ function UserProfile() {
 
     // Check file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image size should be less than 2MB');
+      alert("Image size should be less than 2MB");
       return;
     }
 
@@ -114,9 +119,13 @@ function UserProfile() {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not set';
+    if (!dateString) return "Not set";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   if (loading) {
@@ -136,6 +145,10 @@ function UserProfile() {
         <div className="max-w-6xl mx-auto">
           {/* Main Container with Background and Shadow */}
           <div className="bg-white rounded-3xl shadow-2xl p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <BackToDashboardButton />
+              <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+            </div>
             {/* Profile Picture */}
             <div className="flex flex-col items-center justify-center mb-8">
               <div className="relative mb-4">
@@ -167,8 +180,8 @@ function UserProfile() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Appointments */}
-              <div 
-                onClick={() => navigate('/appointments')} 
+              <div
+                onClick={() => navigate("/appointments")}
                 className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
               >
                 <div className="absolute top-4 right-4">
@@ -179,8 +192,12 @@ function UserProfile() {
                     <CalendarCheck className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">{stats.appointments}</h2>
-                <p className="text-gray-600 text-sm font-medium">Appointments</p>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                  {stats.appointments}
+                </h2>
+                <p className="text-gray-600 text-sm font-medium">
+                  Appointments
+                </p>
               </div>
 
               {/* Reports */}
@@ -193,7 +210,9 @@ function UserProfile() {
                     <FileText className="w-6 h-6 text-cyan-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">{stats.reports}</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                  {stats.reports}
+                </h2>
                 <p className="text-gray-600 text-sm font-medium">Reports</p>
               </div>
 
@@ -207,7 +226,9 @@ function UserProfile() {
                     <Award className="w-6 h-6 text-yellow-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">{stats.day_streak}</h2>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                  {stats.day_streak}
+                </h2>
                 <p className="text-gray-600 text-sm font-medium">Day Streak</p>
               </div>
             </div>
@@ -230,7 +251,7 @@ function UserProfile() {
                     className="bg-green-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-green-600 transition-all shadow-lg disabled:opacity-50 font-medium"
                   >
                     <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save'}
+                    {saving ? "Saving..." : "Save"}
                   </button>
                   <button
                     onClick={handleCancel}
@@ -255,13 +276,17 @@ function UserProfile() {
                   {editing ? (
                     <input
                       type="text"
-                      value={editedData.name || ''}
-                      onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
+                      value={editedData.name || ""}
+                      onChange={(e) =>
+                        setEditedData({ ...editedData, name: e.target.value })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       placeholder="Enter your name"
                     />
                   ) : (
-                    <p className="text-gray-900 font-semibold">{profile.name || 'Not set'}</p>
+                    <p className="text-gray-900 font-semibold">
+                      {profile.name || "Not set"}
+                    </p>
                   )}
                 </div>
               </div>
@@ -272,7 +297,9 @@ function UserProfile() {
                   <Mail className="w-6 h-6 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Email</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Email
+                  </p>
                   <p className="text-gray-900 font-semibold">{profile.email}</p>
                 </div>
               </div>
@@ -283,17 +310,23 @@ function UserProfile() {
                   <Phone className="w-6 h-6 text-green-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Phone</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Phone
+                  </p>
                   {editing ? (
                     <input
                       type="tel"
-                      value={editedData.phone || ''}
-                      onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
+                      value={editedData.phone || ""}
+                      onChange={(e) =>
+                        setEditedData({ ...editedData, phone: e.target.value })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       placeholder="Enter phone number"
                     />
                   ) : (
-                    <p className="text-gray-900 font-semibold">{profile.phone || 'Not set'}</p>
+                    <p className="text-gray-900 font-semibold">
+                      {profile.phone || "Not set"}
+                    </p>
                   )}
                 </div>
               </div>
@@ -304,16 +337,25 @@ function UserProfile() {
                   <Calendar className="w-6 h-6 text-purple-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Date of Birth</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Date of Birth
+                  </p>
                   {editing ? (
                     <input
                       type="date"
-                      value={editedData.date_of_birth || ''}
-                      onChange={(e) => setEditedData({ ...editedData, date_of_birth: e.target.value })}
+                      value={editedData.date_of_birth || ""}
+                      onChange={(e) =>
+                        setEditedData({
+                          ...editedData,
+                          date_of_birth: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     />
                   ) : (
-                    <p className="text-gray-900 font-semibold">{formatDate(profile.date_of_birth)}</p>
+                    <p className="text-gray-900 font-semibold">
+                      {formatDate(profile.date_of_birth)}
+                    </p>
                   )}
                 </div>
               </div>
@@ -324,11 +366,15 @@ function UserProfile() {
                   <User className="w-6 h-6 text-pink-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Gender</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Gender
+                  </p>
                   {editing ? (
                     <select
-                      value={editedData.gender || ''}
-                      onChange={(e) => setEditedData({ ...editedData, gender: e.target.value })}
+                      value={editedData.gender || ""}
+                      onChange={(e) =>
+                        setEditedData({ ...editedData, gender: e.target.value })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     >
                       <option value="">Select gender</option>
@@ -337,7 +383,9 @@ function UserProfile() {
                       <option value="other">Other</option>
                     </select>
                   ) : (
-                    <p className="text-gray-900 font-semibold capitalize">{profile.gender || 'Not set'}</p>
+                    <p className="text-gray-900 font-semibold capitalize">
+                      {profile.gender || "Not set"}
+                    </p>
                   )}
                 </div>
               </div>
@@ -348,11 +396,18 @@ function UserProfile() {
                   <Droplet className="w-6 h-6 text-red-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Blood Group</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Blood Group
+                  </p>
                   {editing ? (
                     <select
-                      value={editedData.blood_group || ''}
-                      onChange={(e) => setEditedData({ ...editedData, blood_group: e.target.value })}
+                      value={editedData.blood_group || ""}
+                      onChange={(e) =>
+                        setEditedData({
+                          ...editedData,
+                          blood_group: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     >
                       <option value="">Select blood group</option>
@@ -366,7 +421,9 @@ function UserProfile() {
                       <option value="O-">O-</option>
                     </select>
                   ) : (
-                    <p className="text-gray-900 font-semibold">{profile.blood_group || 'Not set'}</p>
+                    <p className="text-gray-900 font-semibold">
+                      {profile.blood_group || "Not set"}
+                    </p>
                   )}
                 </div>
               </div>
@@ -377,17 +434,26 @@ function UserProfile() {
                   <MapPin className="w-6 h-6 text-orange-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Address</p>
+                  <p className="text-sm text-gray-500 mb-1 font-medium">
+                    Address
+                  </p>
                   {editing ? (
                     <textarea
-                      value={editedData.address || ''}
-                      onChange={(e) => setEditedData({ ...editedData, address: e.target.value })}
+                      value={editedData.address || ""}
+                      onChange={(e) =>
+                        setEditedData({
+                          ...editedData,
+                          address: e.target.value,
+                        })
+                      }
                       className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
                       rows="3"
                       placeholder="Enter your address"
                     />
                   ) : (
-                    <p className="text-gray-900 font-semibold">{profile.address || 'Not set'}</p>
+                    <p className="text-gray-900 font-semibold">
+                      {profile.address || "Not set"}
+                    </p>
                   )}
                 </div>
               </div>

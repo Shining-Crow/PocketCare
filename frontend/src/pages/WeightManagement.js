@@ -346,13 +346,6 @@ export default function WeightManagement() {
               Weight Management
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard")}
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
-          >
-            Dashboard
-          </button>
         </div>
 
         {error && (

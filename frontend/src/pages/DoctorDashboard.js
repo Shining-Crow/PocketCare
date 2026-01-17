@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
@@ -23,6 +23,42 @@ import {
 function DoctorDashboard() {
   const navigate = useNavigate();
   const [doctor, setDoctor] = useState(null);
+  const doctorSpecialtiesText = useMemo(() => {
+    if (!doctor) return "";
+    const raw = doctor.specialties;
+
+    let list = [];
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (typeof raw === "string" && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+        else list = [raw];
+      } catch {
+        list = [raw];
+      }
+    } else if (doctor.specialty) {
+      list = [doctor.specialty];
+    }
+
+    const cleaned = list
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .filter(Boolean);
+
+    // de-dupe case-insensitively
+    const seen = new Set();
+    const uniq = [];
+    for (const s of cleaned) {
+      const key = s.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniq.push(s);
+      }
+    }
+
+    return uniq.join(", ");
+  }, [doctor]);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [activeTab, setActiveTab] = useState("overview");
@@ -463,7 +499,7 @@ function DoctorDashboard() {
             <h1 className="text-3xl font-bold mb-2">
               Welcome, Dr. {doctor.name}
             </h1>
-            <p className="text-blue-100">{doctor.specialty}</p>
+            <p className="text-blue-100">{doctorSpecialtiesText || doctor.specialty}</p>
           </div>
         </div>
 
@@ -620,7 +656,7 @@ function DoctorDashboard() {
                         />
                       ) : (
                         <p className="text-gray-900 font-medium">
-                          {doctor.specialty}
+                          {doctorSpecialtiesText || doctor.specialty}
                         </p>
                       )}
                     </div>

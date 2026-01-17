@@ -28,7 +28,7 @@ def get_doctor_profile():
         doctor_id = get_jwt_identity()
         
         query = """
-            SELECT id, name, email, phone, specialty, qualification, 
+            SELECT id, name, email, phone, specialty, specialty_id, specialties, qualification, 
                    experience, rating, consultation_fee, bio, available_slots,
                    available_days, day_specific_availability, created_at
             FROM doctors 

@@ -348,7 +348,7 @@ def login():
         role = data.get('role', 'user')  # default to user
 
         if role == 'doctor':
-            query = "SELECT id, email, password_hash, name, phone, specialty FROM doctors WHERE email = %s"
+            query = "SELECT id, email, password_hash, name, phone, specialty, specialty_id, specialties FROM doctors WHERE email = %s"
             user = execute_query(query, (email,), fetch_one=True)
         else:
             query = "SELECT id, email, password_hash, name, phone FROM users WHERE email = %s"
@@ -371,6 +371,10 @@ def login():
         }
         if role == 'doctor' and 'specialty' in user:
             user_data['specialty'] = user['specialty']
+        if role == 'doctor' and 'specialties' in user:
+            user_data['specialties'] = user.get('specialties')
+        if role == 'doctor' and 'specialty_id' in user:
+            user_data['specialty_id'] = user.get('specialty_id')
 
         return jsonify({
             'message': 'Login successful',

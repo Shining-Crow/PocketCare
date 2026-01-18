@@ -8,13 +8,60 @@ def fix_database():
     """Fix/upgrade DB schema for PocketCare.
 
     Safe to run multiple times.
-    - Ensures doctors.password_hash exists
+    - Ensures core lookup tables exist (specialties)
+    - Ensures doctors table has all columns used by the API
+    - Ensures appointments table has all columns used by the API
+    - Ensures admins table exists for admin login
     - Ensures consultation chat tables exist (consultation_threads, consultation_messages)
-    - Ensures specialties table exists and doctors.specialty_id exists
+    - Ensures weight management tables exist (weight_entries, weight_goals)
+    - Ensures messages/chat tables exist (messages, chat_messages)
     """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        def _table_exists(table_name: str) -> bool:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+                LIMIT 1
+                """,
+                (table_name,),
+            )
+            return bool(cursor.fetchone())
+
+        def _column_exists(table_name: str, column_name: str) -> bool:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = %s
+                  AND COLUMN_NAME = %s
+                LIMIT 1
+                """,
+                (table_name, column_name),
+            )
+            return bool(cursor.fetchone())
+
+        def _ensure_table(table_name: str, create_sql: str):
+            if _table_exists(table_name):
+                return
+            print(f"Creating {table_name} table...")
+            cursor.execute(create_sql)
+            conn.commit()
+            print(f"✓ {table_name} table created")
+
+        def _ensure_column(table_name: str, column_name: str, add_column_sql: str):
+            """add_column_sql should be a full ALTER TABLE ... ADD COLUMN ... statement."""
+            if _column_exists(table_name, column_name):
+                return
+            print(f"Adding {table_name}.{column_name} column...")
+            cursor.execute(add_column_sql)
+            conn.commit()
+            print(f"✓ {table_name}.{column_name} column added")
 
         # --- Specialties lookup table (and doctors.specialty_id) ---
         cursor.execute(
@@ -34,19 +81,28 @@ def fix_database():
         conn.commit()
 
         # Ensure doctors.specialty_id exists
-        cursor.execute(
-            """
-            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='doctors' AND COLUMN_NAME='specialty_id'
-            """
-        )
-        if cursor.fetchone():
+        if _column_exists('doctors', 'specialty_id'):
             print("✓ specialty_id column already exists in doctors table")
         else:
             print("Adding specialty_id column to doctors table...")
             cursor.execute("ALTER TABLE doctors ADD COLUMN specialty_id INT NULL")
             conn.commit()
             print("✓ specialty_id column added successfully")
+
+        # Ensure doctors table has newer profile columns used by API.
+        # Note: JSON columns require MySQL 5.7+/MariaDB equivalent.
+        _ensure_column('doctors', 'specialties', "ALTER TABLE doctors ADD COLUMN specialties JSON NULL")
+        _ensure_column('doctors', 'qualification', "ALTER TABLE doctors ADD COLUMN qualification VARCHAR(255) NULL")
+        _ensure_column('doctors', 'experience', "ALTER TABLE doctors ADD COLUMN experience INT NULL")
+        _ensure_column('doctors', 'rating', "ALTER TABLE doctors ADD COLUMN rating DECIMAL(2,1) DEFAULT 0.0")
+        _ensure_column('doctors', 'hospital_id', "ALTER TABLE doctors ADD COLUMN hospital_id INT NULL")
+        _ensure_column('doctors', 'consultation_fee', "ALTER TABLE doctors ADD COLUMN consultation_fee DECIMAL(10,2) NULL")
+        _ensure_column('doctors', 'available_slots', "ALTER TABLE doctors ADD COLUMN available_slots JSON NULL")
+        _ensure_column('doctors', 'available_days', "ALTER TABLE doctors ADD COLUMN available_days JSON NULL")
+        _ensure_column('doctors', 'day_specific_availability', "ALTER TABLE doctors ADD COLUMN day_specific_availability JSON NULL")
+        _ensure_column('doctors', 'is_available', "ALTER TABLE doctors ADD COLUMN is_available BOOLEAN DEFAULT TRUE")
+        _ensure_column('doctors', 'bio', "ALTER TABLE doctors ADD COLUMN bio TEXT NULL")
+        _ensure_column('doctors', 'created_at', "ALTER TABLE doctors ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 
         # Backfill doctors.specialty_id from doctors.specialty (best effort)
         try:
@@ -100,20 +156,131 @@ def fix_database():
             pass
         
         # Check if password_hash column exists
-        cursor.execute("""
-            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME='doctors' AND COLUMN_NAME='password_hash'
-        """)
-        
-        if cursor.fetchone():
+        if _column_exists('doctors', 'password_hash'):
             print("✓ password_hash column already exists in doctors table")
         else:
             print("Adding password_hash column to doctors table...")
-            cursor.execute("""
-                ALTER TABLE doctors ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''
-            """)
+            cursor.execute("ALTER TABLE doctors ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''")
             conn.commit()
             print("✓ password_hash column added successfully")
+
+        # Ensure users table has newer profile columns (used in profile + appointments joins).
+        _ensure_column('users', 'phone', "ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL")
+        _ensure_column('users', 'date_of_birth', "ALTER TABLE users ADD COLUMN date_of_birth DATE NULL")
+        _ensure_column('users', 'gender', "ALTER TABLE users ADD COLUMN gender ENUM('male','female','other') NULL")
+        _ensure_column('users', 'blood_group', "ALTER TABLE users ADD COLUMN blood_group VARCHAR(5) NULL")
+        _ensure_column('users', 'address', "ALTER TABLE users ADD COLUMN address TEXT NULL")
+        _ensure_column('users', 'created_at', "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        _ensure_column('users', 'updated_at', "ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+
+        # Ensure appointments table has fields used by doctor/user dashboards.
+        _ensure_column('appointments', 'symptoms', "ALTER TABLE appointments ADD COLUMN symptoms TEXT NULL")
+        _ensure_column(
+            'appointments',
+            'status',
+            "ALTER TABLE appointments ADD COLUMN status ENUM('pending','confirmed','completed','cancelled') DEFAULT 'pending'",
+        )
+        _ensure_column('appointments', 'notes', "ALTER TABLE appointments ADD COLUMN notes TEXT NULL")
+        _ensure_column('appointments', 'created_at', "ALTER TABLE appointments ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        _ensure_column(
+            'appointments',
+            'updated_at',
+            "ALTER TABLE appointments ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+        )
+
+        # Ensure admins table exists (for admin login/dashboard).
+        _ensure_table(
+            'admins',
+            """
+            CREATE TABLE IF NOT EXISTS admins (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                role VARCHAR(50) DEFAULT 'admin',
+                is_active BOOLEAN DEFAULT TRUE,
+                last_login TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_email (email)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        # Ensure chat and messaging tables exist.
+        _ensure_table(
+            'chat_messages',
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                sender ENUM('user', 'ai') NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'messages',
+            """
+            CREATE TABLE IF NOT EXISTS messages (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                sender_id INT NOT NULL,
+                receiver_id INT NOT NULL,
+                appointment_id INT,
+                message TEXT NOT NULL,
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL,
+                INDEX idx_sender (sender_id),
+                INDEX idx_receiver (receiver_id),
+                INDEX idx_appointment (appointment_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        # Ensure weight management tables exist.
+        _ensure_table(
+            'weight_entries',
+            """
+            CREATE TABLE IF NOT EXISTS weight_entries (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                entry_date DATE NOT NULL,
+                weight_kg DECIMAL(6,2) NOT NULL,
+                height_cm DECIMAL(6,2) NOT NULL,
+                age_years INT NULL,
+                bmi DECIMAL(6,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_weight_entries_user_date (user_id, entry_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'weight_goals',
+            """
+            CREATE TABLE IF NOT EXISTS weight_goals (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                start_weight_kg DECIMAL(6,2) NULL,
+                target_weight_kg DECIMAL(6,2) NOT NULL,
+                start_date DATE NULL,
+                target_date DATE NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_weight_goals_user_active (user_id, is_active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
 
         # --- Consultation chat tables ---
         cursor.execute(

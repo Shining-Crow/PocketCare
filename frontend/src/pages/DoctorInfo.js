@@ -182,10 +182,10 @@ export default function DoctorInfo() {
   };
 
   const convert12to24Hours = (timeSlot) => {
-    // Convert "10:00-11:00" format to just "10:00:00" (start time)
+    // Keep the full time range format "10:00-11:00" for backend to calculate capacity
+    // Backend will parse the start time for storage
     if (timeSlot.includes("-")) {
-      const startTime = timeSlot.split("-")[0];
-      return `${startTime}:00`;
+      return timeSlot; // Return the full range like "09:00-11:00"
     }
     return timeSlot;
   };

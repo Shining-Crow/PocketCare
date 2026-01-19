@@ -172,6 +172,9 @@ def create_appointment():
     appointment_time = data.get('appointment_time')
     is_emergency = data.get('is_emergency', False)
 
+    # Store original time slot for duration calculation
+    original_time_slot = appointment_time
+    
     if isinstance(appointment_time, str) and '-' in appointment_time:
         appointment_time = appointment_time.split('-', 1)[0].strip()
 
@@ -215,7 +218,36 @@ def create_appointment():
         if not cursor.fetchone():
             return jsonify({'error': 'Doctor not found'}), 404
 
-        # Check timeslot capacity (max 5 confirmed/pending appointments per slot)
+        # Calculate max appointments based on time slot duration (5 users per hour)
+        max_appointments = 5  # Default for 1 hour or unknown duration
+        
+        if isinstance(original_time_slot, str) and '-' in original_time_slot:
+            try:
+                # Parse time slot range like "09:00-11:00"
+                start_time_str, end_time_str = original_time_slot.split('-')
+                start_parts = start_time_str.strip().split(':')
+                end_parts = end_time_str.strip().split(':')
+                
+                start_hour = int(start_parts[0])
+                start_min = int(start_parts[1]) if len(start_parts) > 1 else 0
+                end_hour = int(end_parts[0])
+                end_min = int(end_parts[1]) if len(end_parts) > 1 else 0
+                
+                # Calculate duration in hours
+                duration_hours = (end_hour - start_hour) + (end_min - start_min) / 60.0
+                
+                # 5 appointments per hour
+                max_appointments = int(duration_hours * 5)
+                
+                # Ensure at least 5 appointments for any valid slot
+                if max_appointments < 5:
+                    max_appointments = 5
+                    
+            except (ValueError, IndexError):
+                # If parsing fails, use default of 5
+                pass
+
+        # Check timeslot capacity (max appointments based on duration)
         # Only check for non-emergency appointments
         if not is_emergency:
             cursor.execute(
@@ -232,11 +264,13 @@ def create_appointment():
             result = cursor.fetchone()
             slot_count = result['count'] if result else 0
             
-            if slot_count >= 5:
+            if slot_count >= max_appointments:
                 return jsonify({
                     'error': 'Timeslot is full',
-                    'message': 'This timeslot already has 5 appointments. If this is an emergency, please select the emergency option.',
-                    'slot_full': True
+                    'message': f'This timeslot already has {max_appointments} appointments. If this is an emergency, please select the emergency option.',
+                    'slot_full': True,
+                    'max_appointments': max_appointments,
+                    'current_count': slot_count
                 }), 400
 
         # For emergency appointments, always require doctor approval (pending status)
@@ -506,3 +540,93 @@ def delete_appointment(appointment_id):
         return jsonify({'error': f'Database error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Failed to delete appointment: {str(e)}'}), 500
+
+# Check slot availability endpoint
+@appointments_bp.route('/appointments/check-availability', methods=['POST'])
+@jwt_required()
+def check_slot_availability():
+    """Check available slots for a specific doctor, date, and time"""
+    try:
+        data = request.get_json(silent=True) or {}
+        
+        doctor_id = data.get('doctor_id')
+        appointment_date = data.get('appointment_date')
+        appointment_time = data.get('appointment_time')
+        
+        if not all([doctor_id, appointment_date, appointment_time]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Store original time slot for duration calculation
+        original_time_slot = appointment_time
+        
+        # Parse the time slot
+        if isinstance(appointment_time, str) and '-' in appointment_time:
+            appointment_time = appointment_time.split('-', 1)[0].strip()
+        
+        if isinstance(appointment_time, str) and re.fullmatch(r"\d{2}:\d{2}", appointment_time):
+            appointment_time = f"{appointment_time}:00"
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Calculate max appointments based on time slot duration (5 users per hour)
+        max_appointments = 5  # Default for 1 hour or unknown duration
+        duration_hours = 1.0
+        
+        if isinstance(original_time_slot, str) and '-' in original_time_slot:
+            try:
+                # Parse time slot range like "09:00-11:00"
+                start_time_str, end_time_str = original_time_slot.split('-')
+                start_parts = start_time_str.strip().split(':')
+                end_parts = end_time_str.strip().split(':')
+                
+                start_hour = int(start_parts[0])
+                start_min = int(start_parts[1]) if len(start_parts) > 1 else 0
+                end_hour = int(end_parts[0])
+                end_min = int(end_parts[1]) if len(end_parts) > 1 else 0
+                
+                # Calculate duration in hours
+                duration_hours = (end_hour - start_hour) + (end_min - start_min) / 60.0
+                
+                # 5 appointments per hour
+                max_appointments = int(duration_hours * 5)
+                
+                # Ensure at least 5 appointments for any valid slot
+                if max_appointments < 5:
+                    max_appointments = 5
+                    
+            except (ValueError, IndexError):
+                # If parsing fails, use default of 5
+                pass
+        
+        # Get current appointment count for this slot
+        cursor.execute(
+            """
+            SELECT COUNT(*) as count 
+            FROM appointments 
+            WHERE doctor_id = %s 
+            AND appointment_date = %s 
+            AND appointment_time = %s 
+            AND status IN ('pending', 'confirmed')
+            """,
+            (int(doctor_id), appointment_date, appointment_time)
+        )
+        result = cursor.fetchone()
+        current_count = result['count'] if result else 0
+        
+        cursor.close()
+        conn.close()
+        
+        available_slots = max_appointments - current_count
+        is_available = available_slots > 0
+        
+        return jsonify({
+            'is_available': is_available,
+            'max_appointments': max_appointments,
+            'current_count': current_count,
+            'available_slots': available_slots,
+            'duration_hours': duration_hours
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to check availability: {str(e)}'}), 500

@@ -6,8 +6,171 @@ from utils.validators import validate_email_format, validate_password_strength, 
 from datetime import datetime
 import json
 from datetime import date, timedelta
+import secrets
+import threading
+import time
+import base64
 
 auth_bp = Blueprint('auth', __name__)
+
+
+# --- Lightweight captcha + rate limiting ---
+# Note: This is an intentionally simple, dependency-free captcha to deter naive scripting.
+# It is stored in-memory, so it resets on backend restart (OK for this use-case).
+
+_captcha_lock = threading.Lock()
+_captcha_store = {}  # captcha_id -> {answer:int, expires_at:float, ip:str, used:bool}
+
+_rate_lock = threading.Lock()
+_rate_store = {}  # key -> [timestamps]
+
+
+def _get_client_ip() -> str:
+    # Respect common proxy header if present.
+    xff = request.headers.get('X-Forwarded-For')
+    if xff:
+        # XFF is a CSV list; take the first hop
+        return (xff.split(',')[0] or '').strip() or (request.remote_addr or '')
+    return request.remote_addr or ''
+
+
+def _rate_limited(key: str, limit: int, window_seconds: int) -> bool:
+    now = time.time()
+    cutoff = now - float(window_seconds)
+    with _rate_lock:
+        lst = _rate_store.get(key) or []
+        lst = [t for t in lst if t >= cutoff]
+        if len(lst) >= int(limit):
+            _rate_store[key] = lst
+            return True
+        lst.append(now)
+        _rate_store[key] = lst
+    return False
+
+
+def _new_captcha(ip: str) -> dict:
+    # Image captcha: random text rendered into a PNG with light noise.
+    # This is meant to deter naive scripts, not to be bot-proof.
+    try:
+        from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    except Exception as exc:
+        raise RuntimeError("Captcha image generation requires Pillow") from exc
+
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # avoid ambiguous 0/O, 1/I
+    text = "".join(alphabet[secrets.randbelow(len(alphabet))] for _ in range(5))
+
+    width, height = 180, 64
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # Font: try a common bundled font; fall back to PIL default.
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 34)
+    except Exception:
+        font = ImageFont.load_default()
+
+    # Background noise (lines)
+    for _ in range(6):
+        x1 = secrets.randbelow(width)
+        y1 = secrets.randbelow(height)
+        x2 = secrets.randbelow(width)
+        y2 = secrets.randbelow(height)
+        color = (secrets.randbelow(120), secrets.randbelow(120), secrets.randbelow(120))
+        draw.line((x1, y1, x2, y2), fill=color, width=2)
+
+    # Dots
+    for _ in range(120):
+        x = secrets.randbelow(width)
+        y = secrets.randbelow(height)
+        color = (secrets.randbelow(180), secrets.randbelow(180), secrets.randbelow(180))
+        draw.point((x, y), fill=color)
+
+    # Text (slightly jittered)
+    x = 18
+    for ch in text:
+        y = 10 + secrets.randbelow(12)
+        color = (secrets.randbelow(60), secrets.randbelow(60), secrets.randbelow(60))
+        draw.text((x, y), ch, font=font, fill=color)
+        x += 28 + secrets.randbelow(6)
+
+    # Gentle blur to make OCR a bit harder
+    img = img.filter(ImageFilter.GaussianBlur(radius=0.8))
+
+    from io import BytesIO
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    png_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    captcha_id = secrets.token_urlsafe(16)
+    expires_at = time.time() + 5 * 60  # 5 minutes
+
+    with _captcha_lock:
+        # Best-effort pruning of expired/used captchas to avoid unbounded growth.
+        now = time.time()
+        if _captcha_store:
+            for cid, rec in list(_captcha_store.items()):
+                try:
+                    if rec.get('used') or float(rec.get('expires_at') or 0) < now:
+                        _captcha_store.pop(cid, None)
+                except Exception:
+                    _captcha_store.pop(cid, None)
+
+        _captcha_store[captcha_id] = {
+            'answer': text.upper(),
+            'expires_at': float(expires_at),
+            'ip': ip,
+            'used': False,
+        }
+
+    return {
+        'captcha_id': captcha_id,
+        'image_base64': png_b64,
+        'mime_type': 'image/png',
+        'expires_in_seconds': 300,
+    }
+
+
+def _verify_captcha(captcha_id: str, captcha_answer, ip: str) -> (bool, str):
+    cid = (captcha_id or '').strip()
+    if not cid:
+        return False, 'Missing captcha_id'
+
+    provided = ("" if captcha_answer is None else str(captcha_answer)).strip().upper()
+    if not provided:
+        return False, 'Invalid captcha answer'
+
+    now = time.time()
+    with _captcha_lock:
+        rec = _captcha_store.get(cid)
+        if not rec:
+            return False, 'Captcha expired or invalid'
+        if rec.get('used'):
+            return False, 'Captcha already used'
+        if float(rec.get('expires_at') or 0) < now:
+            _captcha_store.pop(cid, None)
+            return False, 'Captcha expired or invalid'
+        # Bind captcha to IP to reduce token reuse.
+        if (rec.get('ip') or '') != (ip or ''):
+            return False, 'Captcha invalid'
+
+        expected = (rec.get('answer') or '').strip().upper()
+        if expected != provided:
+            return False, 'Incorrect captcha'
+
+        # One-time use: invalidate.
+        rec['used'] = True
+        _captcha_store.pop(cid, None)
+    return True, ''
+
+
+@auth_bp.route('/captcha', methods=['GET'])
+def captcha():
+    ip = _get_client_ip()
+    # Throttle captcha generation itself
+    if _rate_limited(f"captcha:{ip}", limit=60, window_seconds=60):
+        return jsonify({'error': 'Too many captcha requests. Please slow down.'}), 429
+    return jsonify(_new_captcha(ip)), 200
 
 
 def _require_admin_identity():
@@ -54,12 +217,21 @@ def _fill_daily_series(start: date, days: int, by_day: dict, factory: dict):
 def register():
     """Register a new user"""
     try:
+        ip = _get_client_ip()
+        # Basic anti-burst protection
+        if _rate_limited(f"register:user:{ip}", limit=10, window_seconds=60):
+            return jsonify({'error': 'Too many registration attempts. Please try again later.'}), 429
+
         data = request.get_json()
         
         # Validate required fields
-        is_valid, error = validate_required_fields(data, ['email', 'password', 'name'])
+        is_valid, error = validate_required_fields(data, ['email', 'password', 'name', 'captcha_id', 'captcha_answer'])
         if not is_valid:
             return jsonify({'error': error}), 400
+
+        ok, captcha_err = _verify_captcha(data.get('captcha_id'), data.get('captcha_answer'), ip)
+        if not ok:
+            return jsonify({'error': captcha_err}), 400
         
         email = data.get('email').lower().strip()
         password = data.get('password')
@@ -118,13 +290,21 @@ def register():
 @auth_bp.route('/doctor/register', methods=['POST'])
 def register_doctor():
     try:
+        ip = _get_client_ip()
+        if _rate_limited(f"register:doctor:{ip}", limit=10, window_seconds=60):
+            return jsonify({'error': 'Too many registration attempts. Please try again later.'}), 429
+
         data = request.get_json()
 
         # Required fields
-        required = ['name', 'email', 'password']
+        required = ['name', 'email', 'password', 'captcha_id', 'captcha_answer']
         is_valid, error = validate_required_fields(data, required)
         if not is_valid:
             return jsonify({'error': error}), 400
+
+        ok, captcha_err = _verify_captcha(data.get('captcha_id'), data.get('captcha_answer'), ip)
+        if not ok:
+            return jsonify({'error': captcha_err}), 400
 
         email = data.get('email').lower().strip()
         password = data.get('password')

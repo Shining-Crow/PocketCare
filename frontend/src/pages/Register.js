@@ -1,35 +1,71 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { register } from '../utils/auth';
+import React, { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { register } from "../utils/auth";
+import api from "../utils/api";
 
 function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: ''
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    captcha_id: "",
+    captcha_answer: "",
   });
-  const [error, setError] = useState('');
+  const [captchaImage, setCaptchaImage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+
+  const fetchCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const res = await api.get("/auth/captcha");
+      const b64 = res.data?.image_base64 || "";
+      setCaptchaImage(
+        b64 ? `data:${res.data?.mime_type || "image/png"};base64,${b64}` : "",
+      );
+      setFormData((prev) => ({
+        ...prev,
+        captcha_id: res.data?.captcha_id || "",
+        captcha_answer: "",
+      }));
+    } catch (e) {
+      setCaptchaImage("");
+      setError("Unable to load captcha. Please refresh the page.");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCaptcha();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       await register(formData);
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      const msg =
+        err.response?.data?.error || "Registration failed. Please try again.";
+      setError(msg);
+      if ((msg || "").toLowerCase().includes("captcha")) {
+        await fetchCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -46,17 +82,20 @@ function Register() {
             Join PocketCare today
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Full Name
               </label>
               <input
@@ -70,9 +109,12 @@ function Register() {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email address
               </label>
               <input
@@ -86,9 +128,12 @@ function Register() {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <input
@@ -105,9 +150,12 @@ function Register() {
                 Must be 8+ characters with uppercase, lowercase, and number
               </p>
             </div>
-            
+
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Phone Number (Optional)
               </label>
               <input
@@ -120,6 +168,48 @@ function Register() {
                 onChange={handleChange}
               />
             </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="captcha_answer"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Captcha
+                </label>
+                <button
+                  type="button"
+                  onClick={fetchCaptcha}
+                  disabled={captchaLoading}
+                  className="text-sm font-medium text-primary hover:text-blue-600 disabled:opacity-50"
+                >
+                  {captchaLoading ? "Loading..." : "New captcha"}
+                </button>
+              </div>
+
+              <div className="mt-2 flex items-center justify-center border border-gray-200 rounded-md bg-white py-2">
+                {captchaImage ? (
+                  <img src={captchaImage} alt="Captcha" className="h-12" />
+                ) : (
+                  <div className="text-sm text-gray-700">
+                    {captchaLoading
+                      ? "Loading captcha..."
+                      : "Captcha unavailable"}
+                  </div>
+                )}
+              </div>
+
+              <input
+                id="captcha_answer"
+                name="captcha_answer"
+                type="text"
+                required
+                className="mt-2 appearance-none relative block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="Enter the text you see"
+                value={formData.captcha_answer}
+                onChange={handleChange}
+              />
+            </div>
           </div>
 
           <div>
@@ -128,13 +218,16 @@ function Register() {
               disabled={loading}
               className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              {loading ? 'Creating account...' : 'Sign up'}
+              {loading ? "Creating account..." : "Sign up"}
             </button>
           </div>
-          
+
           <div className="text-center text-sm">
             <span className="text-gray-600">Already have an account? </span>
-            <Link to="/login" className="font-medium text-primary hover:text-blue-600">
+            <Link
+              to="/login"
+              className="font-medium text-primary hover:text-blue-600"
+            >
               Sign in
             </Link>
           </div>

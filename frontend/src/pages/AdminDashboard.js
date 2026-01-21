@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import LocationPickerMap from '../components/LocationPickerMap';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -59,6 +60,45 @@ function AdminDashboard() {
   const [weightWeekly, setWeightWeekly] = useState([]);
   const [weightActiveGoals, setWeightActiveGoals] = useState(0);
   const [weightAvgCheckins, setWeightAvgCheckins] = useState(0);
+
+  const [hospitalForm, setHospitalForm] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    phone: '',
+    email: '',
+    password: '',
+    emergency_contact: '',
+    latitude: 23.8103,
+    longitude: 90.4125,
+  });
+  const [hospitalCreateLoading, setHospitalCreateLoading] = useState(false);
+  const [hospitalCreateError, setHospitalCreateError] = useState('');
+  const [hospitalCreateSuccess, setHospitalCreateSuccess] = useState('');
+
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [accountModalTab, setAccountModalTab] = useState('hospital'); // hospital | admin
+
+  const [adminCreateForm, setAdminCreateForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'admin',
+  });
+  const [adminCreateLoading, setAdminCreateLoading] = useState(false);
+  const [adminCreateError, setAdminCreateError] = useState('');
+  const [adminCreateSuccess, setAdminCreateSuccess] = useState('');
+
+  const [toast, setToast] = useState({ isOpen: false, type: 'success', message: '' });
+
+  useEffect(() => {
+    if (!toast.isOpen) return;
+    const t = setTimeout(() => {
+      setToast((s) => ({ ...s, isOpen: false }));
+    }, 3200);
+    return () => clearTimeout(t);
+  }, [toast.isOpen]);
 
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken');
@@ -144,6 +184,69 @@ function AdminDashboard() {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminInfo');
     navigate('/admin/login');
+  };
+
+  const submitCreateHospital = async (e) => {
+    e.preventDefault();
+    setHospitalCreateError('');
+    setHospitalCreateSuccess('');
+    setHospitalCreateLoading(true);
+
+    try {
+      const payload = {
+        ...hospitalForm,
+        latitude: Number(hospitalForm.latitude),
+        longitude: Number(hospitalForm.longitude),
+      };
+      const res = await api.post('/auth/admin/hospitals', payload);
+      setHospitalCreateSuccess(`Hospital created (ID: ${res.data?.hospital?.id})`);
+      setAccountModalOpen(false);
+      setToast({
+        isOpen: true,
+        type: 'success',
+        message: `Hospital created (ID: ${res.data?.hospital?.id})`,
+      });
+      setHospitalForm((s) => ({
+        ...s,
+        name: '',
+        address: '',
+        city: '',
+        state: '',
+        phone: '',
+        email: '',
+        password: '',
+        emergency_contact: '',
+      }));
+    } catch (err) {
+      setHospitalCreateError(err?.response?.data?.error || 'Failed to create hospital');
+      console.error(err);
+    } finally {
+      setHospitalCreateLoading(false);
+    }
+  };
+
+  const submitCreateAdmin = async (e) => {
+    e.preventDefault();
+    setAdminCreateError('');
+    setAdminCreateSuccess('');
+    setAdminCreateLoading(true);
+
+    try {
+      const res = await api.post('/auth/admin/admins', adminCreateForm);
+      setAdminCreateSuccess(`Admin created (ID: ${res.data?.admin?.id})`);
+      setAccountModalOpen(false);
+      setToast({
+        isOpen: true,
+        type: 'success',
+        message: `Admin created (ID: ${res.data?.admin?.id})`,
+      });
+      setAdminCreateForm({ name: '', email: '', password: '', role: 'admin' });
+    } catch (err) {
+      setAdminCreateError(err?.response?.data?.error || 'Failed to create admin');
+      console.error(err);
+    } finally {
+      setAdminCreateLoading(false);
+    }
   };
 
   if (loading) {
@@ -574,6 +677,34 @@ function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {toast.isOpen ? (
+          <div className="fixed top-5 right-5 z-[60]">
+            <div
+              className={`shadow-lg border rounded-xl px-4 py-3 flex items-start gap-3 bg-white ${
+                toast.type === 'success' ? 'border-green-200' : 'border-gray-200'
+              }`}
+            >
+              <div
+                className={`mt-0.5 h-2.5 w-2.5 rounded-full ${
+                  toast.type === 'success' ? 'bg-green-500' : 'bg-gray-500'
+                }`}
+              />
+              <div className="min-w-[220px]">
+                <div className="text-sm font-semibold text-gray-900">Success</div>
+                <div className="text-sm text-gray-700 mt-0.5">{toast.message}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast((s) => ({ ...s, isOpen: false }))}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {/* Welcome Banner */}
         <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg p-8">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
@@ -960,20 +1091,294 @@ function AdminDashboard() {
 
         {/* Users & Doctors Tab */}
         {activeTab === 'users' && (
-          <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Users & Doctors Management</h2>
-            <p className="text-gray-600 mb-6">Manage and view all users and doctors on the platform</p>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-4xl font-bold text-blue-600 mb-2">{stats?.total_users || 0}</p>
-                <p className="text-gray-700 font-medium">Total Users</p>
-              </div>
-              <div className="p-6 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-4xl font-bold text-green-600 mb-2">{stats?.total_doctors || 0}</p>
-                <p className="text-gray-700 font-medium">Total Doctors</p>
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Users & Doctors Management</h2>
+              <p className="text-gray-600">Platform totals and account creation.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-4xl font-bold text-blue-600 mb-2">{stats?.total_users || 0}</p>
+                  <p className="text-gray-700 font-medium">Total Users</p>
+                </div>
+                <div className="p-6 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-4xl font-bold text-green-600 mb-2">{stats?.total_doctors || 0}</p>
+                  <p className="text-gray-700 font-medium">Total Doctors</p>
+                </div>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mt-6">Advanced user and doctor management features coming soon...</p>
+
+            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Account Creation</h3>
+                  <p className="text-sm text-gray-600 mt-1">Create Hospital or Admin accounts from a modal.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountModalTab('hospital');
+                      setHospitalCreateError('');
+                      setHospitalCreateSuccess('');
+                      setAdminCreateError('');
+                      setAdminCreateSuccess('');
+                      setAccountModalOpen(true);
+                    }}
+                    className="px-5 py-2 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95"
+                  >
+                    + Create Account
+                  </button>
+                  <a
+                    href="/hospital/login"
+                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-900 hover:bg-gray-200"
+                  >
+                    Hospital Login
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {accountModalOpen ? (
+              <div className="fixed inset-0 z-50 overflow-y-auto">
+                <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                  <div
+                    className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                    onClick={() => setAccountModalOpen(false)}
+                  />
+
+                  <div className="inline-block transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
+                    <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Create Account</h3>
+                        <p className="text-xs text-gray-500 mt-1">Choose Hospital or Admin.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAccountModalOpen(false)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-900 text-sm font-semibold"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="px-6 pt-5">
+                      <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => setAccountModalTab('hospital')}
+                          className={`flex-1 py-2 rounded-md text-sm font-semibold transition ${
+                            accountModalTab === 'hospital'
+                              ? 'bg-white shadow text-gray-900'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Hospital Account
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAccountModalTab('admin')}
+                          className={`flex-1 py-2 rounded-md text-sm font-semibold transition ${
+                            accountModalTab === 'admin'
+                              ? 'bg-white shadow text-gray-900'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Admin Account
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="px-6 py-6">
+                      {accountModalTab === 'hospital' ? (
+                        <div>
+                          {hospitalCreateError ? (
+                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                              {hospitalCreateError}
+                            </div>
+                          ) : null}
+                          {hospitalCreateSuccess ? (
+                            <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+                              {hospitalCreateSuccess}
+                            </div>
+                          ) : null}
+
+                          <form onSubmit={submitCreateHospital} className="space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Hospital Name *</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.name}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, name: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Email (Login) *</label>
+                                <input
+                                  type="email"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.email}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, email: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Password *</label>
+                                <input
+                                  type="password"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.password}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, password: e.target.value }))}
+                                  required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.phone}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, phone: e.target.value }))}
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Address *</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.address}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, address: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">City</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.city}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, city: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">State</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.state}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, state: e.target.value }))}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Emergency Contact</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={hospitalForm.emergency_contact}
+                                  onChange={(e) => setHospitalForm((s) => ({ ...s, emergency_contact: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">Location (Mini Map) *</label>
+                              <LocationPickerMap
+                                value={{ lat: hospitalForm.latitude, lng: hospitalForm.longitude }}
+                                onChange={(v) =>
+                                  setHospitalForm((s) => ({
+                                    ...s,
+                                    latitude: v?.lat,
+                                    longitude: v?.lng,
+                                  }))
+                                }
+                                height={320}
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="submit"
+                                disabled={hospitalCreateLoading}
+                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60"
+                              >
+                                {hospitalCreateLoading ? 'Creating...' : 'Create Hospital Account'}
+                              </button>
+                              <div className="text-xs text-gray-500">Saves credentials + latitude/longitude.</div>
+                            </div>
+                          </form>
+                        </div>
+                      ) : (
+                        <div>
+                          {adminCreateError ? (
+                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                              {adminCreateError}
+                            </div>
+                          ) : null}
+                          {adminCreateSuccess ? (
+                            <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+                              {adminCreateSuccess}
+                            </div>
+                          ) : null}
+
+                          <form onSubmit={submitCreateAdmin} className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={adminCreateForm.name}
+                                  onChange={(e) => setAdminCreateForm((s) => ({ ...s, name: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
+                                <input
+                                  type="email"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={adminCreateForm.email}
+                                  onChange={(e) => setAdminCreateForm((s) => ({ ...s, email: e.target.value }))}
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Password *</label>
+                                <input
+                                  type="password"
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={adminCreateForm.password}
+                                  onChange={(e) => setAdminCreateForm((s) => ({ ...s, password: e.target.value }))}
+                                  required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+                                <input
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  value={adminCreateForm.role}
+                                  onChange={(e) => setAdminCreateForm((s) => ({ ...s, role: e.target.value }))}
+                                  placeholder="admin"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="submit"
+                                disabled={adminCreateLoading}
+                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60"
+                              >
+                                {adminCreateLoading ? 'Creating...' : 'Create Admin Account'}
+                              </button>
+                              <div className="text-xs text-gray-500">Creates another admin user.</div>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 

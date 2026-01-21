@@ -19,6 +19,7 @@ api.interceptors.request.use(
     // and trigger the global logout redirect.
     const userToken = localStorage.getItem("token");
     const adminToken = localStorage.getItem("adminToken");
+    const hospitalToken = localStorage.getItem("hospitalToken");
     const currentPath =
       typeof window !== "undefined" ? window.location.pathname : "";
     const url = (config?.url || "").toString();
@@ -28,7 +29,12 @@ api.interceptors.request.use(
       url.startsWith("/auth/admin") ||
       url.includes("/admin/");
 
-    const token = isAdminContext ? adminToken : userToken;
+    const isHospitalContext =
+      currentPath.startsWith("/hospital") ||
+      url.startsWith("/auth/hospital") ||
+      url.includes("/hospital/");
+
+    const token = isAdminContext ? adminToken : isHospitalContext ? hospitalToken : userToken;
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -66,7 +72,7 @@ api.interceptors.response.use(
         (typeof apiMsg === "string" && apiMsg.toLowerCase().includes("token"));
 
       const hasAnyToken = !!(
-        localStorage.getItem("token") || localStorage.getItem("adminToken")
+        localStorage.getItem("token") || localStorage.getItem("adminToken") || localStorage.getItem("hospitalToken")
       );
 
       if (shouldForceLogout && hasAnyToken) {
@@ -74,11 +80,15 @@ api.interceptors.response.use(
         localStorage.removeItem("user");
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminInfo");
+        localStorage.removeItem("hospitalToken");
+        localStorage.removeItem("hospitalInfo");
 
         // Redirect to appropriate login page
         const currentPath = window.location.pathname;
         if (currentPath.includes("/admin")) {
           window.location.href = "/admin/login";
+        } else if (currentPath.includes("/hospital")) {
+          window.location.href = "/hospital/login";
         } else {
           window.location.href = "/login";
         }

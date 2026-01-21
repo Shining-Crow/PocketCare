@@ -15,6 +15,7 @@ def fix_database():
     - Ensures consultation chat tables exist (consultation_threads, consultation_messages)
     - Ensures weight management tables exist (weight_entries, weight_goals)
     - Ensures messages/chat tables exist (messages, chat_messages)
+    - Ensures hospitals supports login + geo location (hospitals.password_hash, hospitals.latitude/longitude)
     """
     try:
         conn = get_db_connection()
@@ -339,6 +340,44 @@ def fix_database():
             )
             conn.commit()
             print("✓ consultation_messages table created")
+
+        # --- Hospitals: login + geo fields ---
+        cursor.execute(
+            """
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='hospitals'
+            """
+        )
+        hospital_cols = {r['COLUMN_NAME'] if isinstance(r, dict) else r[0] for r in (cursor.fetchall() or [])}
+
+        if not hospital_cols:
+            print("! hospitals table not found; skipping hospital upgrades")
+        else:
+            if 'latitude' not in hospital_cols:
+                print("Adding latitude column to hospitals table...")
+                cursor.execute("ALTER TABLE hospitals ADD COLUMN latitude DECIMAL(10,8) NULL")
+                conn.commit()
+                print("✓ latitude column added")
+
+            if 'longitude' not in hospital_cols:
+                print("Adding longitude column to hospitals table...")
+                cursor.execute("ALTER TABLE hospitals ADD COLUMN longitude DECIMAL(11,8) NULL")
+                conn.commit()
+                print("✓ longitude column added")
+
+            if 'password_hash' not in hospital_cols:
+                print("Adding password_hash column to hospitals table...")
+                cursor.execute("ALTER TABLE hospitals ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''")
+                conn.commit()
+                print("✓ password_hash column added")
+
+            # Helpful index for geo queries (best-effort)
+            try:
+                cursor.execute("CREATE INDEX idx_location ON hospitals(latitude, longitude)")
+                conn.commit()
+            except Exception:
+                pass
         
         cursor.close()
         conn.close()

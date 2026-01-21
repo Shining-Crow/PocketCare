@@ -59,14 +59,8 @@ const HospitalDashboard = () => {
     const hospitalInfo = localStorage.getItem('hospitalInfo');
 
     if (!hospitalToken || !hospitalInfo) {
-      // Initialize default hospital for demo purposes
-      const defaultHospital = {
-        name: 'City General Hospital',
-        id: 1  // Changed to numeric ID
-      };
-      localStorage.setItem('hospitalInfo', JSON.stringify(defaultHospital));
-      setHospital(defaultHospital);
-      fetchHospitalData(1);
+      navigate('/hospital/login');
+      return;
     } else {
       const parsedHospital = JSON.parse(hospitalInfo);
       setHospital(parsedHospital);

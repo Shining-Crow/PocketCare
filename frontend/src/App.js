@@ -26,6 +26,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import MedicalReports from "./pages/MedicalReports";
 import WeightManagement from "./pages/WeightManagement";
+import HospitalDashboard from "./pages/HospitalDashboard";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -126,6 +127,10 @@ function App() {
           }
         />
         <Route path="/admin" element={<Navigate to="/admin/login" />} />
+
+        {/* Hospital Routes - Direct Access */}
+        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
+        <Route path="/hospital" element={<Navigate to="/hospital/dashboard" />} />
 
         {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" />} />

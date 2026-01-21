@@ -32,7 +32,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # CORS settings
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001').split(',')
     
     # API Keys
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')

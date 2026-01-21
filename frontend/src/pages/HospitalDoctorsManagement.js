@@ -1,22 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import SuccessModal from '../components/SuccessModal';
 
 const HospitalDoctorsManagement = () => {
-  // Load doctors from localStorage if exists
-  const savedDoctors = JSON.parse(localStorage.getItem('hospitalDoctors'));
-  const [doctors, setDoctors] = useState(savedDoctors || [
-    { id: 1, name: 'Dr. Sarah Wilson', specialty: 'Cardiology', status: 'available', appointments: 8, rating: 4.8, email: 'sarah.w@hospital.com', phone: '+880 1234567890', experience: '12 years', qualifications: 'MBBS, MD Cardiology' },
-    { id: 2, name: 'Dr. Michael Brown', specialty: 'Neurology', status: 'in-session', appointments: 6, rating: 4.7, email: 'michael.b@hospital.com', phone: '+880 1234567891', experience: '15 years', qualifications: 'MBBS, DM Neurology' },
-    { id: 3, name: 'Dr. Emily Davis', specialty: 'Pediatrics', status: 'available', appointments: 4, rating: 4.9, email: 'emily.d@hospital.com', phone: '+880 1234567892', experience: '8 years', qualifications: 'MBBS, DCH' },
-    { id: 4, name: 'Dr. James Miller', specialty: 'Orthopedics', status: 'offline', appointments: 0, rating: 4.6, email: 'james.m@hospital.com', phone: '+880 1234567893', experience: '10 years', qualifications: 'MBBS, MS Orthopedics' },
-    { id: 5, name: 'Dr. Lisa Chen', specialty: 'Oncology', status: 'available', appointments: 7, rating: 4.8, email: 'lisa.c@hospital.com', phone: '+880 1234567894', experience: '14 years', qualifications: 'MBBS, DM Oncology' },
-    { id: 6, name: 'Dr. Robert Kim', specialty: 'Emergency Medicine', status: 'in-session', appointments: 5, rating: 4.5, email: 'robert.k@hospital.com', phone: '+880 1234567895', experience: '9 years', qualifications: 'MBBS, DEM' },
-  ]);
-
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingDoctor, setEditingDoctor] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [availableSpecialties, setAvailableSpecialties] = useState([]);
+  const [error, setError] = useState(null);
+  const [successModal, setSuccessModal] = useState({ show: false, title: '', message: '' });
   const [newDoctor, setNewDoctor] = useState({
     name: '',
     specialty: '',
@@ -26,8 +21,59 @@ const HospitalDoctorsManagement = () => {
     qualifications: ''
   });
 
-  // Save doctors to localStorage whenever they change
+  const API_BASE_URL = 'http://localhost:5000/api';
+  const HOSPITAL_ID = 1; // Hardcoded for now
+
+  // Fetch doctors from backend
+  const fetchDoctors = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log('Fetching doctors from:', `${API_BASE_URL}/hospital-doctors?hospital_id=${HOSPITAL_ID}`);
+      const response = await axios.get(`${API_BASE_URL}/hospital-doctors`, {
+        params: { hospital_id: HOSPITAL_ID }
+      });
+      
+      console.log('API Response:', response.data);
+      
+      if (response.data.success) {
+        console.log('Setting doctors:', response.data.doctors);
+        setDoctors(response.data.doctors);
+      }
+    } catch (err) {
+      console.error('Error fetching doctors:', err);
+      console.error('Error details:', err.response?.data);
+      setError('Failed to load doctors. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch specialties
+  const fetchSpecialties = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/hospital-doctors/specialties`);
+      
+      if (response.data.success) {
+        setAvailableSpecialties(response.data.specialties);
+      }
+    } catch (err) {
+      console.error('Error fetching specialties:', err);
+    }
+  }, []);
+
+  // Load data on component mount
   useEffect(() => {
+    console.log('Component mounted, fetching data...');
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('HOSPITAL_ID:', HOSPITAL_ID);
+    fetchDoctors();
+    fetchSpecialties();
+  }, [fetchDoctors, fetchSpecialties]);
+
+  // Save doctors to localStorage whenever they change (for backward compatibility)
+  useEffect(() => {
+    console.log('Doctors state updated:', doctors.length, 'doctors');
     localStorage.setItem('hospitalDoctors', JSON.stringify(doctors));
   }, [doctors]);
 
@@ -38,71 +84,123 @@ const HospitalDoctorsManagement = () => {
   const filteredDoctors = doctors.filter(doctor => {
     const matchesSearch = doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doctor.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         (doctor.email && doctor.email.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesSpecialty = filterSpecialty === 'all' || doctor.specialty === filterSpecialty;
     const matchesStatus = filterStatus === 'all' || doctor.status === filterStatus;
     
     return matchesSearch && matchesSpecialty && matchesStatus;
   });
 
-  const handleAddDoctor = () => {
+  console.log('Filtered doctors:', filteredDoctors.length, 'of', doctors.length);
+
+  const handleAddDoctor = async () => {
     if (!newDoctor.name.trim() || !newDoctor.specialty.trim()) {
       alert('Name and specialty are required');
       return;
     }
 
-    const newDoctorWithId = {
-      ...newDoctor,
-      id: Date.now(),
-      status: 'available',
-      appointments: 0,
-      rating: 0,
-      phone: newDoctor.phone || 'Not provided',
-      experience: newDoctor.experience || 'Not specified',
-      qualifications: newDoctor.qualifications || 'Not specified'
-    };
+    try {
+      setLoading(true);
+      const response = await axios.post(`${API_BASE_URL}/hospital-doctors`, {
+        ...newDoctor,
+        hospital_id: HOSPITAL_ID
+      });
 
-    setDoctors([...doctors, newDoctorWithId]);
-    setNewDoctor({ name: '', specialty: '', email: '', phone: '', experience: '', qualifications: '' });
-    setShowAddForm(false);
-    alert('Doctor added successfully!');
-  };
-
-  const handleUpdateDoctor = (id, updates) => {
-    setDoctors(doctors.map(doctor => 
-      doctor.id === id ? { ...doctor, ...updates } : doctor
-    ));
-    setEditingDoctor(null);
-    alert('Doctor updated successfully!');
-  };
-
-  const handleDeleteDoctor = (id) => {
-    if (window.confirm('Are you sure you want to remove this doctor?')) {
-      setDoctors(doctors.filter(doctor => doctor.id !== id));
-      alert('Doctor removed successfully!');
+      if (response.data.success) {
+        // Refresh doctors list
+        await fetchDoctors();
+        
+        setNewDoctor({ name: '', specialty: '', email: '', phone: '', experience: '', qualifications: '' });
+        setShowAddForm(false);
+        setSuccessModal({
+          show: true,
+          title: 'Doctor Added!',
+          message: `${newDoctor.name} has been successfully added to the hospital.`
+        });
+      }
+    } catch (err) {
+      console.error('Error adding doctor:', err);
+      alert(err.response?.data?.error || 'Failed to add doctor. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStatusChange = (id, newStatus) => {
-    setDoctors(doctors.map(doctor => 
-      doctor.id === id ? { ...doctor, status: newStatus } : doctor
-    ));
+  const handleDeleteDoctor = async (id) => {
+    if (window.confirm('Are you sure you want to remove this doctor?')) {
+      try {
+        setLoading(true);
+        const response = await axios.delete(`${API_BASE_URL}/hospital-doctors/${id}`);
+        
+        if (response.data.success) {
+          // Refresh doctors list
+          await fetchDoctors();
+          setSuccessModal({
+            show: true,
+            title: 'Doctor Removed!',
+            message: 'The doctor has been successfully removed from the hospital.'
+          });
+        }
+      } catch (err) {
+        console.error('Error deleting doctor:', err);
+        const errorMsg = err.response?.data?.error || 'Failed to remove doctor. Please try again.';
+        alert(errorMsg);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
-  // Calculate statistics
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/hospital-doctors/${id}`, {
+        status: newStatus
+      });
+      
+      if (response.data.success) {
+        // Update local state
+        setDoctors(doctors.map(doctor => 
+          doctor.id === id ? { ...doctor, status: newStatus, is_available: newStatus === 'available' } : doctor
+        ));
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert('Failed to update doctor status. Please try again.');
+    }
+  };
+
+  // Calculate statistics from local data
   const activeDoctors = doctors.filter(d => d.status === 'available' || d.status === 'in-session').length;
-  const totalAppointments = doctors.reduce((sum, doctor) => sum + doctor.appointments, 0);
+  const totalAppointments = doctors.reduce((sum, doctor) => sum + (doctor.appointments || 0), 0);
   const averageRating = doctors.length > 0 
-    ? (doctors.reduce((sum, doctor) => sum + doctor.rating, 0) / doctors.length).toFixed(1)
+    ? (doctors.reduce((sum, doctor) => sum + (doctor.rating || 0), 0) / doctors.length).toFixed(1)
     : '0.0';
+
+  console.log('Render state - doctors:', doctors.length, 'loading:', loading, 'filteredDoctors:', filteredDoctors.length);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center">
+            <span className="text-red-600 mr-3 text-xl">⚠️</span>
+            <span className="text-red-700">{error}</span>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-600 hover:text-red-800 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Doctors Management</h1>
-          <p className="text-gray-600">Manage doctors, availability, and telemedicine sessions</p>
+          <p className="text-gray-600">Manage doctors, availability, and schedules</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
@@ -188,19 +286,24 @@ const HospitalDoctorsManagement = () => {
                 required
               >
                 <option value="">Select Specialty</option>
-                <option value="Cardiology">Cardiology</option>
-                <option value="Neurology">Neurology</option>
-                <option value="Pediatrics">Pediatrics</option>
-                <option value="Orthopedics">Orthopedics</option>
-                <option value="Oncology">Oncology</option>
-                <option value="Emergency Medicine">Emergency Medicine</option>
-                <option value="General Medicine">General Medicine</option>
-                <option value="Surgery">Surgery</option>
-                <option value="Gynecology">Gynecology</option>
-                <option value="Dermatology">Dermatology</option>
-                <option value="ENT">ENT</option>
-                <option value="Ophthalmology">Ophthalmology</option>
-                <option value="Psychiatry">Psychiatry</option>
+                {availableSpecialties.length > 0 ? (
+                  availableSpecialties.map(specialty => (
+                    <option key={specialty} value={specialty}>{specialty}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Cardiology">Cardiology</option>
+                    <option value="Neurology">Neurology</option>
+                    <option value="Pediatrics">Pediatrics</option>
+                    <option value="Orthopedics">Orthopedics</option>
+                    <option value="Oncology">Oncology</option>
+                    <option value="Emergency Medicine">Emergency Medicine</option>
+                    <option value="General Medicine">General Medicine</option>
+                    <option value="Surgery">Surgery</option>
+                    <option value="Gynecology">Gynecology</option>
+                    <option value="Dermatology">Dermatology</option>
+                  </>
+                )}
               </select>
             </div>
             <div>
@@ -247,14 +350,17 @@ const HospitalDoctorsManagement = () => {
           <div className="flex justify-end space-x-3 mt-6">
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+              disabled={loading}
+              className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               onClick={handleAddDoctor}
-              className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+              disabled={loading}
+              className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
+              {loading && <span className="mr-2">⏳</span>}
               Add Doctor
             </button>
           </div>
@@ -328,7 +434,16 @@ const HospitalDoctorsManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredDoctors.length === 0 ? (
+              {loading && doctors.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                      <p className="text-gray-500">Loading doctors...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredDoctors.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                     No doctors found matching your criteria
@@ -411,12 +526,6 @@ const HospitalDoctorsManagement = () => {
                     <td className="px-6 py-4">
                       <div className="flex flex-col sm:flex-row gap-2">
                         <button
-                          onClick={() => setEditingDoctor(doctor)}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition"
-                        >
-                          Edit
-                        </button>
-                        <button
                           onClick={() => handleDeleteDoctor(doctor.id)}
                           className="px-3 py-1.5 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 text-sm font-medium transition"
                         >
@@ -432,29 +541,13 @@ const HospitalDoctorsManagement = () => {
         </div>
       </div>
 
-      {/* Summary Footer */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-xl text-sm text-gray-600">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <span className="font-medium text-gray-800">Quick Actions:</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <button className="px-3 py-1 bg-green-50 text-green-700 rounded text-xs hover:bg-green-100">
-                Export List
-              </button>
-              <button className="px-3 py-1 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100">
-                Generate Schedule
-              </button>
-              <button className="px-3 py-1 bg-purple-50 text-purple-700 rounded text-xs hover:bg-purple-100">
-                View Analytics
-              </button>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-gray-800">📊 Statistics</div>
-            <div className="text-xs">Total: {doctors.length} doctors • Active: {activeDoctors}</div>
-          </div>
-        </div>
-      </div>
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.show}
+        onClose={() => setSuccessModal({ show: false, title: '', message: '' })}
+        title={successModal.title}
+        message={successModal.message}
+      />
     </div>
   );
 };

@@ -1,42 +1,48 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 const HospitalLogin = () => {
     const navigate = useNavigate();
     const [credentials, setCredentials] = useState({
-        hospitalId: '',
+        email: '',
         password: ''
     });
     const [error, setError] = useState('');
-
-    const handleSubmit = (e) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
 
-        // Demo login - accept any credentials for now
-        // In production, this would validate against backend
-        if (credentials.hospitalId && credentials.password) {
-            // Set hospital token and info
-            localStorage.setItem('hospitalToken', 'demo-hospital-token');
-            localStorage.setItem('hospitalInfo', JSON.stringify({
-                name: credentials.hospitalId,
-                id: 'hospital_' + Date.now()
-            }));
-
-            // Navigate to dashboard
-            navigate('/hospital/dashboard');
-        } else {
-            setError('Please enter both Hospital ID and Password');
+        if (!credentials.email || !credentials.password) {
+            setError('Please enter both Email and Password');
+            return;
         }
-    };
 
-    const handleDemoLogin = () => {
-        // Quick demo login
-        localStorage.setItem('hospitalToken', 'demo-hospital-token');
-        localStorage.setItem('hospitalInfo', JSON.stringify({
-            name: 'City General Hospital',
-            id: 'hospital_001'
-        }));
-        navigate('/hospital/dashboard');
+        try {
+            setIsSubmitting(true);
+            const res = await api.post('/auth/hospital/login', {
+                email: credentials.email,
+                password: credentials.password,
+            });
+
+            const token = res?.data?.access_token;
+            const hospital = res?.data?.hospital;
+
+            if (!token || !hospital) {
+                throw new Error('Invalid login response');
+            }
+
+            localStorage.setItem('hospitalToken', token);
+            localStorage.setItem('hospitalInfo', JSON.stringify(hospital));
+
+            navigate('/hospital/dashboard');
+        } catch (err) {
+            const apiError = err?.response?.data?.error;
+            setError(apiError || err?.message || 'Login failed');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -56,14 +62,14 @@ const HospitalLogin = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Hospital ID
+                                Email
                             </label>
                             <input
-                                type="text"
-                                value={credentials.hospitalId}
-                                onChange={(e) => setCredentials({ ...credentials, hospitalId: e.target.value })}
+                                type="email"
+                                value={credentials.email}
+                                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Enter your hospital ID"
+                                placeholder="Enter hospital email"
                             />
                         </div>
 
@@ -88,24 +94,12 @@ const HospitalLogin = () => {
 
                         <button
                             type="submit"
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
+                            disabled={isSubmitting}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg disabled:opacity-70"
                         >
-                            Sign In
+                            {isSubmitting ? 'Signing In...' : 'Sign In'}
                         </button>
                     </form>
-
-                    {/* Demo Access */}
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                        <button
-                            onClick={handleDemoLogin}
-                            className="w-full bg-green-50 text-green-700 py-3 rounded-lg font-semibold hover:bg-green-100 transition-all border border-green-200"
-                        >
-                            🎯 Demo Access (Quick Login)
-                        </button>
-                        <p className="text-xs text-gray-500 text-center mt-2">
-                            Click for instant access to demo dashboard
-                        </p>
-                    </div>
 
                     {/* Footer */}
                     <div className="mt-6 text-center">

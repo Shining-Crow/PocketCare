@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS hospitals (
     longitude DECIMAL(11,8),
     phone VARCHAR(20),
     email VARCHAR(255),
+    password_hash VARCHAR(255) NOT NULL,
     emergency_contact VARCHAR(20),
     total_beds INT,
     available_beds INT,

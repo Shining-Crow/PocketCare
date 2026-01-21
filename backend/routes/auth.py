@@ -695,6 +695,66 @@ def admin_login():
         return jsonify({'error': f'Admin login failed: {str(e)}'}), 500
 
 
+# Hospital Login
+@auth_bp.route('/hospital/login', methods=['POST'])
+def hospital_login():
+    """Hospital login endpoint (uses hospitals table as account store)."""
+    try:
+        data = request.get_json(silent=True) or {}
+
+        is_valid, error = validate_required_fields(data, ['email', 'password'])
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        email = (data.get('email') or '').lower().strip()
+        password = data.get('password')
+
+        is_valid, error = validate_email_format(email)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        hospital = execute_query(
+            """
+            SELECT id, name, email, password_hash, phone, address, city, state, latitude, longitude
+            FROM hospitals
+            WHERE LOWER(email) = LOWER(%s)
+            LIMIT 1
+            """,
+            (email,),
+            fetch_one=True,
+        )
+
+        if not hospital:
+            return jsonify({'error': 'Invalid email or password'}), 401
+
+        if not verify_password(password, hospital.get('password_hash') or ''):
+            return jsonify({'error': 'Invalid email or password'}), 401
+
+        access_token = create_access_token(identity=f"hospital_{hospital['id']}")
+
+        hospital_data = {
+            'id': hospital['id'],
+            'name': hospital.get('name'),
+            'email': hospital.get('email'),
+            'phone': hospital.get('phone'),
+            'address': hospital.get('address'),
+            'city': hospital.get('city'),
+            'state': hospital.get('state'),
+            'latitude': float(hospital['latitude']) if hospital.get('latitude') is not None else None,
+            'longitude': float(hospital['longitude']) if hospital.get('longitude') is not None else None,
+            'role': 'hospital',
+        }
+
+        return jsonify({
+            'message': 'Hospital login successful',
+            'hospital': hospital_data,
+            'access_token': access_token,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Hospital login failed: {str(e)}'}), 500
+
+
 # Get Dashboard Statistics
 @auth_bp.route('/admin/dashboard-stats', methods=['GET'])
 @jwt_required_custom
@@ -741,6 +801,185 @@ def get_dashboard_stats():
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch statistics: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/hospitals', methods=['POST'])
+@jwt_required_custom
+def admin_create_hospital():
+    """Create a hospital account + set location (admin only)."""
+    try:
+        _require_admin_identity()
+
+        data = request.get_json(silent=True) or {}
+        required = ['name', 'address', 'email', 'password', 'latitude', 'longitude']
+        is_valid, error = validate_required_fields(data, required)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        name = (data.get('name') or '').strip()
+        address = (data.get('address') or '').strip()
+        city = (data.get('city') or '').strip() or None
+        state = (data.get('state') or '').strip() or None
+        phone = (data.get('phone') or '').strip() or None
+        emergency_contact = (data.get('emergency_contact') or '').strip() or None
+
+        email = (data.get('email') or '').lower().strip()
+        password = data.get('password')
+
+        # Geo
+        try:
+            latitude = float(data.get('latitude'))
+            longitude = float(data.get('longitude'))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'latitude and longitude must be numbers'}), 400
+
+        # Validate email + password
+        is_valid, error = validate_email_format(email)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        is_valid, error = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        # Prevent duplicates (best-effort; DB may not have unique constraint)
+        existing = execute_query(
+            'SELECT id FROM hospitals WHERE LOWER(email) = LOWER(%s) LIMIT 1',
+            (email,),
+            fetch_one=True,
+        )
+        if existing:
+            return jsonify({'error': 'Hospital email already exists'}), 409
+
+        hashed = hash_password(password)
+
+        total_beds = data.get('total_beds')
+        available_beds = data.get('available_beds')
+        icu_beds = data.get('icu_beds')
+        services = data.get('services')
+        services_json = None
+        if services is not None:
+            # Accept list or string; store as JSON
+            if isinstance(services, list):
+                services_json = json.dumps(services, ensure_ascii=False)
+            elif isinstance(services, str) and services.strip():
+                services_json = json.dumps([s.strip() for s in services.split(',') if s.strip()], ensure_ascii=False)
+
+        hospital_id = execute_query(
+            """
+            INSERT INTO hospitals (
+                name, address, city, state,
+                latitude, longitude,
+                phone, email, password_hash,
+                emergency_contact,
+                total_beds, available_beds, icu_beds,
+                services, created_at
+            ) VALUES (
+                %s, %s, %s, %s,
+                %s, %s,
+                %s, %s, %s,
+                %s,
+                %s, %s, %s,
+                %s, %s
+            )
+            """,
+            (
+                name, address, city, state,
+                latitude, longitude,
+                phone, email, hashed,
+                emergency_contact,
+                total_beds, available_beds, icu_beds,
+                services_json, datetime.now(),
+            ),
+            commit=True,
+        )
+
+        return jsonify({
+            'message': 'Hospital account created',
+            'hospital': {
+                'id': hospital_id,
+                'name': name,
+                'email': email,
+                'latitude': latitude,
+                'longitude': longitude,
+            }
+        }), 201
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to create hospital: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/admins', methods=['POST'])
+@jwt_required_custom
+def admin_create_admin_account():
+    """Create a new admin account (admin only)."""
+    try:
+        _require_admin_identity()
+
+        data = request.get_json(silent=True) or {}
+        required = ['name', 'email', 'password']
+        is_valid, error = validate_required_fields(data, required)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        name = (data.get('name') or '').strip()
+        email = (data.get('email') or '').lower().strip()
+        password = data.get('password')
+        role = (data.get('role') or 'admin').strip() or 'admin'
+        is_active = data.get('is_active')
+
+        if len(role) > 50:
+            return jsonify({'error': 'role is too long'}), 400
+
+        is_valid, error = validate_email_format(email)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        is_valid, error = validate_password_strength(password)
+        if not is_valid:
+            return jsonify({'error': error}), 400
+
+        existing = execute_query(
+            'SELECT id FROM admins WHERE LOWER(email) = LOWER(%s) LIMIT 1',
+            (email,),
+            fetch_one=True,
+        )
+        if existing:
+            return jsonify({'error': 'Admin email already exists'}), 409
+
+        hashed = hash_password(password)
+
+        if is_active is None:
+            is_active = True
+        else:
+            is_active = bool(is_active)
+
+        admin_id = execute_query(
+            """
+            INSERT INTO admins (email, password_hash, name, role, is_active, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (email, hashed, name, role, is_active, datetime.now()),
+            commit=True,
+        )
+
+        return jsonify({
+            'message': 'Admin account created',
+            'admin': {
+                'id': admin_id,
+                'email': email,
+                'name': name,
+                'role': role,
+                'is_active': is_active,
+            }
+        }), 201
+
+    except PermissionError as e:
+        return jsonify({'error': str(e)}), 403
+    except Exception as e:
+        return jsonify({'error': f'Failed to create admin: {str(e)}'}), 500
 
 
 @auth_bp.route('/admin/analytics/appointments', methods=['GET'])

@@ -14,6 +14,9 @@ import {
   X,
   TrendingUp,
   CalendarCheck,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import Footer from "../components/Footer";
 import BackToDashboardButton from "../components/BackToDashboardButton";
@@ -38,9 +41,12 @@ function UserProfile() {
   });
   const [editedData, setEditedData] = useState({});
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const [sosHistory, setSosHistory] = useState([]);
+  const [sosHistoryLoading, setSosHistoryLoading] = useState(false);
+  const [sosHistoryError, setSosHistoryError] = useState(null);
+  const [sosHistoryOffset, setSosHistoryOffset] = useState(0);
+  const [sosHistoryHasMore, setSosHistoryHasMore] = useState(false);
+  const SOS_HISTORY_PAGE_SIZE = 10;
 
   const fetchProfile = async () => {
     try {
@@ -61,12 +67,90 @@ function UserProfile() {
         appointments: Number(response.data?.stats?.appointments || 0),
       });
       setEditedData(userData);
+
+      // Load SOS history after we have a valid user profile.
+      fetchSosHistory({ reset: true });
     } catch (error) {
       console.error("Error fetching profile:", error);
       alert(error.response?.data?.error || "Failed to load profile");
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchSosHistory = async ({ reset = false } = {}) => {
+    try {
+      setSosHistoryError(null);
+      setSosHistoryLoading(true);
+
+      const offset = reset ? 0 : sosHistoryOffset;
+      const res = await api.get("/emergency/sos/history", {
+        params: { limit: SOS_HISTORY_PAGE_SIZE, offset },
+      });
+
+      const items = Array.isArray(res.data?.requests) ? res.data.requests : [];
+      const nextOffset = Number(res.data?.next_offset ?? offset + items.length);
+      const hasMore = Boolean(res.data?.has_more);
+
+      if (reset) {
+        setSosHistory(items);
+      } else {
+        setSosHistory((prev) => {
+          const seen = new Set(prev.map((r) => r?.id));
+          const merged = [...prev];
+          for (const r of items) {
+            if (!seen.has(r?.id)) merged.push(r);
+          }
+          return merged;
+        });
+      }
+
+      setSosHistoryOffset(nextOffset);
+      setSosHistoryHasMore(hasMore);
+    } catch (error) {
+      console.error("Error fetching SOS history:", error);
+      setSosHistoryError(error.response?.data?.error || "Failed to load SOS history");
+      setSosHistory([]);
+      setSosHistoryOffset(0);
+      setSosHistoryHasMore(false);
+    } finally {
+      setSosHistoryLoading(false);
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "—";
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const SosStatusBadge = ({ status }) => {
+    const s = (status || "").toString();
+    const styles =
+      s === "pending"
+        ? "bg-amber-50 text-amber-800 border-amber-200"
+        : s === "acknowledged"
+        ? "bg-blue-50 text-blue-800 border-blue-200"
+        : s === "resolved"
+        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+        : "bg-gray-50 text-gray-700 border-gray-200";
+    return (
+      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${styles}`}>
+        {s ? s.toUpperCase() : "UNKNOWN"}
+      </span>
+    );
   };
 
   const handleEdit = () => {
@@ -421,6 +505,149 @@ function UserProfile() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* SOS History */}
+            <div className="mt-10">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">SOS History</h2>
+                    <p className="text-sm text-gray-500">Your past emergency requests</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchSosHistory({ reset: true })}
+                  disabled={sosHistoryLoading}
+                  className="w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <span className="inline-flex items-center justify-center gap-2">
+                    {sosHistoryLoading && (
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                    )}
+                    <span>Refresh</span>
+                  </span>
+                </button>
+              </div>
+
+              {sosHistoryError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {sosHistoryError}
+                </div>
+              )}
+
+              {!sosHistoryError && sosHistory.length === 0 && !sosHistoryLoading && (
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                  No SOS history yet.
+                </div>
+              )}
+
+              {sosHistory.length > 0 && (
+                <div className="grid gap-3">
+                  {sosHistory.map((req) => (
+                    <div
+                      key={req.id}
+                      className="rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-bold text-gray-900">Request #{req.id}</div>
+                            <SosStatusBadge status={req.status} />
+                          </div>
+                          <div className="mt-1 text-sm text-gray-600">
+                            Type: <span className="font-semibold text-gray-900">{req.emergency_type || "General"}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">Created</div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatDateTime(req.created_at)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                            <Clock className="w-4 h-4" /> Accepted
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatDateTime(req.acknowledged_at)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4" /> Resolved
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatDateTime(req.resolved_at)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">Hospital</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {req.hospital_name || "—"}
+                          </div>
+                          <div className="mt-0.5 text-sm text-gray-700">{req.hospital_phone || ""}</div>
+                        </div>
+                      </div>
+
+                      {(req.note || req.hospital_phone || (typeof req.latitude === "number" && typeof req.longitude === "number")) && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {req.hospital_phone && (
+                            <a
+                              href={`tel:${req.hospital_phone}`}
+                              className="rounded-xl bg-gray-900 text-white px-3 py-2 text-xs font-semibold hover:bg-gray-800"
+                            >
+                              Call hospital
+                            </a>
+                          )}
+                          {typeof req.latitude === "number" && typeof req.longitude === "number" && (
+                            <a
+                              href={`https://www.google.com/maps?q=${req.latitude},${req.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              View location
+                            </a>
+                          )}
+                          {req.note && (
+                            <div className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">
+                              <span className="font-semibold text-gray-800">Note: </span>
+                              {req.note}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {sosHistoryHasMore && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => fetchSosHistory({ reset: false })}
+                        disabled={sosHistoryLoading}
+                        className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <span className="inline-flex items-center justify-center gap-2">
+                          {sosHistoryLoading && (
+                            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                          )}
+                          <span>Load more</span>
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {/* End Main Container */}

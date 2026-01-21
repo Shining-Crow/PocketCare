@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
@@ -17,6 +17,93 @@ import {
 } from "lucide-react";
 import Footer from "../components/Footer";
 
+function SosUpdateModal({ isOpen, onClose, title, message, tone = "info" }) {
+  if (!isOpen) return null;
+
+  const toneStyles = {
+    info: {
+      ring: "ring-blue-100",
+      iconBg: "bg-blue-50",
+      iconFg: "text-blue-600",
+      accent: "from-blue-600 to-indigo-600",
+      border: "border-blue-100",
+      Icon: AlertCircle,
+    },
+    success: {
+      ring: "ring-emerald-100",
+      iconBg: "bg-emerald-50",
+      iconFg: "text-emerald-600",
+      accent: "from-emerald-600 to-teal-600",
+      border: "border-emerald-100",
+      Icon: HeartPulse,
+    },
+    danger: {
+      ring: "ring-red-100",
+      iconBg: "bg-red-50",
+      iconFg: "text-red-600",
+      accent: "from-red-600 to-rose-600",
+      border: "border-red-100",
+      Icon: AlertTriangle,
+    },
+    emergency: {
+      ring: "ring-red-100",
+      iconBg: "bg-red-50",
+      iconFg: "text-red-600",
+      accent: "from-red-600 to-orange-500",
+      border: "border-red-100",
+      Icon: Zap,
+    },
+  };
+
+  const style = toneStyles[tone] || toneStyles.info;
+  const Icon = style.Icon;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative min-h-screen flex items-center justify-center px-4">
+        <div
+          className={`w-full max-w-md rounded-3xl bg-white shadow-2xl ring-1 ${style.ring} border ${style.border} overflow-hidden`}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className={`h-1.5 w-full bg-gradient-to-r ${style.accent}`} />
+          <div className="p-6">
+            <div className="flex items-start gap-4">
+              <div className={`h-12 w-12 rounded-2xl ${style.iconBg} flex items-center justify-center`}
+              >
+                <Icon className={`w-6 h-6 ${style.iconFg}`} />
+              </div>
+              <div className="flex-1">
+                <div className="text-lg font-bold text-gray-900">{title}</div>
+                <div className="mt-1 text-sm text-gray-600 leading-relaxed">{message}</div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 w-9 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`w-full rounded-2xl py-3.5 font-semibold text-white bg-gradient-to-r ${style.accent} shadow-lg hover:opacity-95 active:opacity-90`}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -25,8 +112,61 @@ function Dashboard() {
   const [sosProgress, setSosProgress] = useState(0);
   const [selectedEmergency, setSelectedEmergency] = useState(null);
   const [emergencyNote, setEmergencyNote] = useState("");
+  const [sosFeedback, setSosFeedback] = useState(null);
+  const [sosSuccessModal, setSosSuccessModal] = useState({
+    show: false,
+    title: "SOS Sent",
+    message: "Your emergency alert has been sent to nearby hospitals.",
+  });
+  const [sosStatusModal, setSosStatusModal] = useState({
+    show: false,
+    title: "Update",
+    message: "",
+    tone: "info",
+  });
+  const [sosSending, setSosSending] = useState(false);
+  const [latestSos, setLatestSos] = useState(null);
+  const [latestSosLoading, setLatestSosLoading] = useState(false);
+  const [latestSosError, setLatestSosError] = useState(null);
+  const [latestSosUpdatedAt, setLatestSosUpdatedAt] = useState(null);
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(true);
+
+  const SOS_HOLD_MS = 1000;
+  const holdRafRef = useRef(null);
+  const holdStartRef = useRef(0);
+  const holdPointerActiveRef = useRef(false);
+  const holdActivatedRef = useRef(false);
+  const sosSendingRef = useRef(false);
+  const sosPollStartRef = useRef(0);
+  const sosStatusNotifiedRef = useRef({ requestId: null, status: null });
+  const latestSosLoadingRef = useRef(false);
+
+  const sosNotifyStorageKey = useCallback(() => {
+    const uid = user?.id ?? "unknown";
+    return `pc_sos_notify_${uid}`;
+  }, [user?.id]);
+
+  const safeJsonParse = (raw) => {
+    try {
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const formatShortDateTime = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const fetchRecentActivity = async () => {
     try {
@@ -197,31 +337,279 @@ function Dashboard() {
     };
   }, []);
 
-  const handleSOSActivate = useCallback(() => {
-    const typeLabel = selectedEmergency || "general-emergency";
-    // TODO: replace alert with real API call using typeLabel and emergencyNote
-    alert(`🚨 SOS Activated (${typeLabel})! Contacting emergency services...`);
+  const getCurrentPosition = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation is not supported by this browser."));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(pos),
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+
+  const handleSOSActivate = useCallback(async () => {
+    if (sosSendingRef.current) return;
+    sosSendingRef.current = true;
+    setSosSending(true);
+    setSosFeedback(null);
+
+    try {
+      const typeLabel = selectedEmergency || null;
+      const note = emergencyNote?.trim() || null;
+
+      const pos = await getCurrentPosition();
+      const latitude = pos?.coords?.latitude;
+      const longitude = pos?.coords?.longitude;
+
+      if (typeof latitude !== "number" || typeof longitude !== "number") {
+        throw new Error("Could not read your location. Please try again.");
+      }
+
+      const res = await api.post("/emergency/sos", {
+        latitude,
+        longitude,
+        emergency_type: typeLabel,
+        note,
+      });
+
+      const requestId = res?.data?.request_id;
+
+      // Optimistically set latest SOS so the status panel appears immediately.
+      // The polling refresh will reconcile with the server (hospital name, timestamps, etc.).
+      setLatestSos({
+        id: requestId || "new",
+        status: "pending",
+        latitude,
+        longitude,
+        emergency_type: typeLabel,
+        note,
+        created_at: new Date().toISOString(),
+        acknowledged_at: null,
+        resolved_at: null,
+        hospital_id: null,
+        hospital_name: null,
+        hospital_phone: null,
+      });
+      setLatestSosUpdatedAt(new Date());
+
+      setSosSuccessModal({
+        show: true,
+        title: "SOS Sent",
+        message: requestId
+          ? `Your SOS request (#${requestId}) was created and sent to nearby hospitals.`
+          : "Your emergency alert has been sent to nearby hospitals.",
+      });
+
+      // Start tracking status updates right away.
+      sosPollStartRef.current = Date.now();
+      setEmergencyNote("");
+      setSelectedEmergency(null);
+      setSosFeedback(null);
+    } catch (err) {
+      const apiMsg = err?.response?.data?.error || err?.response?.data?.msg;
+      const msg =
+        (typeof apiMsg === "string" && apiMsg) ||
+        err?.message ||
+        "Failed to send SOS. Please try again.";
+      setSosFeedback({ type: "error", message: msg });
+    } finally {
+      sosSendingRef.current = false;
+      setSosSending(false);
+    }
+  }, [selectedEmergency, emergencyNote]);
+
+  const fetchLatestSos = useCallback(async () => {
+    if (latestSosLoadingRef.current) return;
+    latestSosLoadingRef.current = true;
+    setLatestSosError(null);
+    setLatestSosLoading(true);
+    try {
+      const res = await api.get("/emergency/sos/latest");
+      const req = res?.data?.request || null;
+      setLatestSos(req);
+      setLatestSosUpdatedAt(new Date());
+
+      // If we see an active request, ensure polling window exists.
+      if (req?.status && (req.status === "pending" || req.status === "acknowledged")) {
+        if (!sosPollStartRef.current) sosPollStartRef.current = Date.now();
+      }
+    } catch (err) {
+      const apiMsg = err?.response?.data?.error || err?.response?.data?.msg;
+      const msg =
+        (typeof apiMsg === "string" && apiMsg) ||
+        err?.message ||
+        "Failed to fetch SOS status.";
+      setLatestSosError(msg);
+    } finally {
+      latestSosLoadingRef.current = false;
+      setLatestSosLoading(false);
+    }
+  }, []);
+
+  const stopHoldAnimation = useCallback(() => {
+    if (holdRafRef.current) {
+      cancelAnimationFrame(holdRafRef.current);
+      holdRafRef.current = null;
+    }
+  }, []);
+
+  const resetHold = useCallback(() => {
+    stopHoldAnimation();
+    holdPointerActiveRef.current = false;
+    holdActivatedRef.current = false;
     setSosHolding(false);
     setSosProgress(0);
-  }, [selectedEmergency]);
+  }, [stopHoldAnimation]);
 
   useEffect(() => {
-    let interval;
-    if (sosHolding) {
-      interval = setInterval(() => {
-        setSosProgress((prev) => {
-          if (prev >= 100) {
-            handleSOSActivate();
-            return 0;
-          }
-          return prev + 2;
-        });
-      }, 20);
-    } else {
-      setSosProgress(0);
+    return () => {
+      stopHoldAnimation();
+    };
+  }, [stopHoldAnimation]);
+
+  useEffect(() => {
+    // Load latest SOS status when dashboard opens.
+    fetchLatestSos();
+  }, [fetchLatestSos]);
+
+  useEffect(() => {
+    const status = latestSos?.status;
+    const shouldPoll = status === "pending" || status === "acknowledged";
+    if (!shouldPoll) return;
+
+    const startedAt = sosPollStartRef.current || Date.now();
+    sosPollStartRef.current = startedAt;
+    const maxMs = 10 * 60 * 1000; // 10 minutes
+
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > maxMs) {
+        clearInterval(timer);
+        return;
+      }
+      fetchLatestSos();
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [latestSos?.status, fetchLatestSos]);
+
+  useEffect(() => {
+    // One-time notification when a hospital accepts/resolves the SOS.
+    const requestId = latestSos?.id ?? null;
+    const status = latestSos?.status ?? null;
+    if (!requestId || !status) return;
+
+    // Prevent repeat popups across reloads using localStorage.
+    const storageKey = sosNotifyStorageKey();
+    const stored = safeJsonParse(localStorage.getItem(storageKey)) || {};
+    const storedRequestId = stored?.requestId ?? null;
+    const storedStatus = stored?.status ?? null;
+    const alreadyNotifiedAcrossReloads = storedRequestId === requestId && storedStatus === status;
+
+    const prev = sosStatusNotifiedRef.current;
+    if (prev.requestId !== requestId) {
+      sosStatusNotifiedRef.current = { requestId, status: null };
     }
-    return () => clearInterval(interval);
-  }, [sosHolding, handleSOSActivate]);
+    const alreadyNotifiedThisSession =
+      sosStatusNotifiedRef.current.requestId === requestId && sosStatusNotifiedRef.current.status === status;
+    if (alreadyNotifiedAcrossReloads || alreadyNotifiedThisSession) return;
+
+    if (status === "acknowledged") {
+      const hospitalName = latestSos?.hospital_name || "a hospital";
+      setSosStatusModal({
+        show: true,
+        title: "SOS Accepted",
+        message: `Good news — ${hospitalName} has accepted your emergency request.`,
+        tone: "success",
+      });
+      sosStatusNotifiedRef.current = { requestId, status };
+      localStorage.setItem(storageKey, JSON.stringify({ requestId, status }));
+      return;
+    }
+
+    if (status === "resolved") {
+      const hospitalName = latestSos?.hospital_name || "the hospital";
+      setSosStatusModal({
+        show: true,
+        title: "SOS Resolved",
+        message: `${hospitalName} marked your emergency request as resolved.`,
+        tone: "info",
+      });
+      sosStatusNotifiedRef.current = { requestId, status };
+      localStorage.setItem(storageKey, JSON.stringify({ requestId, status }));
+    }
+  }, [latestSos, sosNotifyStorageKey]);
+
+  const startHold = useCallback(
+    (e) => {
+      if (sosSendingRef.current) return;
+      if (holdPointerActiveRef.current) return;
+
+      setSosFeedback(null);
+      holdPointerActiveRef.current = true;
+      holdActivatedRef.current = false;
+      setSosHolding(true);
+      setSosProgress(0);
+
+      try {
+        e?.preventDefault?.();
+        e?.currentTarget?.setPointerCapture?.(e.pointerId);
+      } catch (_) {
+        // no-op
+      }
+
+      holdStartRef.current = performance.now();
+      stopHoldAnimation();
+
+      const tick = (now) => {
+        if (!holdPointerActiveRef.current) return;
+        const elapsed = now - holdStartRef.current;
+        const progress = Math.max(0, Math.min(100, (elapsed / SOS_HOLD_MS) * 100));
+
+        setSosProgress(progress);
+
+        if (progress >= 100 && !holdActivatedRef.current) {
+          holdActivatedRef.current = true;
+          setSosProgress(100);
+          setSosHolding(false);
+          stopHoldAnimation();
+          handleSOSActivate();
+          return;
+        }
+
+        holdRafRef.current = requestAnimationFrame(tick);
+      };
+
+      holdRafRef.current = requestAnimationFrame(tick);
+    },
+    [SOS_HOLD_MS, handleSOSActivate, stopHoldAnimation]
+  );
+
+  const endHold = useCallback(
+    (e) => {
+      try {
+        e?.preventDefault?.();
+        if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+      } catch (_) {
+        // no-op
+      }
+
+      if (!holdPointerActiveRef.current) return;
+      holdPointerActiveRef.current = false;
+      stopHoldAnimation();
+
+      if (!holdActivatedRef.current) {
+        setSosHolding(false);
+        setSosProgress(0);
+      }
+    },
+    [stopHoldAnimation]
+  );
 
   if (!user) return null;
 
@@ -268,7 +656,7 @@ function Dashboard() {
                       strokeDasharray={`${2 * Math.PI * 88}`}
                       strokeDashoffset={`${2 * Math.PI * 88 * (1 - sosProgress / 100)
                         }`}
-                      className="transition-all duration-100"
+                      className=""
                       strokeLinecap="round"
                     />
                   </svg>
@@ -276,16 +664,25 @@ function Dashboard() {
                   {/* Hold button */}
                   <button
                     type="button"
-                    onMouseDown={() => setSosHolding(true)}
-                    onMouseUp={() => setSosHolding(false)}
-                    onMouseLeave={() => setSosHolding(false)}
-                    onTouchStart={() => setSosHolding(true)}
-                    onTouchEnd={() => setSosHolding(false)}
-                    className="relative w-36 h-36 rounded-full bg-white shadow-md border border-gray-200 flex flex-col items-center justify-center transition-transform duration-150"
-                    style={{ transform: sosHolding ? "scale(0.96)" : "scale(1)" }}
+                    onPointerDown={startHold}
+                    onPointerUp={endHold}
+                    onPointerCancel={endHold}
+                    onPointerLeave={endHold}
+                    disabled={sosSending}
+                    className={`relative w-36 h-36 rounded-full bg-white shadow-md border border-gray-200 flex flex-col items-center justify-center transition-transform duration-150 ${
+                      sosSending ? "opacity-70 cursor-not-allowed" : ""
+                    }`}
+                    style={{
+                      transform: sosHolding ? "scale(0.96)" : "scale(1)",
+                      touchAction: "none",
+                    }}
                   >
                     <span className="text-2xl font-semibold tracking-wide text-gray-900">
-                      {sosHolding ? `${Math.floor(sosProgress)}%` : "HOLD"}
+                      {sosSending
+                        ? "SENDING"
+                        : sosHolding
+                        ? `${Math.floor(sosProgress)}%`
+                        : "HOLD"}
                     </span>
                     <span className="mt-1 text-[11px] uppercase tracking-[0.25em] text-gray-500">
                       Panic Mode
@@ -294,10 +691,31 @@ function Dashboard() {
                 </div>
 
                 <p className="mt-5 text-xs text-gray-500 text-center">
-                  {sosHolding
+                  {sosSending
+                    ? "Sending your SOS…"
+                    : sosHolding
                     ? "Keep holding to confirm SOS. Release to cancel."
                     : "Press and hold for 1 second to send an emergency alert."}
                 </p>
+
+                {sosFeedback?.type === "error" && (
+                  <div className="mt-4 w-full max-w-md rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="font-semibold">SOS not sent</div>
+                        <div className="text-red-700/90">{sosFeedback.message}</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-red-700/70 hover:text-red-800"
+                        onClick={() => setSosFeedback(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Emergency types */}
@@ -349,8 +767,200 @@ function Dashboard() {
                   placeholder="Additional details (optional)"
                 />
               </div>
+
+              {/* Status tracker (only while active) */}
+              {(latestSos && latestSos.status !== "resolved") && (
+              <div className="mt-6 rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-11 w-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">SOS status</div>
+                      <div className="text-xs text-gray-500">
+                        {latestSosUpdatedAt
+                          ? `Updated ${latestSosUpdatedAt.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchLatestSos}
+                    disabled={latestSosLoading}
+                    className="relative w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      {latestSosLoading && (
+                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                      )}
+                      <span>Refresh</span>
+                    </span>
+                  </button>
+                </div>
+
+                {latestSosError && (
+                  <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {latestSosError}
+                  </div>
+                )}
+
+                {!latestSos && !latestSosError && (
+                  <div className="mt-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                    No SOS request found yet. Send one to start tracking.
+                  </div>
+                )}
+
+                {latestSos && (
+                  <div className="mt-4 grid gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${
+                          latestSos.status === "pending"
+                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                            : latestSos.status === "acknowledged"
+                            ? "bg-blue-50 text-blue-800 border-blue-200"
+                            : latestSos.status === "resolved"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-gray-50 text-gray-700 border-gray-200"
+                        }`}
+                      >
+                        {String(latestSos.status || "unknown").toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {latestSos.status === "pending"
+                          ? "Waiting for a nearby hospital to accept."
+                          : latestSos.status === "acknowledged"
+                          ? "A hospital has accepted your request."
+                          : latestSos.status === "resolved"
+                          ? "Marked as resolved by the hospital."
+                          : ""}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Request</div>
+                        <div className="mt-1 text-sm font-bold text-gray-900">#{latestSos.id}</div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Created</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">
+                          {formatShortDateTime(latestSos.created_at) || "—"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Type</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-900">
+                          {latestSos.emergency_type || "General"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline */}
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                      <div className="text-xs font-semibold text-gray-800">Progress</div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        {[
+                          { key: "pending", label: "Requested" },
+                          { key: "acknowledged", label: "Accepted" },
+                          { key: "resolved", label: "Resolved" },
+                        ].map((step, idx) => {
+                          const isDone =
+                            latestSos.status === "resolved" ||
+                            (latestSos.status === "acknowledged" && step.key !== "resolved") ||
+                            (latestSos.status === "pending" && step.key === "pending");
+                          const isActive = latestSos.status === step.key;
+                          return (
+                            <div key={step.key} className="flex items-center gap-2">
+                              <div
+                                className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+                                  isDone
+                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                    : "bg-gray-50 border-gray-200 text-gray-500"
+                                }`}
+                              >
+                                {idx + 1}
+                              </div>
+                              <div className="min-w-0">
+                                <div className={`font-semibold ${isActive ? "text-gray-900" : "text-gray-700"}`}>
+                                  {step.label}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {(latestSos.hospital_name || latestSos.hospital_phone) && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <div className="text-xs font-semibold text-gray-800">Hospital</div>
+                        <div className="mt-1 text-sm font-bold text-gray-900">
+                          {latestSos.hospital_name || "Hospital"}
+                        </div>
+                        {latestSos.hospital_phone && (
+                          <div className="mt-1 text-sm text-gray-700">{latestSos.hospital_phone}</div>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {latestSos.hospital_phone && (
+                            <a
+                              href={`tel:${latestSos.hospital_phone}`}
+                              className="rounded-xl bg-gray-900 text-white px-3 py-2 text-xs font-semibold hover:bg-gray-800"
+                            >
+                              Call hospital
+                            </a>
+                          )}
+                          {typeof latestSos.latitude === "number" && typeof latestSos.longitude === "number" && (
+                            <a
+                              href={`https://www.google.com/maps?q=${latestSos.latitude},${latestSos.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              View location
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {latestSos.note && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <div className="text-xs font-semibold text-gray-800">Your note</div>
+                        <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{latestSos.note}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              )}
             </div>
           </div>
+
+          <SosUpdateModal
+            isOpen={sosSuccessModal.show}
+            onClose={() => {
+              setSosSuccessModal((p) => ({ ...p, show: false }));
+              resetHold();
+            }}
+            title={sosSuccessModal.title}
+            message={sosSuccessModal.message}
+            tone="emergency"
+          />
+
+          <SosUpdateModal
+            isOpen={sosStatusModal.show}
+            onClose={() => setSosStatusModal((p) => ({ ...p, show: false }))}
+            title={sosStatusModal.title}
+            message={sosStatusModal.message}
+            tone={sosStatusModal.tone}
+          />
 
           {/* Healthcare Services Grid */}
           <div>
@@ -460,9 +1070,20 @@ function Dashboard() {
                       .toString()
                       .replaceAll("_", " ");
 
+                    const metaId =
+                      item?.meta?.appointment_id ||
+                      item?.meta?.report_id ||
+                      item?.meta?.symptom_log_id ||
+                      item?.meta?.weight_entry_id ||
+                      item?.meta?.weight_goal_id ||
+                      item?.meta?.chat_message_id ||
+                      item?.timestamp ||
+                      'na';
+                    const keyBase = `${item?.type || 'activity'}:${metaId}`;
+
                     return (
                       <div
-                        key={item?.meta?.appointment_id || item?.meta?.report_id || item?.meta?.symptom_log_id || item?.meta?.weight_entry_id || item?.meta?.weight_goal_id || item?.meta?.chat_message_id || idx}
+                        key={`${keyBase}:${idx}`}
                         onClick={() => handleActivityClick(item)}
                         className="flex items-start gap-4 p-4 bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl border border-gray-100 hover:border-indigo-200 transition-colors cursor-pointer"
                       >

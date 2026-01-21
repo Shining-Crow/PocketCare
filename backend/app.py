@@ -38,6 +38,7 @@ def create_app(config_name='development'):
     from routes.reports import reports_bp
     from routes.weight_management import weight_management_bp
     from routes.activity import activity_bp
+    from routes.emergency_sos import emergency_sos_bp
     from routes.bed_management import bed_management_bp
     from routes.hospital_doctors import hospital_doctors_bp
     from routes.hospital_appointments import hospital_appointments_bp
@@ -52,6 +53,7 @@ def create_app(config_name='development'):
     app.register_blueprint(reports_bp, url_prefix='/api/reports')
     app.register_blueprint(weight_management_bp, url_prefix='/api')
     app.register_blueprint(activity_bp, url_prefix='/api/activity')
+    app.register_blueprint(emergency_sos_bp, url_prefix='/api')
     app.register_blueprint(bed_management_bp, url_prefix='/api/bed-management')
     app.register_blueprint(hospital_doctors_bp, url_prefix='/api')
     app.register_blueprint(hospital_appointments_bp, url_prefix='/api')

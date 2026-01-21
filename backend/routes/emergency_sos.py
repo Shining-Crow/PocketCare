@@ -135,6 +135,78 @@ def get_latest_emergency_sos():
         connection.close()
 
 
+@emergency_sos_bp.route('/emergency/sos/history', methods=['GET', 'OPTIONS'])
+def get_emergency_sos_history():
+    if request.method == 'OPTIONS':
+        return ('', 200)
+
+    verify_jwt_in_request()
+    user_id = _parse_user_id(get_jwt_identity())
+    if user_id is None:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        limit = int(request.args.get('limit', 20))
+    except Exception:
+        limit = 20
+    limit = max(1, min(limit, 200))
+
+    try:
+        offset = int(request.args.get('offset', 0))
+    except Exception:
+        offset = 0
+    offset = max(0, offset)
+
+    connection = get_db_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                  er.id,
+                  er.status,
+                  er.latitude,
+                  er.longitude,
+                  er.emergency_type,
+                  er.note,
+                  er.created_at,
+                  er.acknowledged_at,
+                  er.resolved_at,
+                  er.hospital_id,
+                  h.name AS hospital_name,
+                  h.phone AS hospital_phone
+                FROM emergency_requests er
+                LEFT JOIN hospitals h ON h.id = er.hospital_id
+                WHERE er.user_id = %s
+                ORDER BY er.created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (user_id, limit, offset),
+            )
+            rows = cursor.fetchall() or []
+
+        has_more = len(rows) == limit
+        next_offset = offset + len(rows)
+
+        return (
+            jsonify(
+                {
+                    'success': True,
+                    'requests': rows,
+                    'limit': limit,
+                    'offset': offset,
+                    'next_offset': next_offset,
+                    'has_more': has_more,
+                }
+            ),
+            200,
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        connection.close()
+
+
 @emergency_sos_bp.route('/hospital/emergency/requests', methods=['GET', 'OPTIONS'])
 def hospital_list_emergency_requests():
     if request.method == 'OPTIONS':

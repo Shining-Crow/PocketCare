@@ -45,6 +45,14 @@ function SosUpdateModal({ isOpen, onClose, title, message, tone = "info" }) {
       border: "border-red-100",
       Icon: AlertTriangle,
     },
+    emergency: {
+      ring: "ring-red-100",
+      iconBg: "bg-red-50",
+      iconFg: "text-red-600",
+      accent: "from-red-600 to-orange-500",
+      border: "border-red-100",
+      Icon: Zap,
+    },
   };
 
   const style = toneStyles[tone] || toneStyles.info;
@@ -368,6 +376,25 @@ function Dashboard() {
       });
 
       const requestId = res?.data?.request_id;
+
+      // Optimistically set latest SOS so the status panel appears immediately.
+      // The polling refresh will reconcile with the server (hospital name, timestamps, etc.).
+      setLatestSos({
+        id: requestId || "new",
+        status: "pending",
+        latitude,
+        longitude,
+        emergency_type: typeLabel,
+        note,
+        created_at: new Date().toISOString(),
+        acknowledged_at: null,
+        resolved_at: null,
+        hospital_id: null,
+        hospital_name: null,
+        hospital_phone: null,
+      });
+      setLatestSosUpdatedAt(new Date());
+
       setSosSuccessModal({
         show: true,
         title: "SOS Sent",
@@ -741,7 +768,8 @@ function Dashboard() {
                 />
               </div>
 
-              {/* Status tracker */}
+              {/* Status tracker (only while active) */}
+              {(latestSos && latestSos.status !== "resolved") && (
               <div className="mt-6 rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
@@ -911,6 +939,7 @@ function Dashboard() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
 
@@ -922,7 +951,7 @@ function Dashboard() {
             }}
             title={sosSuccessModal.title}
             message={sosSuccessModal.message}
-            tone="danger"
+            tone="emergency"
           />
 
           <SosUpdateModal

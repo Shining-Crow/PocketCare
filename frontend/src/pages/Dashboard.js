@@ -6,7 +6,6 @@ import {
   HeartPulse,
   AlertCircle,
   Activity,
-  Hospital,
   Calendar,
   User,
   FileText,
@@ -349,74 +348,6 @@ function Dashboard() {
                   className="w-full rounded-2xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-gray-50"
                   placeholder="Additional details (optional)"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions with 3D Effect */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <Zap className="w-6 h-6 mr-2 text-yellow-500" />
-              Quick Actions
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Symptom Checker */}
-              <div className="group relative">
-                <div className="relative bg-white rounded-2xl shadow-md p-8 text-gray-900 transform group-hover:scale-105 transition-all duration-300 cursor-pointer border border-gray-200">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center mr-4 group-hover:rotate-12 transition-transform">
-                      <Activity className="w-8 h-8 text-orange-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        Symptom Checker
-                      </h3>
-                      <p className="text-orange-600 text-sm font-medium">
-                        AI-Powered Analysis
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 mb-6">
-                    Get instant insights about your symptoms with our advanced AI
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/symptom-checker")}
-                    className="w-full bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-lg"
-                  >
-                    Start Analysis →
-                  </button>
-                </div>
-              </div>
-
-              {/* Find Doctors */}
-              <div className="group relative">
-                <div className="relative bg-white rounded-2xl shadow-md p-8 text-gray-900 transform group-hover:scale-105 transition-all duration-300 cursor-pointer border border-gray-200">
-                  <div className="flex items-center mb-6">
-                    <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mr-4 group-hover:rotate-12 transition-transform">
-                      <Hospital className="w-8 h-8 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        Find Doctors
-                      </h3>
-                      <p className="text-blue-600 text-sm font-medium">
-                        500+ Specialists
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 mb-6">
-                    Search and book appointments with verified healthcare
-                    professionals
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/doctors")}
-                    className="w-full bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg"
-                  >
-                    Browse Now →
-                  </button>
-                </div>
               </div>
             </div>
           </div>

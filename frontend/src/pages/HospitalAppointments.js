@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import moment from 'moment';
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip
-} from 'recharts';
 
 // Configurations
 const CONFIG = {
@@ -37,48 +34,51 @@ const HospitalAppointments = () => {
     }
   });
 
+  // Notification modal state
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'success' // 'success' or 'error'
+  });
+
+  // Show notification
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
+
   // Initialize data
   useEffect(() => {
     initializeData();
   }, []);
 
-  // Generate initial mock data
+  // Fetch appointments and doctors from API
   const initializeData = async () => {
-    // Generate doctors
-    const doctors = CONFIG.departments.map((dept, i) => ({
-      id: i + 1,
-      name: `Dr. ${['John', 'Sarah', 'Mike'][i % 3]} ${['Smith', 'Johnson', 'Williams'][i % 3]}`,
-      department: dept,
-      available: true
-    }));
-
-    // Generate appointments
-    const appointments = Array.from({ length: 20 }, (_, i) => {
-      const doc = doctors[Math.floor(Math.random() * doctors.length)];
-      const date = moment().add(Math.floor(Math.random() * 10), 'days');
+    try {
+      const hospitalId = localStorage.getItem('hospital_id') || '1';
       
-      return {
-        id: i + 1,
-        patientName: `Patient ${i + 1}`,
-        patientPhone: `+8801${Math.random().toString().slice(2, 11)}`,
-        doctorId: doc.id,
-        doctorName: doc.name,
-        department: doc.department,
-        date: date.format('YYYY-MM-DD'),
-        time: `${9 + Math.floor(Math.random() * 8)}:${['00', '30'][Math.floor(Math.random() * 2)]}`,
-        type: CONFIG.appointmentTypes[Math.floor(Math.random() * 4)],
-        status: CONFIG.statuses[Math.floor(Math.random() * 4)],
-        priority: CONFIG.priorities[Math.floor(Math.random() * 4)],
-        notes: ''
-      };
-    });
-
-    setState(prev => ({
-      ...prev,
-      appointments,
-      doctors,
-      loading: false
-    }));
+      // Fetch appointments
+      const appointmentsResponse = await fetch(`http://localhost:5000/api/hospital-appointments?hospital_id=${hospitalId}`);
+      const appointmentsData = await appointmentsResponse.json();
+      
+      // Fetch doctors
+      const doctorsResponse = await fetch(`http://localhost:5000/api/hospital-appointments/doctors?hospital_id=${hospitalId}`);
+      const doctorsData = await doctorsResponse.json();
+      
+      setState(prev => ({
+        ...prev,
+        appointments: appointmentsData.appointments || [],
+        doctors: doctorsData.doctors || [],
+        stats: appointmentsData.stats || { total: 0, today: 0, pending: 0, confirmed: 0 },
+        loading: false
+      }));
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setState(prev => ({ ...prev, loading: false }));
+      showNotification('Failed to load appointments. Please check the server connection.', 'error');
+    }
   };
 
   // Dynamic calculations
@@ -105,14 +105,14 @@ const HospitalAppointments = () => {
   // Filter appointments based on current filters
   const filteredAppointments = state.appointments.filter(apt => {
     const matchesSearch = !state.filters.search || 
-      apt.patientName.toLowerCase().includes(state.filters.search.toLowerCase()) ||
-      apt.doctorName.toLowerCase().includes(state.filters.search.toLowerCase());
+      apt.patient_name?.toLowerCase().includes(state.filters.search.toLowerCase()) ||
+      apt.doctor_name?.toLowerCase().includes(state.filters.search.toLowerCase());
     
     const matchesStatus = state.filters.status === 'all' || 
       apt.status === state.filters.status;
     
     const matchesDoctor = state.filters.doctor === 'all' || 
-      apt.doctorId.toString() === state.filters.doctor;
+      apt.hospital_doctor_id?.toString() === state.filters.doctor;
     
     const matchesDepartment = state.filters.department === 'all' || 
       apt.department === state.filters.department;
@@ -129,48 +129,102 @@ const HospitalAppointments = () => {
   };
 
   const handleFormSubmit = async (formData) => {
-    const selectedDoctor = state.doctors.find(d => d.id.toString() === formData.doctorId);
-    const newAppointment = {
-      ...formData,
-      id: state.appointments.length + 1,
-      doctorName: selectedDoctor?.name || 'Unknown',
-      department: selectedDoctor?.department || 'General',
-      status: 'pending',
-      priority: 'normal',
-      type: 'Consultation',
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const hospitalId = localStorage.getItem('hospital_id') || '1';
+      const selectedDoctor = state.doctors.find(d => d.id.toString() === formData.doctorId);
+      
+      const payload = {
+        hospital_id: parseInt(hospitalId),
+        hospital_doctor_id: formData.doctorId ? parseInt(formData.doctorId) : null,
+        patient_name: formData.patientName,
+        patient_phone: formData.patientPhone,
+        patient_email: formData.patientEmail || '',
+        appointment_date: formData.date,
+        appointment_time: formData.time,
+        department: selectedDoctor?.department || 'General',
+        appointment_type: formData.type || 'Consultation',
+        priority: formData.priority || 'normal',
+        status: 'pending',
+        symptoms: formData.symptoms || '',
+        notes: formData.notes || ''
+      };
 
-    setState(prev => ({
-      ...prev,
-      appointments: [...prev.appointments, newAppointment],
-      showForm: false,
-      formData: null
-    }));
-    
-    alert('Appointment scheduled successfully!');
+      if (state.formData?.id) {
+        // Update existing appointment
+        const response = await fetch(`http://localhost:5000/api/hospital-appointments/${state.formData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to update appointment');
+        
+        showNotification('Appointment updated successfully!', 'success');
+      } else {
+        // Create new appointment
+        const response = await fetch('http://localhost:5000/api/hospital-appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to create appointment');
+        
+        showNotification('Appointment scheduled successfully!', 'success');
+      }
+
+      setState(prev => ({
+        ...prev,
+        showForm: false,
+        formData: null
+      }));
+      
+      // Refresh data
+      await initializeData();
+    } catch (error) {
+      console.error('Error saving appointment:', error);
+      showNotification('Failed to save appointment. Please try again.', 'error');
+    }
   };
 
   const handleStatusUpdate = async (id, newStatus) => {
-    setState(prev => ({
-      ...prev,
-      appointments: prev.appointments.map(apt =>
-        apt.id === id ? { ...apt, status: newStatus } : apt
-      )
-    }));
-    
-    alert('Status updated successfully!');
+    try {
+      const response = await fetch(`http://localhost:5000/api/hospital-appointments/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+      
+      showNotification('Status updated successfully!', 'success');
+      
+      // Refresh data
+      await initializeData();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      showNotification('Failed to update status. Please try again.', 'error');
+    }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure?')) return;
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
     
-    setState(prev => ({
-      ...prev,
-      appointments: prev.appointments.filter(apt => apt.id !== id)
-    }));
-    
-    alert('Appointment cancelled!');
+    try {
+      const response = await fetch(`http://localhost:5000/api/hospital-appointments/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete appointment');
+      
+      showNotification('Appointment cancelled successfully!', 'success');
+      
+      // Refresh data
+      await initializeData();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      showNotification('Failed to cancel appointment. Please try again.', 'error');
+    }
   };
 
   // UI Helper Functions
@@ -183,12 +237,6 @@ const HospitalAppointments = () => {
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
-
-  // Chart Data
-  const chartData = CONFIG.statuses.map(status => ({
-    name: status,
-    value: state.appointments.filter(a => a.status === status).length
-  }));
 
   if (state.loading) {
     return (
@@ -275,17 +323,17 @@ const HospitalAppointments = () => {
             {filteredAppointments.map(apt => (
               <tr key={apt.id} className="border-t hover:bg-gray-50">
                 <td className="px-4 py-3">
-                  <p className="font-medium">{apt.patientName}</p>
-                  <p className="text-sm text-gray-600">{apt.patientPhone}</p>
+                  <p className="font-medium">{apt.patient_name}</p>
+                  <p className="text-sm text-gray-600">{apt.patient_phone}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p>{apt.doctorName}</p>
+                  <p>{apt.doctor_name || 'Not Assigned'}</p>
                   <p className="text-sm text-gray-600">{apt.department}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p>{moment(apt.date).format('MMM D, YYYY')}</p>
+                  <p>{moment(apt.appointment_date).format('MMM D, YYYY')}</p>
                   <p className="text-sm text-gray-600">
-                    {moment(apt.time, 'HH:mm').format('h:mm A')}
+                    {moment(apt.appointment_time, 'HH:mm:ss').format('h:mm A')}
                   </p>
                 </td>
                 <td className="px-4 py-3">
@@ -327,48 +375,6 @@ const HospitalAppointments = () => {
         </table>
       </div>
 
-      {/* Analytics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-semibold mb-4">Status Distribution</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={index} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042'][index]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-semibold mb-4">Quick Actions</h3>
-          <div className="space-y-3">
-            <button className="w-full text-left p-3 border rounded hover:bg-gray-50">
-              📋 Generate Daily Report
-            </button>
-            <button className="w-full text-left p-3 border rounded hover:bg-gray-50">
-              🔔 Send Reminders
-            </button>
-            <button className="w-full text-left p-3 border rounded hover:bg-gray-50">
-              📊 View Analytics
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Appointment Form Modal */}
       {state.showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -401,7 +407,7 @@ const HospitalAppointments = () => {
                     <label className="block mb-1">Patient Name</label>
                     <input
                       name="patientName"
-                      defaultValue={state.formData?.patientName || ''}
+                      defaultValue={state.formData?.patient_name || ''}
                       className="border rounded w-full p-2"
                       required
                     />
@@ -411,7 +417,16 @@ const HospitalAppointments = () => {
                     <input
                       name="patientPhone"
                       type="tel"
-                      defaultValue={state.formData?.patientPhone || ''}
+                      defaultValue={state.formData?.patient_phone || ''}
+                      className="border rounded w-full p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1">Email (Optional)</label>
+                    <input
+                      name="patientEmail"
+                      type="email"
+                      defaultValue={state.formData?.patient_email || ''}
                       className="border rounded w-full p-2"
                     />
                   </div>
@@ -419,9 +434,8 @@ const HospitalAppointments = () => {
                     <label className="block mb-1">Doctor</label>
                     <select
                       name="doctorId"
-                      defaultValue={state.formData?.doctorId || ''}
+                      defaultValue={state.formData?.hospital_doctor_id || ''}
                       className="border rounded w-full p-2"
-                      required
                     >
                       <option value="">Select Doctor</option>
                       {state.doctors.map(d => (
@@ -436,8 +450,9 @@ const HospitalAppointments = () => {
                     <input
                       name="date"
                       type="date"
-                      defaultValue={state.formData?.date || moment().format('YYYY-MM-DD')}
+                      defaultValue={state.formData?.appointment_date || moment().format('YYYY-MM-DD')}
                       className="border rounded w-full p-2"
+                      required
                     />
                   </div>
                   <div>
@@ -445,8 +460,53 @@ const HospitalAppointments = () => {
                     <input
                       name="time"
                       type="time"
-                      defaultValue={state.formData?.time || '09:00'}
+                      defaultValue={state.formData?.appointment_time ? state.formData.appointment_time.substring(0, 5) : '09:00'}
                       className="border rounded w-full p-2"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1">Type</label>
+                    <select
+                      name="type"
+                      defaultValue={state.formData?.appointment_type || 'Consultation'}
+                      className="border rounded w-full p-2"
+                    >
+                      {CONFIG.appointmentTypes.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block mb-1">Priority</label>
+                    <select
+                      name="priority"
+                      defaultValue={state.formData?.priority || 'normal'}
+                      className="border rounded w-full p-2"
+                    >
+                      {CONFIG.priorities.map(p => (
+                        <option key={p} value={p}>
+                          {p.charAt(0).toUpperCase() + p.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block mb-1">Symptoms</label>
+                    <textarea
+                      name="symptoms"
+                      defaultValue={state.formData?.symptoms || ''}
+                      className="border rounded w-full p-2"
+                      rows="2"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block mb-1">Notes</label>
+                    <textarea
+                      name="notes"
+                      defaultValue={state.formData?.notes || ''}
+                      className="border rounded w-full p-2"
+                      rows="2"
                     />
                   </div>
                 </div>
@@ -471,6 +531,42 @@ const HospitalAppointments = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stylish Notification Modal */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className={`rounded-lg shadow-2xl p-4 min-w-[300px] max-w-md transform transition-all duration-300 ${
+            notification.type === 'success' 
+              ? 'bg-gradient-to-r from-green-500 to-green-600' 
+              : 'bg-gradient-to-r from-red-500 to-red-600'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-medium">{notification.message}</p>
+              </div>
+              <button
+                onClick={() => setNotification({ show: false, message: '', type: 'success' })}
+                className="flex-shrink-0 text-white hover:text-gray-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

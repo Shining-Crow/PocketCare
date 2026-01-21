@@ -1,22 +1,136 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
 
 const HospitalBedManagement = () => {
-  // Load initial data from localStorage if exists
-  const savedBedStatus = JSON.parse(localStorage.getItem('bedStatus'));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
-  const [bedStatus, setBedStatus] = useState(savedBedStatus || {
-    general: { total: 50, available: 15, reserved: 5 },
-    icu: { total: 20, available: 2, reserved: 3 },
-    emergency: { total: 15, available: 5, reserved: 2 },
-    pediatrics: { total: 25, available: 10, reserved: 3 },
-    maternity: { total: 30, available: 10, reserved: 5 }
+  // Ward bed management - using original structure
+  const [bedStatus, setBedStatus] = useState({
+    general_ac: { total: 0, available: 0, reserved: 0 },
+    general_non_ac: { total: 0, available: 0, reserved: 0 },
+    icu: { total: 0, available: 0, reserved: 0 },
+    emergency: { total: 0, available: 0, reserved: 0 },
+    pediatrics_ac: { total: 0, available: 0, reserved: 0 },
+    pediatrics_non_ac: { total: 0, available: 0, reserved: 0 },
+    maternity_ac: { total: 0, available: 0, reserved: 0 },
+    maternity_non_ac: { total: 0, available: 0, reserved: 0 },
+    // Private Rooms
+    private_1bed_no_bath: { total: 0, available: 0, reserved: 0 },
+    private_1bed_with_bath: { total: 0, available: 0, reserved: 0 },
+    private_2bed_with_bath: { total: 0, available: 0, reserved: 0 }
   });
+  
+  const hospitalId = 1; // TODO: Get from logged-in hospital context
+
+  // Ward configuration with labels
+  const wardConfig = {
+    general_ac: { label: 'General Ward (AC)', wardType: 'general', acType: 'ac' },
+    general_non_ac: { label: 'General Ward (Non-AC)', wardType: 'general', acType: 'non_ac' },
+    maternity_ac: { label: 'Maternity Ward (AC)', wardType: 'maternity', acType: 'ac' },
+    maternity_non_ac: { label: 'Maternity Ward (Non-AC)', wardType: 'maternity', acType: 'non_ac' },
+    pediatrics_ac: { label: 'Pediatrics Ward (AC)', wardType: 'pediatrics', acType: 'ac' },
+    pediatrics_non_ac: { label: 'Pediatrics Ward (Non-AC)', wardType: 'pediatrics', acType: 'non_ac' },
+    icu: { label: 'ICU', wardType: 'icu', acType: 'not_applicable' },
+    emergency: { label: 'Emergency', wardType: 'emergency', acType: 'not_applicable' },
+    // Private Rooms - treated as wards for consistency
+    private_1bed_no_bath: { label: 'Private Room (1 Bed)', wardType: 'private_room', acType: 'not_applicable', roomConfig: '1_bed_no_bath' },
+    private_1bed_with_bath: { label: 'Private Room (1 Bed, Attached Bath)', wardType: 'private_room', acType: 'not_applicable', roomConfig: '1_bed_with_bath' },
+    private_2bed_with_bath: { label: 'Private Room (2 Beds, Attached Bath)', wardType: 'private_room', acType: 'not_applicable', roomConfig: '2_bed_with_bath' }
+  };
+
+  useEffect(() => {
+    loadBedData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadBedData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get(`/bed-management/bed-wards?hospital_id=${hospitalId}`);
+      if (response.data.success && response.data.wards.length > 0) {
+        const newBedStatus = {
+          general_ac: { total: 0, available: 0, reserved: 0 },
+          general_non_ac: { total: 0, available: 0, reserved: 0 },
+          icu: { total: 0, available: 0, reserved: 0 },
+          emergency: { total: 0, available: 0, reserved: 0 },
+          pediatrics_ac: { total: 0, available: 0, reserved: 0 },
+          pediatrics_non_ac: { total: 0, available: 0, reserved: 0 },
+          maternity_ac: { total: 0, available: 0, reserved: 0 },
+          maternity_non_ac: { total: 0, available: 0, reserved: 0 },
+          private_1bed_no_bath: { total: 0, available: 0, reserved: 0 },
+          private_1bed_with_bath: { total: 0, available: 0, reserved: 0 },
+          private_2bed_with_bath: { total: 0, available: 0, reserved: 0 }
+        };
+        response.data.wards.forEach(ward => {
+          // Handle regular wards
+          if (ward.ward_type !== 'private_room') {
+            const key = ward.ac_type === 'not_applicable' 
+              ? ward.ward_type 
+              : `${ward.ward_type}_${ward.ac_type}`;
+            if (newBedStatus[key]) {
+              newBedStatus[key] = {
+                total: ward.total_beds,
+                available: ward.available_beds,
+                reserved: ward.reserved_beds,
+                id: ward.id
+              };
+            }
+          } else {
+            // Handle private rooms - map by room configuration
+            // Convert room_config to match state key format
+            // room_config: 1_bed_no_bath -> state key: private_1bed_no_bath (no underscore between 1 and bed)
+            let key = `private_${ward.room_config}`;
+            
+            // Check if key exists, if not try alternative format
+            if (!newBedStatus[key]) {
+              // Try without underscore between number and bed
+              key = key.replace(/_(\d+)_bed/, '_$1bed');
+            }
+            
+            if (newBedStatus[key]) {
+              newBedStatus[key] = {
+                total: ward.total_beds,
+                available: ward.available_beds,
+                reserved: ward.reserved_beds,
+                id: ward.id
+              };
+            } else {
+              console.warn(`Private room key not found. Tried: private_${ward.room_config} and ${key}`);
+            }
+          }
+        });
+        setBedStatus(newBedStatus);
+      }
+    } catch (error) {
+      console.error('Error loading bed data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [hospitalId]);
 
   const updateBedCount = (type, field, value) => {
-    const newValue = parseInt(value) || 0;
-    const maxValue = field === 'available' ? bedStatus[type].total : 
-                     bedStatus[type].total - bedStatus[type].available;
+    // Allow empty string for user to clear the input
+    if (value === '') {
+      const updatedStatus = {
+        ...bedStatus,
+        [type]: {
+          ...bedStatus[type],
+          [field]: ''
+        }
+      };
+      setBedStatus(updatedStatus);
+      return;
+    }
+
+    const newValue = parseInt(value);
     
+    // If not a valid number, ignore
+    if (isNaN(newValue)) return;
+    
+    const maxValue = field === 'available' ? bedStatus[type].total :
+      bedStatus[type].total - bedStatus[type].available;
+
     // Validate input
     if (newValue < 0) return;
     if (newValue > maxValue && field !== 'total') {
@@ -31,46 +145,79 @@ const HospitalBedManagement = () => {
         [field]: newValue
       }
     };
-    
+
     setBedStatus(updatedStatus);
-    // Auto-save to localStorage for demo
-    localStorage.setItem('bedStatus', JSON.stringify(updatedStatus));
   };
 
-  const saveBedStatus = () => {
-    // Save to localStorage (in real app, this would be API call)
-    localStorage.setItem('bedStatus', JSON.stringify(bedStatus));
-    
-    // Also update hospital dashboard data
-    const hospitalInfo = JSON.parse(localStorage.getItem('hospitalInfo') || '{}');
-    const updatedHospitalInfo = {
-      ...hospitalInfo,
-      lastBedUpdate: new Date().toISOString(),
-      bedStatus: bedStatus
-    };
-    localStorage.setItem('hospitalInfo', JSON.stringify(updatedHospitalInfo));
-    
-    alert('Bed status updated successfully!');
+  const saveBedStatus = async () => {
+    setSaving(true);
+    try {
+      for (const [key, data] of Object.entries(bedStatus)) {
+        const config = wardConfig[key];
+        // Convert empty strings to 0 before saving
+        const total = parseInt(data.total) || 0;
+        const available = parseInt(data.available) || 0;
+        const reserved = parseInt(data.reserved) || 0;
+        const occupied = total - available - reserved;
+        
+        const wardData = {
+          hospital_id: hospitalId,
+          ward_type: config.wardType,
+          ac_type: config.acType,
+          total_beds: total,
+          available_beds: available,
+          reserved_beds: reserved,
+          occupied_beds: occupied
+        };
+        
+        // Add room configuration for private rooms
+        if (config.roomConfig) {
+          wardData.room_config = config.roomConfig;
+        }
+        
+        await api.post('/bed-management/bed-wards', wardData);
+      }
+      
+      setShowSuccessModal(true);
+      await loadBedData();
+    } catch (error) {
+      console.error('Error saving bed status:', error);
+      alert('Failed to save bed data');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const resetToDefault = () => {
-    if (window.confirm('Reset all bed counts to default values?')) {
-      const defaultStatus = {
-        general: { total: 50, available: 15, reserved: 5 },
-        icu: { total: 20, available: 2, reserved: 3 },
-        emergency: { total: 15, available: 5, reserved: 2 },
-        pediatrics: { total: 25, available: 10, reserved: 3 },
-        maternity: { total: 30, available: 10, reserved: 5 }
-      };
-      setBedStatus(defaultStatus);
-      localStorage.setItem('bedStatus', JSON.stringify(defaultStatus));
-    }
+    setBedStatus({
+      general_ac: { total: 50, available: 10, reserved: 5 },
+      general_non_ac: { total: 40, available: 8, reserved: 3 },
+      maternity_ac: { total: 30, available: 6, reserved: 2 },
+      maternity_non_ac: { total: 25, available: 5, reserved: 2 },
+      pediatrics_ac: { total: 20, available: 4, reserved: 2 },
+      pediatrics_non_ac: { total: 15, available: 3, reserved: 1 },
+      icu: { total: 10, available: 2, reserved: 1 },
+      emergency: { total: 15, available: 5, reserved: 0 },
+      private_1bed_no_bath: { total: 10, available: 3, reserved: 1 },
+      private_1bed_with_bath: { total: 8, available: 2, reserved: 1 },
+      private_2bed_with_bath: { total: 5, available: 1, reserved: 1 }
+    });
   };
+
+
 
   // Calculate total available beds
   const totalAvailableBeds = Object.values(bedStatus).reduce((sum, ward) => sum + ward.available, 0);
   const totalCapacity = Object.values(bedStatus).reduce((sum, ward) => sum + ward.total, 0);
-  const sosAvailability = totalAvailableBeds > 5 ? 'high' : totalAvailableBeds > 0 ? 'medium' : 'low';
+  const sosAvailability = totalAvailableBeds > 10 ? 'high' : totalAvailableBeds > 0 ? 'medium' : 'low';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl text-gray-600">Loading bed management...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -82,23 +229,23 @@ const HospitalBedManagement = () => {
       {/* Status Banner */}
       <div className="mb-8 p-6 rounded-xl border shadow-sm" style={{
         background: sosAvailability === 'high' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
-                   sosAvailability === 'medium' ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
-                   'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+          sosAvailability === 'medium' ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
+            'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
         borderColor: sosAvailability === 'high' ? '#10b981' :
-                    sosAvailability === 'medium' ? '#f59e0b' :
-                    '#ef4444'
+          sosAvailability === 'medium' ? '#f59e0b' :
+            '#ef4444'
       }}>
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div>
             <h3 className="text-xl font-semibold text-gray-800 mb-1">
               {sosAvailability === 'high' ? '🚨 Ready for Emergencies' :
-               sosAvailability === 'medium' ? '⚠️ Limited Capacity' :
-               '🔴 Full Capacity'}
+                sosAvailability === 'medium' ? '⚠️ Limited Capacity' :
+                  '🔴 Full Capacity'}
             </h3>
             <p className="text-gray-700">
               {sosAvailability === 'high' ? 'Hospital is optimally prepared for emergency cases' :
-               sosAvailability === 'medium' ? 'Emergency cases will be routed only for critical needs' :
-               'No beds available for emergency routing'}
+                sosAvailability === 'medium' ? 'Emergency cases will be routed only for critical needs' :
+                  'No beds available for emergency routing'}
             </p>
           </div>
           <div className="mt-4 md:mt-0">
@@ -112,26 +259,46 @@ const HospitalBedManagement = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {Object.entries(bedStatus).map(([type, data]) => {
           const occupied = data.total - data.available - data.reserved;
-          const occupancyPercentage = (occupied / data.total) * 100;
+          const occupancyPercentage = data.total > 0 ? (occupied / data.total) * 100 : 0;
           const occupancyColor = occupancyPercentage > 90 ? 'bg-red-500' :
-                               occupancyPercentage > 75 ? 'bg-yellow-500' :
-                               'bg-green-500';
-          
+            occupancyPercentage > 75 ? 'bg-yellow-500' :
+              'bg-green-500';
+
           return (
             <div key={type} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800 capitalize">{type} Ward</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">{wardConfig[type].label}</h3>
                   <p className="text-sm text-gray-500">Total Capacity: {data.total} beds</p>
                 </div>
                 <div className="text-right">
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${data.available > 5 ? 'bg-green-100 text-green-800' : data.available > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                  <div className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap inline-block ${
+                    data.available > 5 
+                      ? 'bg-green-100 text-green-700 border border-green-300' 
+                      : data.available > 0 
+                        ? 'bg-yellow-100 text-yellow-700 border border-yellow-300' 
+                        : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}>
                     {data.available} Available
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
+                {/* Total Beds */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Beds
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={data.total}
+                    onChange={(e) => updateBedCount(type, 'total', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
                 {/* Available Beds */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -211,42 +378,83 @@ const HospitalBedManagement = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-8 p-6 bg-gray-50 rounded-xl">
-        <div>
-          <h4 className="font-medium text-gray-800 mb-1">📊 Real-time Integration</h4>
-          <p className="text-sm text-gray-600">
-            Updated bed availability helps route emergency cases efficiently. 
-            Save changes to activate new routing.
-          </p>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={resetToDefault}
-            className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-          >
-            Reset to Default
-          </button>
-          <button
-            onClick={saveBedStatus}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center justify-center"
-          >
-            <span className="mr-2">💾</span>
-            Save Changes
-          </button>
-        </div>
+      <div className="flex space-x-4">
+        <button
+          onClick={saveBedStatus}
+          disabled={saving}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save All Changes'}
+        </button>
+        <button
+          onClick={resetToDefault}
+          disabled={saving}
+          className="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition disabled:opacity-50"
+        >
+          Reset to Default
+        </button>
       </div>
 
-      {/* Help Text */}
-      <div className="mt-6 text-sm text-gray-500">
-        <p className="mb-1">💡 <strong>Tips:</strong></p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Update bed counts regularly for accurate emergency routing</li>
-          <li>Reserved beds are for scheduled procedures/admissions</li>
-          <li>Emergency cases are routed based on available beds</li>
-          <li>Save changes to update the live system</li>
-        </ul>
-      </div>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="bg-green-100 rounded-full p-3">
+                <svg className="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+            </div>
+            
+            {/* Success Message */}
+            <div className="text-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
+              <p className="text-gray-600">Bed status has been updated successfully</p>
+            </div>
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition duration-200 transform hover:scale-105"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add custom animations */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

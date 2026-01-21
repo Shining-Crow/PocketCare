@@ -89,6 +89,31 @@ CREATE TABLE IF NOT EXISTS hospitals (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
+-- TABLE: hospital_doctors
+-- Separate table for managing doctors within a specific hospital
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS hospital_doctors (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    specialty VARCHAR(100) NOT NULL,
+    qualification VARCHAR(255),
+    experience INT COMMENT 'Years of experience',
+    rating DECIMAL(2,1) DEFAULT 0.0,
+    consultation_fee DECIMAL(10,2),
+    is_available BOOLEAN DEFAULT TRUE,
+    bio TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_hospital_id (hospital_id),
+    INDEX idx_specialty (specialty),
+    UNIQUE KEY unique_hospital_email (hospital_id, email),
+    CONSTRAINT fk_hospital_doctors_hospital FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
 -- TABLE: appointments
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS appointments (
@@ -107,6 +132,35 @@ CREATE TABLE IF NOT EXISTS appointments (
     INDEX idx_user (user_id),
     INDEX idx_doctor (doctor_id),
     INDEX idx_date (appointment_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: hospital_appointments
+-- Separate table for managing appointments within hospitals
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS hospital_appointments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_id INT NOT NULL,
+    hospital_doctor_id INT NULL COMMENT 'References hospital_doctors table',
+    patient_name VARCHAR(100) NOT NULL,
+    patient_phone VARCHAR(20),
+    patient_email VARCHAR(255),
+    appointment_date DATE NOT NULL,
+    appointment_time TIME NOT NULL,
+    department VARCHAR(100) NOT NULL,
+    appointment_type VARCHAR(50) DEFAULT 'Consultation' COMMENT 'e.g., Consultation, Follow-up, Emergency, Check-up',
+    priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+    status ENUM('pending', 'confirmed', 'completed', 'cancelled') DEFAULT 'pending',
+    symptoms TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+    FOREIGN KEY (hospital_doctor_id) REFERENCES hospital_doctors(id) ON DELETE SET NULL,
+    INDEX idx_hospital (hospital_id),
+    INDEX idx_hospital_doctor (hospital_doctor_id),
+    INDEX idx_date (appointment_date),
+    INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
@@ -270,6 +324,81 @@ CREATE TABLE IF NOT EXISTS admins (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: bed_wards
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS bed_wards (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_id INT NOT NULL,
+    ward_type ENUM('general', 'maternity', 'pediatrics', 'icu', 'emergency', 'private_room') NOT NULL,
+    ac_type ENUM('ac', 'non_ac', 'not_applicable') DEFAULT 'not_applicable',
+    room_config VARCHAR(50) NULL COMMENT 'For private rooms: 1_bed_no_bath, 1_bed_with_bath, 2_bed_with_bath (2 beds always have attached bathroom)',
+    total_beds INT NOT NULL DEFAULT 0,
+    available_beds INT NOT NULL DEFAULT 0,
+    reserved_beds INT NOT NULL DEFAULT 0,
+    occupied_beds INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+    INDEX idx_hospital_ward (hospital_id, ward_type),
+    INDEX idx_ward_type (ward_type),
+    UNIQUE KEY uq_hospital_ward_ac (hospital_id, ward_type, ac_type, room_config),
+    CONSTRAINT chk_bed_counts CHECK (
+        total_beds >= 0 AND
+        available_beds >= 0 AND
+        reserved_beds >= 0 AND
+        occupied_beds >= 0 AND
+        (available_beds + reserved_beds + occupied_beds) <= total_beds
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: private_rooms
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS private_rooms (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_id INT NOT NULL,
+    room_number VARCHAR(50) NOT NULL,
+    bed_count ENUM('1', '2') NOT NULL DEFAULT '1',
+    has_attached_bathroom BOOLEAN DEFAULT FALSE,
+    ac_type ENUM('ac', 'non_ac') NOT NULL DEFAULT 'non_ac',
+    status ENUM('available', 'occupied', 'reserved', 'maintenance') DEFAULT 'available',
+    daily_rate DECIMAL(10,2) DEFAULT 0.00,
+    patient_name VARCHAR(100) NULL,
+    patient_contact VARCHAR(20) NULL,
+    admission_date DATE NULL,
+    expected_discharge_date DATE NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+    INDEX idx_hospital_room (hospital_id, room_number),
+    INDEX idx_room_status (status),
+    UNIQUE KEY uq_hospital_room_number (hospital_id, room_number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: bed_allocation_logs
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS bed_allocation_logs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospital_id INT NOT NULL,
+    ward_id INT NULL,
+    room_id INT NULL,
+    allocation_type ENUM('ward', 'private_room') NOT NULL,
+    action ENUM('allocated', 'released', 'reserved', 'cancelled') NOT NULL,
+    patient_name VARCHAR(100) NULL,
+    patient_contact VARCHAR(20) NULL,
+    allocated_by VARCHAR(100) NULL COMMENT 'Staff member who made the allocation',
+    notes TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+    FOREIGN KEY (ward_id) REFERENCES bed_wards(id) ON DELETE SET NULL,
+    FOREIGN KEY (room_id) REFERENCES private_rooms(id) ON DELETE SET NULL,
+    INDEX idx_hospital_logs (hospital_id, created_at),
+    INDEX idx_allocation_type (allocation_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================

@@ -10,7 +10,6 @@ const HospitalLogin = () => {
     });
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -63,22 +62,22 @@ const HospitalLogin = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Hospital ID
+                                Email
                             </label>
                             <input
-                                type="text"
-                                value={credentials.hospitalId}
-                                onChange={(e) => setCredentials({ ...credentials, hospitalId: e.target.value })}
+                                type="email"
+                                value={credentials.email}
+                                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Enter your hospital ID"
+                                placeholder="Enter hospital email"
                             />
                         </div>
-                                    Email
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    type="email"
-                                    value={credentials.email}
-                                    onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+                                Password
+                            </label>
+                            <input
                                 type="password"
                                 value={credentials.password}
                                 onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
@@ -86,20 +85,21 @@ const HospitalLogin = () => {
                                 placeholder="Enter your password"
                             />
                         </div>
-                                disabled={isSubmitting}
 
                         {error && (
-                                {isSubmitting ? 'Signing In...' : 'Sign In'}
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                                 {error}
                             </div>
-                            className="w-full bg-green-50 text-green-700 py-3 rounded-lg font-semibold hover:bg-green-100 transition-all border border-green-200"
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg disabled:opacity-70"
                         >
-                            🎯 Demo Access (Quick Login)
+                            {isSubmitting ? 'Signing In...' : 'Sign In'}
                         </button>
-                        <p className="text-xs text-gray-500 text-center mt-2">
-                            Click for instant access to demo dashboard
-                        </p>
-                    </div>
+                    </form>
 
                     {/* Footer */}
                     <div className="mt-6 text-center">

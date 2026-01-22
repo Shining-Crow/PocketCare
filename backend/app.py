@@ -44,6 +44,7 @@ def create_app(config_name='development'):
     from routes.hospital_appointments import hospital_appointments_bp
     from routes.hospital_dashboard import hospital_dashboard_bp
     from routes.hospitals import hospitals_bp
+    from routes.user_bed_booking import user_bed_booking_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(appointments_bp, url_prefix='/api')
     app.register_blueprint(doctors_bp, url_prefix='/api')
@@ -60,6 +61,7 @@ def create_app(config_name='development'):
     app.register_blueprint(hospital_appointments_bp, url_prefix='/api')
     app.register_blueprint(hospital_dashboard_bp, url_prefix='/api')
     app.register_blueprint(hospitals_bp, url_prefix='/api')
+    app.register_blueprint(user_bed_booking_bp, url_prefix='/api')
     
     # Root endpoint
     @app.route('/')

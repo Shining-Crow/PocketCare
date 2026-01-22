@@ -29,8 +29,10 @@ api.interceptors.request.use(
       url.startsWith("/auth/admin") ||
       url.includes("/admin/");
 
+    // Note: Use "/hospital/" with trailing slash to avoid matching "/hospitals" (user page)
     const isHospitalContext =
-      currentPath.startsWith("/hospital") ||
+      currentPath.startsWith("/hospital/") ||
+      currentPath === "/hospital" ||
       url.startsWith("/auth/hospital") ||
       url.includes("/hospital/");
 

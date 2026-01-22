@@ -7,6 +7,8 @@ const HospitalBedManagement = () => {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
   
+  // Real patient booking data from API
+  const [bookingsByWard, setBookingsByWard] = useState({});
   // AC/Non-AC toggle state for each ward type
   const [acToggle, setAcToggle] = useState({
     general: 'ac',      // 'ac' or 'non_ac'
@@ -39,47 +41,25 @@ const HospitalBedManagement = () => {
     }));
   };
   
-  // Dummy patient data for reserved beds
-  const dummyPatientData = {
-    general_ac: [
-      { bedNumber: 'GA-101', patientName: 'John Doe', age: 45, admissionDate: '2026-01-20', admissionTime: '09:30 AM', reservedUntil: '2026-01-25', doctor: 'Dr. Sarah Johnson', condition: 'Post-surgery recovery', contactNumber: '+1-555-0123', emergencyContact: '+1-555-0124' },
-      { bedNumber: 'GA-102', patientName: 'Mary Smith', age: 52, admissionDate: '2026-01-21', admissionTime: '02:15 PM', reservedUntil: '2026-01-24', doctor: 'Dr. Michael Chen', condition: 'Observation', contactNumber: '+1-555-0125', emergencyContact: '+1-555-0126' }
-    ],
-    general_non_ac: [
-      { bedNumber: 'GN-201', patientName: 'Robert Wilson', age: 38, admissionDate: '2026-01-19', admissionTime: '11:00 AM', reservedUntil: '2026-01-23', doctor: 'Dr. Emily Brown', condition: 'Minor surgery recovery', contactNumber: '+1-555-0127', emergencyContact: '+1-555-0128' }
-    ],
-    pediatrics_ac: [
-      { bedNumber: 'PA-301', patientName: 'Emma Davis', age: 8, admissionDate: '2026-01-22', admissionTime: '08:00 AM', reservedUntil: '2026-01-24', doctor: 'Dr. Lisa Anderson', condition: 'Fever monitoring', contactNumber: '+1-555-0129', emergencyContact: '+1-555-0130', guardian: 'Jennifer Davis' }
-    ],
-    pediatrics_non_ac: [
-      { bedNumber: 'PN-401', patientName: 'Oliver Martinez', age: 5, admissionDate: '2026-01-21', admissionTime: '03:45 PM', reservedUntil: '2026-01-23', doctor: 'Dr. Lisa Anderson', condition: 'Respiratory infection', contactNumber: '+1-555-0131', emergencyContact: '+1-555-0132', guardian: 'Carlos Martinez' }
-    ],
-    maternity_ac: [
-      { bedNumber: 'MA-501', patientName: 'Jessica Taylor', age: 29, admissionDate: '2026-01-22', admissionTime: '06:30 AM', reservedUntil: '2026-01-27', doctor: 'Dr. Amanda White', condition: 'Delivery - Expected', contactNumber: '+1-555-0133', emergencyContact: '+1-555-0134', dueDate: '2026-01-23' }
-    ],
-    maternity_non_ac: [
-      { bedNumber: 'MN-601', patientName: 'Sophie Garcia', age: 32, admissionDate: '2026-01-20', admissionTime: '04:20 PM', reservedUntil: '2026-01-26', doctor: 'Dr. Amanda White', condition: 'Post-delivery care', contactNumber: '+1-555-0135', emergencyContact: '+1-555-0136', deliveryDate: '2026-01-20' }
-    ],
-    icu: [
-      { bedNumber: 'ICU-701', patientName: 'William Thompson', age: 67, admissionDate: '2026-01-18', admissionTime: '01:00 AM', reservedUntil: '2026-01-30', doctor: 'Dr. Richard Lee', condition: 'Critical - Heart condition', contactNumber: '+1-555-0137', emergencyContact: '+1-555-0138', ventilator: 'Yes' }
-    ],
-    emergency: [
-      { bedNumber: 'ER-801', patientName: 'David Brown', age: 41, admissionDate: '2026-01-22', admissionTime: '11:45 PM', reservedUntil: '2026-01-23', doctor: 'Dr. James Wilson', condition: 'Accident - Stable', contactNumber: '+1-555-0139', emergencyContact: '+1-555-0140', triageLevel: 'Level 2' }
-    ],
-    private_1bed_no_bath: [
-      { bedNumber: 'PVT-A101', patientName: 'Charles Miller', age: 55, admissionDate: '2026-01-21', admissionTime: '10:00 AM', reservedUntil: '2026-01-28', doctor: 'Dr. Patricia Davis', condition: 'Recovery - Elective surgery', contactNumber: '+1-555-0141', emergencyContact: '+1-555-0142', roomRate: '$150/day' }
-    ],
-    private_1bed_with_bath: [
-      { bedNumber: 'PVT-B201', patientName: 'Linda Anderson', age: 48, admissionDate: '2026-01-20', admissionTime: '01:30 PM', reservedUntil: '2026-01-27', doctor: 'Dr. Robert Martinez', condition: 'Post-operative care', contactNumber: '+1-555-0143', emergencyContact: '+1-555-0144', roomRate: '$250/day' }
-    ],
-    private_2bed_with_bath: [
-      { bedNumber: 'PVT-C301', patientName: 'Thomas Wilson', age: 72, admissionDate: '2026-01-19', admissionTime: '09:00 AM', reservedUntil: '2026-01-29', doctor: 'Dr. Susan Clark', condition: 'Extended care', contactNumber: '+1-555-0145', emergencyContact: '+1-555-0146', roomRate: '$400/day' }
-    ]
-  };
-  
-  // Handle card click to show patient info
+  // Handle card click to show patient info - using real booking data from API
   const handleCardClick = (wardType, wardLabel) => {
-    const patients = dummyPatientData[wardType] || [];
+    const bookings = bookingsByWard[wardType] || [];
+    // Transform bookings to patient format for display
+    const patients = bookings.map(booking => ({
+      bedNumber: `${wardType.toUpperCase().slice(0, 2)}-${booking.id}`,
+      patientName: booking.patient_name,
+      age: booking.patient_age,
+      admissionDate: booking.admission_date,
+      admissionTime: '09:00 AM', // Default time
+      reservedUntil: booking.expected_discharge,
+      contactNumber: booking.patient_phone,
+      emergencyContact: booking.emergency_contact || 'N/A',
+      condition: booking.medical_notes || 'General admission',
+      status: booking.status,
+      userName: booking.user_name,
+      userEmail: booking.user_email,
+      createdAt: booking.created_at
+    }));
     setSelectedWardInfo({
       wardType,
       wardLabel,
@@ -87,6 +67,18 @@ const HospitalBedManagement = () => {
     });
     setShowPatientModal(true);
   };
+  
+  // Fetch real booking data from API
+  const fetchBookings = useCallback(async () => {
+    try {
+      const response = await api.get('/hospital/bed-bookings/by-ward');
+      if (response.data.success) {
+        setBookingsByWard(response.data.bookings_by_ward || {});
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+    }
+  }, []);
   
   // Ward bed management - using original structure
   const [bedStatus, setBedStatus] = useState({
@@ -158,6 +150,7 @@ const HospitalBedManagement = () => {
 
   useEffect(() => {
     loadBedData();
+    fetchBookings();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadBedData = useCallback(async () => {
@@ -611,9 +604,29 @@ const HospitalBedManagement = () => {
                             </svg>
                             <span className="text-lg">{patient.age} years old</span>
                           </div>
+                          {/* Booked by User Info */}
+                          {patient.userName && (
+                            <div className="mt-2 text-sm text-gray-500">
+                              <span className="font-medium">Booked by:</span> {patient.userName} ({patient.userEmail})
+                            </div>
+                          )}
                         </div>
-                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-full font-bold text-lg shadow-md">
-                          {patient.bedNumber}
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-full font-bold text-lg shadow-md">
+                            {patient.bedNumber}
+                          </div>
+                          {/* Booking Status Badge */}
+                          {patient.status && (
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              patient.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              patient.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                              patient.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                              patient.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       

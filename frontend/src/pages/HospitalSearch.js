@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import {
   Search,
@@ -18,6 +19,7 @@ import Footer from "../components/Footer";
 import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function HospitalSearch() {
+  const navigate = useNavigate();
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -493,6 +495,13 @@ function HospitalSearch() {
                           Call
                         </a>
                       )}
+                      <button
+                        onClick={() => navigate(`/hospitals/${hospital.id}/book-bed`)}
+                        className="flex-1 md:flex-none px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                      >
+                        <Bed className="w-4 h-4" />
+                        Book Bed
+                      </button>
                     </div>
                   </div>
                 </div>

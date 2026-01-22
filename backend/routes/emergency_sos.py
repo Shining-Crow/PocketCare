@@ -354,6 +354,56 @@ def get_emergency_sos_history():
         connection.close()
 
 
+@emergency_sos_bp.route('/emergency/sos/<int:request_id>/resolve', methods=['POST', 'OPTIONS'])
+def user_resolve_emergency_sos(request_id: int):
+    if request.method == 'OPTIONS':
+        return ('', 200)
+
+    verify_jwt_in_request()
+    user_id = _parse_user_id(get_jwt_identity())
+    if user_id is None:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    try:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                    UPDATE emergency_requests
+                    SET status='resolved', resolved_at=%s
+                    WHERE id=%s AND user_id=%s AND status IN ('pending', 'acknowledged')
+                    """,
+                    (datetime.now(), request_id, user_id),
+                )
+            except Exception as e:
+                if _is_unknown_column(e):
+                    cursor.execute(
+                        """
+                        UPDATE emergency_requests
+                        SET status='resolved'
+                        WHERE id=%s AND user_id=%s AND status IN ('pending', 'acknowledged')
+                        """,
+                        (request_id, user_id),
+                    )
+                else:
+                    raise
+
+            connection.commit()
+
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Request not found or not eligible to resolve'}), 404
+
+        return jsonify({'success': True, 'request_id': request_id, 'status': 'resolved'}), 200
+    except Exception as e:
+        connection.rollback()
+        if _is_missing_emergency_requests(e):
+            return jsonify({'error': 'SOS feature is not available (missing table)'}), 404
+        return jsonify({'error': str(e)}), 500
+    finally:
+        connection.close()
+
+
 @emergency_sos_bp.route('/hospital/emergency/requests', methods=['GET', 'OPTIONS'])
 def hospital_list_emergency_requests():
     if request.method == 'OPTIONS':

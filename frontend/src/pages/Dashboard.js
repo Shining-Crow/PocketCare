@@ -131,6 +131,7 @@ function Dashboard() {
   const [latestSosLoading, setLatestSosLoading] = useState(false);
   const [latestSosError, setLatestSosError] = useState(null);
   const [latestSosUpdatedAt, setLatestSosUpdatedAt] = useState(null);
+  const [latestSosResolving, setLatestSosResolving] = useState(false);
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
@@ -450,6 +451,40 @@ function Dashboard() {
       setLatestSosLoading(false);
     }
   }, []);
+
+  const resolveLatestSos = useCallback(async () => {
+    const requestId = latestSos?.id;
+    if (!requestId || requestId === 'new') {
+      setLatestSosError('Cannot resolve this SOS yet. Please wait for the request to be created.');
+      return;
+    }
+
+    setLatestSosError(null);
+    setLatestSosResolving(true);
+    try {
+      await api.post(`/emergency/sos/${requestId}/resolve`);
+      // Optimistic UI update so the tracker collapses immediately.
+      setLatestSos((prev) => (prev ? { ...prev, status: 'resolved', resolved_at: new Date().toISOString() } : prev));
+      setLatestSosUpdatedAt(new Date());
+      setSosStatusModal({
+        show: true,
+        title: 'SOS Resolved',
+        message: 'You marked your emergency request as resolved.',
+        tone: 'info',
+      });
+      // Re-fetch in the background to sync timestamps/hospital fields.
+      fetchLatestSos();
+    } catch (err) {
+      const apiMsg = err?.response?.data?.error || err?.response?.data?.msg;
+      const msg =
+        (typeof apiMsg === 'string' && apiMsg) ||
+        err?.message ||
+        'Failed to resolve SOS request.';
+      setLatestSosError(msg);
+    } finally {
+      setLatestSosResolving(false);
+    }
+  }, [latestSos, fetchLatestSos]);
 
   const stopHoldAnimation = useCallback(() => {
     if (holdRafRef.current) {
@@ -791,19 +826,37 @@ function Dashboard() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={fetchLatestSos}
-                    disabled={latestSosLoading}
-                    className="relative w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      {latestSosLoading && (
-                        <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-                      )}
-                      <span>Refresh</span>
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(latestSos?.id && (latestSos.status === 'pending' || latestSos.status === 'acknowledged')) && (
+                      <button
+                        type="button"
+                        onClick={resolveLatestSos}
+                        disabled={latestSosResolving}
+                        className="relative shrink-0 rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <span className="inline-flex items-center justify-center gap-2">
+                          {latestSosResolving && (
+                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-200 border-t-white" />
+                          )}
+                          <span>Resolve</span>
+                        </span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={fetchLatestSos}
+                      disabled={latestSosLoading}
+                      className="relative w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <span className="inline-flex items-center justify-center gap-2">
+                        {latestSosLoading && (
+                          <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                        )}
+                        <span>Refresh</span>
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 {latestSosError && (

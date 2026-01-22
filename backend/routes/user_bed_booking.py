@@ -13,6 +13,64 @@ def clean_value(val):
     return val
 
 
+def get_hospital_id_from_jwt():
+    """Extract hospital ID from JWT identity (handles 'hospital_X' format)"""
+    jwt_identity = get_jwt_identity()
+    if isinstance(jwt_identity, str) and jwt_identity.startswith('hospital_'):
+        return int(jwt_identity.replace('hospital_', ''))
+    return int(jwt_identity)
+
+
+def get_user_id_from_jwt():
+    """Extract user ID from JWT identity (handles 'user_X' format if applicable)"""
+    jwt_identity = get_jwt_identity()
+    if isinstance(jwt_identity, str) and jwt_identity.startswith('user_'):
+        return int(jwt_identity.replace('user_', ''))
+    return int(jwt_identity)
+
+
+# DEBUG endpoint - remove in production
+@user_bed_booking_bp.route('/debug/all-bookings', methods=['GET'])
+def debug_all_bookings():
+    """Debug endpoint to see all bookings in the database"""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, user_id, hospital_id, ward_type, ac_type, patient_name, status, created_at
+            FROM user_bed_bookings
+            ORDER BY id DESC
+            LIMIT 20
+        """)
+        bookings = cursor.fetchall()
+        
+        # Convert datetime objects to strings
+        result = []
+        for b in bookings:
+            result.append({
+                'id': b['id'],
+                'user_id': b['user_id'],
+                'hospital_id': b['hospital_id'],
+                'ward_type': b['ward_type'],
+                'ac_type': b['ac_type'],
+                'patient_name': b['patient_name'],
+                'status': b['status'],
+                'created_at': str(b['created_at']) if b['created_at'] else None
+            })
+        
+        return jsonify({'bookings': result, 'count': len(result)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 @user_bed_booking_bp.route('/user/bed-bookings', methods=['POST'])
 @jwt_required()
 def create_bed_booking():
@@ -266,7 +324,7 @@ def get_hospital_bookings():
     conn = None
     cursor = None
     try:
-        hospital_id = int(get_jwt_identity())
+        hospital_id = get_hospital_id_from_jwt()
         status_filter = request.args.get('status')
         ward_filter = request.args.get('ward_type')
         
@@ -333,25 +391,28 @@ def get_bookings_by_ward():
     conn = None
     cursor = None
     try:
-        hospital_id = int(get_jwt_identity())
+        hospital_id = get_hospital_id_from_jwt()
+        print(f"[DEBUG] Fetching bookings for hospital_id: {hospital_id}")
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get confirmed and pending bookings (active bookings)
+        # Get confirmed bookings (active reservations) - no pending since we auto-confirm now
         cursor.execute("""
             SELECT 
                 ubb.*,
                 u.name as user_name,
-                u.email as user_email
+                u.email as user_email,
+                u.phone as user_phone
             FROM user_bed_bookings ubb
             JOIN users u ON ubb.user_id = u.id
             WHERE ubb.hospital_id = %s
-            AND ubb.status IN ('pending', 'confirmed')
-            ORDER BY ubb.ward_type, ubb.ac_type, ubb.preferred_date
+            AND ubb.status = 'confirmed'
+            ORDER BY ubb.ward_type, ubb.ac_type, ubb.preferred_date DESC
         """, (hospital_id,))
         
         bookings = cursor.fetchall()
+        print(f"[DEBUG] Found {len(bookings)} bookings for hospital {hospital_id}")
         
         # Group by ward_type and ac_type
         grouped = {}
@@ -359,36 +420,43 @@ def get_bookings_by_ward():
             ward_key = booking['ward_type']
             if booking['ac_type'] and booking['ac_type'] != 'not_applicable':
                 ward_key = f"{booking['ward_type']}_{booking['ac_type']}"
-            elif booking['room_config']:
-                ward_key = booking['room_config']
+            elif booking['ward_type'] == 'private_room' and booking['room_config']:
+                # Map room_config to match frontend keys
+                room_map = {
+                    '1_bed_no_bath': 'private_1bed_no_bath',
+                    '1_bed_with_bath': 'private_1bed_with_bath', 
+                    '2_bed_with_bath': 'private_2bed_with_bath'
+                }
+                ward_key = room_map.get(booking['room_config'], booking['room_config'])
             
             if ward_key not in grouped:
                 grouped[ward_key] = []
             
             booking_dict = {
                 'id': booking['id'],
-                'bedNumber': f"BED-{booking['id']:04d}",
+                'booking_id': f"BK-{booking['id']:04d}",
+                'bed_number': f"BED-{booking['id']:04d}",
                 'patient_name': booking['patient_name'],
                 'patient_age': booking['patient_age'],
-                'admission_date': str(booking['preferred_date']) if booking['preferred_date'] else None,
-                'expected_discharge': None,  # Not in current schema
-                'medical_notes': booking['admission_reason'] or 'Not specified',
+                'patient_gender': booking['patient_gender'],
                 'patient_phone': booking['patient_phone'],
+                'patient_email': booking['patient_email'],
                 'emergency_contact': booking['emergency_contact'],
+                'admission_date': str(booking['preferred_date']) if booking['preferred_date'] else None,
+                'admission_reason': booking['admission_reason'] or 'Not specified',
+                'ward_type': booking['ward_type'],
+                'ac_type': booking['ac_type'],
+                'room_config': booking['room_config'],
                 'status': booking['status'],
-                'user_id': booking['user_id'],
-                'user_name': booking['user_name'],
-                'user_email': booking['user_email'],
-                'created_at': str(booking['created_at']) if booking['created_at'] else None
+                'booked_by': {
+                    'user_id': booking['user_id'],
+                    'name': booking['user_name'],
+                    'email': booking['user_email'],
+                    'phone': booking['user_phone']
+                },
+                'created_at': str(booking['created_at']) if booking['created_at'] else None,
+                'updated_at': str(booking['updated_at']) if booking['updated_at'] else None
             }
-            
-            # Add guardian for pediatrics
-            if booking['ward_type'] == 'pediatrics':
-                booking_dict['guardian'] = booking['user_name']
-            
-            # Add room rate for private rooms
-            if booking['ward_type'] == 'private_room':
-                booking_dict['roomRate'] = 'As per hospital rates'
             
             grouped[ward_key].append(booking_dict)
         
@@ -412,7 +480,7 @@ def update_booking_status(booking_id):
     conn = None
     cursor = None
     try:
-        hospital_id = int(get_jwt_identity())
+        hospital_id = get_hospital_id_from_jwt()
         data = request.get_json()
         new_status = data.get('status')
         notes = data.get('notes')

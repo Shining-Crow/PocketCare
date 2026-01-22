@@ -859,7 +859,7 @@ function Dashboard() {
                       <div className="rounded-2xl border border-gray-200 bg-white p-3">
                         <div className="text-[11px] uppercase tracking-wider text-gray-500">Type</div>
                         <div className="mt-1 text-sm font-semibold text-gray-900">
-                          {latestSos.emergency_type || "General"}
+                          {latestSos.emergency_type_label || latestSos.emergency_type || "General"}
                         </div>
                       </div>
                     </div>

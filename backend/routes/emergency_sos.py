@@ -12,6 +12,25 @@ from utils.database import get_db_connection
 emergency_sos_bp = Blueprint('emergency_sos', __name__)
 
 
+def _is_missing_emergency_types(err: Exception) -> bool:
+    msg = str(err).lower()
+    return (
+        'emergency_types' in msg
+        or "unknown table 'emergency_types'" in msg
+        or 'doesn\'t exist' in msg and 'emergency_types' in msg
+        or 'unknown column' in msg and 'et.' in msg
+    )
+
+
+def _is_unknown_column(err: Exception) -> bool:
+    return 'unknown column' in str(err).lower()
+
+
+def _is_missing_emergency_requests(err: Exception) -> bool:
+    msg = str(err).lower()
+    return 'emergency_requests' in msg and ('doesn\'t exist' in msg or 'table' in msg)
+
+
 def _parse_user_id(identity: Any) -> Optional[int]:
     if identity is None:
         return None
@@ -103,33 +122,97 @@ def get_latest_emergency_sos():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                  er.id,
-                  er.status,
-                  er.latitude,
-                  er.longitude,
-                  er.emergency_type,
-                  er.note,
-                  er.created_at,
-                  er.acknowledged_at,
-                  er.resolved_at,
-                  er.hospital_id,
-                  h.name AS hospital_name,
-                  h.phone AS hospital_phone
-                FROM emergency_requests er
-                LEFT JOIN hospitals h ON h.id = er.hospital_id
-                WHERE er.user_id = %s
-                ORDER BY er.created_at DESC
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            row = cursor.fetchone()
+                        sql_with_types = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.emergency_type,
+                                    COALESCE(
+                                        et.label,
+                                        CASE
+                                            WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                            ELSE er.emergency_type
+                                        END
+                                    ) AS emergency_type_label,
+                                    er.note,
+                                    er.created_at,
+                                    er.acknowledged_at,
+                                    er.resolved_at,
+                                    er.hospital_id,
+                                    h.name AS hospital_name,
+                                    h.phone AS hospital_phone
+                                FROM emergency_requests er
+                                LEFT JOIN emergency_types et ON et.code = er.emergency_type
+                                LEFT JOIN hospitals h ON h.id = er.hospital_id
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT 1
+                        """
+
+                        sql_without_types = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.emergency_type,
+                                    CASE
+                                        WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                        ELSE er.emergency_type
+                                    END AS emergency_type_label,
+                                    er.note,
+                                    er.created_at,
+                                    er.acknowledged_at,
+                                    er.resolved_at,
+                                    er.hospital_id,
+                                    h.name AS hospital_name,
+                                    h.phone AS hospital_phone
+                                FROM emergency_requests er
+                                LEFT JOIN hospitals h ON h.id = er.hospital_id
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT 1
+                        """
+
+                        sql_minimal = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.created_at
+                                FROM emergency_requests er
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT 1
+                        """
+
+                        try:
+                                cursor.execute(sql_with_types, (user_id,))
+                                row = cursor.fetchone()
+                        except Exception as e:
+                                try:
+                                        if _is_missing_emergency_types(e):
+                                                cursor.execute(sql_without_types, (user_id,))
+                                                row = cursor.fetchone()
+                                        elif _is_unknown_column(e):
+                                                cursor.execute(sql_minimal, (user_id,))
+                                                row = cursor.fetchone()
+                                        else:
+                                                raise
+                                except Exception as e2:
+                                        if _is_unknown_column(e2):
+                                                cursor.execute(sql_minimal, (user_id,))
+                                                row = cursor.fetchone()
+                                        else:
+                                                raise
 
         return jsonify({'success': True, 'request': row}), 200
     except Exception as e:
+        if _is_missing_emergency_requests(e):
+            return jsonify({'success': True, 'request': None}), 200
         return jsonify({'error': str(e)}), 500
     finally:
         connection.close()
@@ -160,30 +243,92 @@ def get_emergency_sos_history():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                  er.id,
-                  er.status,
-                  er.latitude,
-                  er.longitude,
-                  er.emergency_type,
-                  er.note,
-                  er.created_at,
-                  er.acknowledged_at,
-                  er.resolved_at,
-                  er.hospital_id,
-                  h.name AS hospital_name,
-                  h.phone AS hospital_phone
-                FROM emergency_requests er
-                LEFT JOIN hospitals h ON h.id = er.hospital_id
-                WHERE er.user_id = %s
-                ORDER BY er.created_at DESC
-                LIMIT %s OFFSET %s
-                """,
-                (user_id, limit, offset),
-            )
-            rows = cursor.fetchall() or []
+                        sql_with_types = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.emergency_type,
+                                    COALESCE(
+                                        et.label,
+                                        CASE
+                                            WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                            ELSE er.emergency_type
+                                        END
+                                    ) AS emergency_type_label,
+                                    er.note,
+                                    er.created_at,
+                                    er.acknowledged_at,
+                                    er.resolved_at,
+                                    er.hospital_id,
+                                    h.name AS hospital_name,
+                                    h.phone AS hospital_phone
+                                FROM emergency_requests er
+                                LEFT JOIN emergency_types et ON et.code = er.emergency_type
+                                LEFT JOIN hospitals h ON h.id = er.hospital_id
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT %s OFFSET %s
+                        """
+
+                        sql_without_types = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.emergency_type,
+                                    CASE
+                                        WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                        ELSE er.emergency_type
+                                    END AS emergency_type_label,
+                                    er.note,
+                                    er.created_at,
+                                    er.acknowledged_at,
+                                    er.resolved_at,
+                                    er.hospital_id,
+                                    h.name AS hospital_name,
+                                    h.phone AS hospital_phone
+                                FROM emergency_requests er
+                                LEFT JOIN hospitals h ON h.id = er.hospital_id
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT %s OFFSET %s
+                        """
+
+                        sql_minimal = """
+                                SELECT
+                                    er.id,
+                                    er.status,
+                                    er.latitude,
+                                    er.longitude,
+                                    er.created_at
+                                FROM emergency_requests er
+                                WHERE er.user_id = %s
+                                ORDER BY er.created_at DESC
+                                LIMIT %s OFFSET %s
+                        """
+
+                        try:
+                                cursor.execute(sql_with_types, (user_id, limit, offset))
+                                rows = cursor.fetchall() or []
+                        except Exception as e:
+                                try:
+                                        if _is_missing_emergency_types(e):
+                                                cursor.execute(sql_without_types, (user_id, limit, offset))
+                                                rows = cursor.fetchall() or []
+                                        elif _is_unknown_column(e):
+                                                cursor.execute(sql_minimal, (user_id, limit, offset))
+                                                rows = cursor.fetchall() or []
+                                        else:
+                                                raise
+                                except Exception as e2:
+                                        if _is_unknown_column(e2):
+                                                cursor.execute(sql_minimal, (user_id, limit, offset))
+                                                rows = cursor.fetchall() or []
+                                        else:
+                                                raise
 
         has_more = len(rows) == limit
         next_offset = offset + len(rows)
@@ -202,6 +347,8 @@ def get_emergency_sos_history():
             200,
         )
     except Exception as e:
+        if _is_missing_emergency_requests(e):
+            return jsonify({'success': True, 'requests': [], 'limit': limit, 'offset': offset, 'next_offset': offset, 'has_more': False}), 200
         return jsonify({'error': str(e)}), 500
     finally:
         connection.close()
@@ -235,7 +382,7 @@ def hospital_list_emergency_requests():
             hlng = float(hospital['longitude'])
 
             # Haversine distance (km)
-            pending_sql = """
+            pending_sql_with_types = """
                 SELECT
                   er.id,
                   er.user_id,
@@ -245,6 +392,46 @@ def hospital_list_emergency_requests():
                   er.latitude,
                   er.longitude,
                   er.emergency_type,
+                  COALESCE(
+                    et.label,
+                    CASE
+                      WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                      ELSE er.emergency_type
+                    END
+                  ) AS emergency_type_label,
+                  er.note,
+                  er.status,
+                  er.hospital_id,
+                  er.created_at,
+                  er.acknowledged_at,
+                  er.resolved_at,
+                  (6371 * 2 * ASIN(SQRT(
+                      POWER(SIN(RADIANS(er.latitude - %s) / 2), 2) +
+                      COS(RADIANS(%s)) * COS(RADIANS(er.latitude)) *
+                      POWER(SIN(RADIANS(er.longitude - %s) / 2), 2)
+                  ))) AS distance_km
+                FROM emergency_requests er
+                JOIN users u ON u.id = er.user_id
+                LEFT JOIN emergency_types et ON et.code = er.emergency_type
+                WHERE er.status = 'pending'
+                HAVING distance_km <= %s
+                ORDER BY er.created_at DESC
+                LIMIT 200
+            """
+            pending_sql_without_types = """
+                SELECT
+                  er.id,
+                  er.user_id,
+                  u.name AS user_name,
+                  u.phone AS user_phone,
+                  u.blood_group AS blood_group,
+                  er.latitude,
+                  er.longitude,
+                  er.emergency_type,
+                  CASE
+                    WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                    ELSE er.emergency_type
+                  END AS emergency_type_label,
                   er.note,
                   er.status,
                   er.hospital_id,
@@ -263,37 +450,154 @@ def hospital_list_emergency_requests():
                 ORDER BY er.created_at DESC
                 LIMIT 200
             """
-            cursor.execute(pending_sql, (hlat, hlat, hlng, radius_km))
-            pending = cursor.fetchall()
+
+            pending_sql_minimal = """
+                SELECT
+                  er.id,
+                  er.user_id,
+                  u.name AS user_name,
+                  u.phone AS user_phone,
+                  u.blood_group AS blood_group,
+                  er.latitude,
+                  er.longitude,
+                  NULL AS emergency_type,
+                  'General' AS emergency_type_label,
+                  NULL AS note,
+                  er.status,
+                  er.created_at,
+                  (6371 * 2 * ASIN(SQRT(
+                      POWER(SIN(RADIANS(er.latitude - %s) / 2), 2) +
+                      COS(RADIANS(%s)) * COS(RADIANS(er.latitude)) *
+                      POWER(SIN(RADIANS(er.longitude - %s) / 2), 2)
+                  ))) AS distance_km
+                FROM emergency_requests er
+                JOIN users u ON u.id = er.user_id
+                WHERE er.status = 'pending'
+                HAVING distance_km <= %s
+                ORDER BY er.created_at DESC
+                LIMIT 200
+            """
+
+            try:
+                cursor.execute(pending_sql_with_types, (hlat, hlat, hlng, radius_km))
+                pending = cursor.fetchall()
+            except Exception as e:
+                try:
+                    if _is_missing_emergency_types(e):
+                        cursor.execute(pending_sql_without_types, (hlat, hlat, hlng, radius_km))
+                        pending = cursor.fetchall()
+                    elif _is_unknown_column(e):
+                        cursor.execute(pending_sql_minimal, (hlat, hlat, hlng, radius_km))
+                        pending = cursor.fetchall()
+                    else:
+                        raise
+                except Exception as e2:
+                    if _is_unknown_column(e2):
+                        cursor.execute(pending_sql_minimal, (hlat, hlat, hlng, radius_km))
+                        pending = cursor.fetchall()
+                    else:
+                        raise
 
             assigned = []
             if include_assigned:
-                cursor.execute(
-                    """
-                    SELECT
-                      er.id,
-                      er.user_id,
-                      u.name AS user_name,
-                      u.phone AS user_phone,
-                      u.blood_group AS blood_group,
-                      er.latitude,
-                      er.longitude,
-                      er.emergency_type,
-                      er.note,
-                      er.status,
-                      er.hospital_id,
-                      er.created_at,
-                      er.acknowledged_at,
-                      er.resolved_at
-                    FROM emergency_requests er
-                    JOIN users u ON u.id = er.user_id
-                    WHERE er.hospital_id = %s
-                    ORDER BY er.created_at DESC
-                    LIMIT 200
-                    """,
-                    (hospital_id,),
-                )
-                assigned = cursor.fetchall()
+                                assigned_sql_with_types = """
+                                        SELECT
+                                            er.id,
+                                            er.user_id,
+                                            u.name AS user_name,
+                                            u.phone AS user_phone,
+                                            u.blood_group AS blood_group,
+                                            er.latitude,
+                                            er.longitude,
+                                            er.emergency_type,
+                                            COALESCE(
+                                                et.label,
+                                                CASE
+                                                    WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                                    ELSE er.emergency_type
+                                                END
+                                            ) AS emergency_type_label,
+                                            er.note,
+                                            er.status,
+                                            er.hospital_id,
+                                            er.created_at,
+                                            er.acknowledged_at,
+                                            er.resolved_at
+                                        FROM emergency_requests er
+                                        JOIN users u ON u.id = er.user_id
+                                        LEFT JOIN emergency_types et ON et.code = er.emergency_type
+                                        WHERE er.hospital_id = %s
+                                        ORDER BY er.created_at DESC
+                                        LIMIT 200
+                                """
+
+                                assigned_sql_without_types = """
+                                        SELECT
+                                            er.id,
+                                            er.user_id,
+                                            u.name AS user_name,
+                                            u.phone AS user_phone,
+                                            u.blood_group AS blood_group,
+                                            er.latitude,
+                                            er.longitude,
+                                            er.emergency_type,
+                                            CASE
+                                                WHEN er.emergency_type IS NULL OR er.emergency_type = '' THEN 'General'
+                                                ELSE er.emergency_type
+                                            END AS emergency_type_label,
+                                            er.note,
+                                            er.status,
+                                            er.hospital_id,
+                                            er.created_at,
+                                            er.acknowledged_at,
+                                            er.resolved_at
+                                        FROM emergency_requests er
+                                        JOIN users u ON u.id = er.user_id
+                                        WHERE er.hospital_id = %s
+                                        ORDER BY er.created_at DESC
+                                        LIMIT 200
+                                """
+
+                                assigned_sql_minimal = """
+                                        SELECT
+                                            er.id,
+                                            er.user_id,
+                                            u.name AS user_name,
+                                            u.phone AS user_phone,
+                                            u.blood_group AS blood_group,
+                                            er.latitude,
+                                            er.longitude,
+                                            NULL AS emergency_type,
+                                            'General' AS emergency_type_label,
+                                            NULL AS note,
+                                            er.status,
+                                            er.created_at
+                                        FROM emergency_requests er
+                                        JOIN users u ON u.id = er.user_id
+                                        WHERE er.hospital_id = %s
+                                        ORDER BY er.created_at DESC
+                                        LIMIT 200
+                                """
+
+                                try:
+                                        cursor.execute(assigned_sql_with_types, (hospital_id,))
+                                        assigned = cursor.fetchall()
+                                except Exception as e:
+                                        try:
+                                                if _is_missing_emergency_types(e):
+                                                        cursor.execute(assigned_sql_without_types, (hospital_id,))
+                                                        assigned = cursor.fetchall()
+                                                elif _is_unknown_column(e):
+                                                        cursor.execute(assigned_sql_minimal, (hospital_id,))
+                                                        assigned = cursor.fetchall()
+                                                else:
+                                                        raise
+                                        except Exception as e2:
+                                                if _is_unknown_column(e2):
+                                                        cursor.execute(assigned_sql_minimal, (hospital_id,))
+                                                        assigned = cursor.fetchall()
+                                                else:
+                                                        raise
 
         return (
             jsonify(
@@ -308,6 +612,8 @@ def hospital_list_emergency_requests():
             200,
         )
     except Exception as e:
+        if _is_missing_emergency_requests(e):
+            return jsonify({'success': True, 'hospital_id': hospital_id, 'radius_km': radius_km, 'pending': [], 'assigned': []}), 200
         return jsonify({'error': str(e)}), 500
     finally:
         connection.close()

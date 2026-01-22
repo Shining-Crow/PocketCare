@@ -160,8 +160,15 @@ const HospitalEmergencySOS = () => {
       const name = (r.user_name || '').toLowerCase();
       const phone = (r.user_phone || '').toLowerCase();
       const type = (r.emergency_type || '').toLowerCase();
+      const typeLabel = (r.emergency_type_label || '').toLowerCase();
       const note = (r.note || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || type.includes(q) || note.includes(q);
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        type.includes(q) ||
+        typeLabel.includes(q) ||
+        note.includes(q)
+      );
     });
   }, [pending, search]);
 
@@ -173,8 +180,15 @@ const HospitalEmergencySOS = () => {
       const name = (r.user_name || '').toLowerCase();
       const phone = (r.user_phone || '').toLowerCase();
       const type = (r.emergency_type || '').toLowerCase();
+      const typeLabel = (r.emergency_type_label || '').toLowerCase();
       const note = (r.note || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || type.includes(q) || note.includes(q);
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        type.includes(q) ||
+        typeLabel.includes(q) ||
+        note.includes(q)
+      );
     });
   }, [assignedActive, search]);
 
@@ -186,8 +200,15 @@ const HospitalEmergencySOS = () => {
       const name = (r.user_name || '').toLowerCase();
       const phone = (r.user_phone || '').toLowerCase();
       const type = (r.emergency_type || '').toLowerCase();
+      const typeLabel = (r.emergency_type_label || '').toLowerCase();
       const note = (r.note || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || type.includes(q) || note.includes(q);
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        type.includes(q) ||
+        typeLabel.includes(q) ||
+        note.includes(q)
+      );
     });
   }, [assigned, search]);
 
@@ -316,7 +337,7 @@ const HospitalEmergencySOS = () => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, type, or note…"
+            placeholder="Search by name, phone, type (label/code), or note…"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
           />
         </div>
@@ -413,7 +434,7 @@ const HospitalEmergencySOS = () => {
                     </div>
 
                     <div className="mt-1 text-sm text-gray-700">
-                      <span className="font-medium">Type:</span> {r.emergency_type || 'Emergency'}
+                      <span className="font-medium">Type:</span> {r.emergency_type_label || r.emergency_type || 'Emergency'}
                     </div>
                     {r.note ? <div className="mt-1 text-sm text-gray-600">{r.note}</div> : null}
 

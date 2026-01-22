@@ -258,7 +258,7 @@ function UserProfile() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Appointments */}
               <div
                 onClick={() => navigate("/appointments")}
@@ -275,9 +275,30 @@ function UserProfile() {
                 <h2 className="text-3xl font-bold text-gray-900 mb-1">
                   {stats.appointments}
                 </h2>
-                <p className="text-gray-600 text-sm font-medium">
-                  Appointments
-                </p>
+                <p className="text-gray-600 text-sm font-medium">Appointments</p>
+              </div>
+
+              {/* SOS History */}
+              <div
+                onClick={() =>
+                  document
+                    .getElementById("sos-history")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="bg-gradient-to-br from-red-50 to-orange-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+              >
+                <div className="absolute top-4 right-4">
+                  <Clock className="w-5 h-5 text-red-600 opacity-50" />
+                </div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                  {sosHistoryLoading ? "…" : sosHistory.length}
+                </h2>
+                <p className="text-gray-600 text-sm font-medium">SOS History</p>
               </div>
             </div>
 
@@ -508,7 +529,7 @@ function UserProfile() {
             </div>
 
             {/* SOS History */}
-            <div className="mt-10">
+            <div className="mt-10" id="sos-history">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <div className="h-11 w-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
@@ -560,7 +581,7 @@ function UserProfile() {
                             <SosStatusBadge status={req.status} />
                           </div>
                           <div className="mt-1 text-sm text-gray-600">
-                            Type: <span className="font-semibold text-gray-900">{req.emergency_type || "General"}</span>
+                            Type: <span className="font-semibold text-gray-900">{req.emergency_type_label || req.emergency_type || "General"}</span>
                           </div>
                         </div>
 

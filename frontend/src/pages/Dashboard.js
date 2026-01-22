@@ -972,12 +972,12 @@ function Dashboard() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
                 {
-                  icon: Calendar,
-                  title: "Appointments",
-                  desc: "Manage bookings",
+                  icon: Search,
+                  title: "Hospital Search",
+                  desc: "Find nearby hospitals",
                   color: "from-green-400 to-emerald-500",
                   bg: "bg-green-500/10",
-                  onClick: () => navigate("/appointments"),
+                  onClick: () => navigate("/hospitals"),
                 },
                 {
                   icon: Stethoscope,

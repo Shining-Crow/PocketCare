@@ -28,6 +28,7 @@ import MedicalReports from "./pages/MedicalReports";
 import WeightManagement from "./pages/WeightManagement";
 import HospitalLogin from "./pages/HospitalLogin";
 import HospitalDashboard from "./pages/HospitalDashboard";
+import HospitalSearch from "./pages/HospitalSearch";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -120,6 +121,7 @@ function App() {
           <Route path="/doctor/:id" element={<DoctorInfo />} />
           <Route path="/book/:doctorId" element={<BookAppointment />} />
           <Route path="/weight-management" element={<WeightManagement />} />
+          <Route path="/hospitals" element={<HospitalSearch />} />
         </Route>
 
         {/* Admin Routes */}

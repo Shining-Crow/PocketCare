@@ -48,6 +48,11 @@ function UserProfile() {
   const [sosHistoryHasMore, setSosHistoryHasMore] = useState(false);
   const SOS_HISTORY_PAGE_SIZE = 10;
 
+  // Appointments state
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(null);
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -70,6 +75,8 @@ function UserProfile() {
 
       // Load SOS history after we have a valid user profile.
       fetchSosHistory({ reset: true });
+      // Load appointments
+      fetchAppointments();
     } catch (error) {
       console.error("Error fetching profile:", error);
       alert(error.response?.data?.error || "Failed to load profile");
@@ -121,6 +128,48 @@ function UserProfile() {
     } finally {
       setSosHistoryLoading(false);
     }
+  };
+
+  const fetchAppointments = async () => {
+    try {
+      setAppointmentsLoading(true);
+      setAppointmentsError(null);
+      const res = await api.get("/user/appointments");
+      const items = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
+      setAppointments(items);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      setAppointmentsError(error.response?.data?.error || "Failed to load appointments");
+      setAppointments([]);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  const formatAppointmentDate = (dateString) => {
+    if (!dateString) return "—";
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getAppointmentStatusBadge = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "confirmed" || s === "scheduled") {
+      return "bg-emerald-50 text-emerald-800 border-emerald-200";
+    } else if (s === "pending") {
+      return "bg-amber-50 text-amber-800 border-amber-200";
+    } else if (s === "completed") {
+      return "bg-blue-50 text-blue-800 border-blue-200";
+    } else if (s === "cancelled") {
+      return "bg-red-50 text-red-800 border-red-200";
+    }
+    return "bg-gray-50 text-gray-700 border-gray-200";
   };
 
   const formatDateTime = (dateString) => {
@@ -261,7 +310,11 @@ function UserProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Appointments */}
               <div
-                onClick={() => navigate("/appointments")}
+                onClick={() =>
+                  document
+                    .getElementById("appointments-section")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
                 className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
               >
                 <div className="absolute top-4 right-4">
@@ -526,6 +579,137 @@ function UserProfile() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Appointments Section */}
+            <div className="mt-10" id="appointments-section">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                    <CalendarCheck className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">My Appointments</h2>
+                    <p className="text-sm text-gray-500">Your scheduled appointments</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchAppointments}
+                    disabled={appointmentsLoading}
+                    className="shrink-0 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      {appointmentsLoading && (
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                      )}
+                      <span>Refresh</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/doctors")}
+                    className="shrink-0 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Book New
+                  </button>
+                </div>
+              </div>
+
+              {appointmentsError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {appointmentsError}
+                </div>
+              )}
+
+              {!appointmentsError && appointments.length === 0 && !appointmentsLoading && (
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-2">No appointments yet</h4>
+                  <p className="text-gray-500 text-sm mb-4">
+                    Book an appointment with a doctor to get started
+                  </p>
+                  <button
+                    onClick={() => navigate("/doctors")}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
+                  >
+                    Find Doctors
+                  </button>
+                </div>
+              )}
+
+              {appointments.length > 0 && (
+                <div className="grid gap-3">
+                  {appointments.map((appt) => (
+                    <div
+                      key={appt.id}
+                      className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                            <User className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-900">
+                              Dr. {appt.doctor_name || "Doctor"}
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              {appt.specialty_name || appt.specialty || "General"}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getAppointmentStatusBadge(
+                            appt.status
+                          )}`}
+                        >
+                          {(appt.status || "scheduled").toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> Date
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatAppointmentDate(appt.appointment_date)}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Time
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {appt.time_slot || appt.appointment_time || "—"}
+                          </div>
+                        </div>
+                        {appt.notes && (
+                          <div className="rounded-xl border border-gray-200 bg-white p-3 col-span-2 md:col-span-1">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500">Notes</div>
+                            <div className="mt-1 text-sm text-gray-700 truncate">
+                              {appt.notes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => navigate("/appointments")}
+                          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* SOS History */}

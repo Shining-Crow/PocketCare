@@ -66,7 +66,19 @@ const HospitalBedManagement = () => {
       const response = await api.get('/hospital/bed-bookings/by-ward');
       console.log('Bookings response:', response.data);
       if (response.data.success) {
-        setBookingsByWard(response.data.bookings_by_ward || {});
+        const raw = response.data.bookings_by_ward || {};
+        const normalized = {};
+        for (const [keyRaw, bookings] of Object.entries(raw)) {
+          let key = keyRaw;
+          // Normalize private room keys to match frontend state keys.
+          // Examples: private_1_bed_no_bath -> private_1bed_no_bath
+          key = key.replace(/^private_(\d+)_bed/, 'private_$1bed');
+
+          if (!normalized[key]) normalized[key] = [];
+          if (Array.isArray(bookings)) normalized[key].push(...bookings);
+        }
+
+        setBookingsByWard(normalized);
       }
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
@@ -385,8 +397,7 @@ const HospitalBedManagement = () => {
           return (
             <div 
               key={cardId} 
-              className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/40 rounded-2xl shadow-md p-5 border-2 border-gray-100 hover:shadow-2xl hover:border-blue-400 hover:-translate-y-1 transition-all duration-300 flex flex-col min-h-[320px] cursor-pointer backdrop-blur-sm"
-              onClick={() => handleCardClick(currentType, ward.label)}
+              className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/40 rounded-2xl shadow-md p-5 border-2 border-gray-100 hover:shadow-2xl hover:border-blue-400 hover:-translate-y-1 transition-all duration-300 flex flex-col min-h-[320px] backdrop-blur-sm"
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
@@ -565,23 +576,43 @@ const HospitalBedManagement = () => {
 
               {/* View Patients Button - only show if there are actual bookings */}
               {(() => {
-                const actualBookings = bookingsByWard[currentType] || [];
-                const hasBookings = actualBookings.length > 0;
-                
+                const currentBookings = bookingsByWard[currentType] || [];
+
+                let bookingKeyForModal = currentType;
+                let totalBookingsCount = currentBookings.length;
+
+                // Private rooms have multiple sub-types; show the button if any option has bookings.
+                if (ward.toggleType === 'private' && ward.options) {
+                  const privateKeys = ward.options.map((o) => o.value);
+                  const total = privateKeys.reduce(
+                    (sum, key) => sum + ((bookingsByWard[key] || []).length || 0),
+                    0
+                  );
+                  totalBookingsCount = total;
+
+                  // If current selection has no bookings, default the modal to the first option that does.
+                  if (currentBookings.length === 0) {
+                    const firstWithBookings = privateKeys.find((k) => (bookingsByWard[k] || []).length > 0);
+                    if (firstWithBookings) bookingKeyForModal = firstWithBookings;
+                  }
+                }
+
+                const hasBookings = totalBookingsCount > 0;
+
                 if (hasBookings) {
                   return (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCardClick(currentType, ward.label);
+                          handleCardClick(bookingKeyForModal, ward.label);
                         }}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                         </svg>
-                        View {actualBookings.length} Patient{actualBookings.length !== 1 ? 's' : ''}
+                        View {totalBookingsCount} Patient{totalBookingsCount !== 1 ? 's' : ''}
                       </button>
                     </div>
                   );

@@ -109,6 +109,10 @@ def create_bed_booking():
         if not hospital:
             return jsonify({'error': 'Hospital not found'}), 404
         
+        # Ensure private room bookings don't accidentally carry AC/Non-AC selection.
+        if ward_type == 'private_room':
+            ac_type = 'not_applicable'
+
         # Check bed availability before booking
         if ward_type == 'private_room' and room_config:
             cursor.execute("""
@@ -418,9 +422,8 @@ def get_bookings_by_ward():
         grouped = {}
         for booking in bookings:
             ward_key = booking['ward_type']
-            if booking['ac_type'] and booking['ac_type'] != 'not_applicable':
-                ward_key = f"{booking['ward_type']}_{booking['ac_type']}"
-            elif booking['ward_type'] == 'private_room' and booking['room_config']:
+            # Private rooms must be grouped by room_config (regardless of any stored ac_type).
+            if booking['ward_type'] == 'private_room' and booking['room_config']:
                 # Map room_config to match frontend keys
                 room_map = {
                     '1_bed_no_bath': 'private_1bed_no_bath',
@@ -428,6 +431,8 @@ def get_bookings_by_ward():
                     '2_bed_with_bath': 'private_2bed_with_bath'
                 }
                 ward_key = room_map.get(booking['room_config'], booking['room_config'])
+            elif booking['ac_type'] and booking['ac_type'] != 'not_applicable':
+                ward_key = f"{booking['ward_type']}_{booking['ac_type']}"
             
             if ward_key not in grouped:
                 grouped[ward_key] = []

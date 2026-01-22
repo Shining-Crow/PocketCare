@@ -78,7 +78,7 @@ def create_bed_booking():
     conn = None
     cursor = None
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_user_id_from_jwt()
         data = request.get_json()
         
         # Required fields
@@ -99,9 +99,24 @@ def create_bed_booking():
         patient_email = clean_value(data.get('patient_email'))
         emergency_contact = clean_value(data.get('emergency_contact'))
         medical_condition = clean_value(data.get('medical_condition'))  # Maps to admission_reason in DB
+        expected_discharge_date = clean_value(data.get('expected_discharge_date'))
+        doctor_name = clean_value(data.get('doctor_name'))
+        special_requirements = clean_value(data.get('special_requirements'))
+        notes = clean_value(data.get('notes'))
         
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # Default patient_email to the logged-in user's email when not explicitly provided.
+        if not patient_email:
+            try:
+                cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+                user_row = cursor.fetchone()
+                if user_row and user_row.get('email'):
+                    patient_email = user_row['email']
+            except Exception:
+                # Non-fatal: booking can proceed without patient_email.
+                pass
         
         # Verify hospital exists
         cursor.execute("SELECT id, name FROM hospitals WHERE id = %s", (hospital_id,))
@@ -109,6 +124,10 @@ def create_bed_booking():
         if not hospital:
             return jsonify({'error': 'Hospital not found'}), 404
         
+        # Ensure private room bookings don't accidentally carry AC/Non-AC selection.
+        if ward_type == 'private_room':
+            ac_type = 'not_applicable'
+
         # Check bed availability before booking
         if ward_type == 'private_room' and room_config:
             cursor.execute("""
@@ -136,13 +155,15 @@ def create_bed_booking():
                 user_id, hospital_id, ward_type, ac_type, room_config,
                 patient_name, patient_age, patient_gender, patient_phone,
                 patient_email, emergency_contact, preferred_date,
-                admission_reason, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'confirmed')
+                expected_discharge_date, admission_reason, doctor_name,
+                special_requirements, notes, status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'confirmed')
         """, (
             user_id, hospital_id, ward_type, ac_type, room_config,
             patient_name, patient_age, patient_gender, patient_phone,
             patient_email, emergency_contact, admission_date,
-            medical_condition
+            expected_discharge_date, medical_condition, doctor_name,
+            special_requirements, notes
         ))
         
         # Update bed_wards table: decrease available_beds and increase reserved_beds
@@ -193,7 +214,7 @@ def get_user_bookings():
     conn = None
     cursor = None
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_user_id_from_jwt()
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -219,8 +240,12 @@ def get_user_bookings():
             # Map DB column names to frontend expected names
             if booking_dict.get('preferred_date'):
                 booking_dict['admission_date'] = str(booking_dict['preferred_date'])
+                booking_dict['preferred_date'] = str(booking_dict['preferred_date'])
+            if booking_dict.get('expected_discharge_date'):
+                booking_dict['expected_discharge_date'] = str(booking_dict['expected_discharge_date'])
             if booking_dict.get('admission_reason'):
                 booking_dict['medical_notes'] = booking_dict['admission_reason']
+                booking_dict['medical_condition'] = booking_dict['admission_reason']
             if booking_dict.get('created_at'):
                 booking_dict['created_at'] = str(booking_dict['created_at'])
             if booking_dict.get('updated_at'):
@@ -247,7 +272,7 @@ def cancel_booking(booking_id):
     conn = None
     cursor = None
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_user_id_from_jwt()
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -363,8 +388,12 @@ def get_hospital_bookings():
             # Map DB column names to frontend expected names
             if booking_dict.get('preferred_date'):
                 booking_dict['admission_date'] = str(booking_dict['preferred_date'])
+                booking_dict['preferred_date'] = str(booking_dict['preferred_date'])
+            if booking_dict.get('expected_discharge_date'):
+                booking_dict['expected_discharge_date'] = str(booking_dict['expected_discharge_date'])
             if booking_dict.get('admission_reason'):
                 booking_dict['medical_notes'] = booking_dict['admission_reason']
+                booking_dict['medical_condition'] = booking_dict['admission_reason']
             if booking_dict.get('created_at'):
                 booking_dict['created_at'] = str(booking_dict['created_at'])
             if booking_dict.get('updated_at'):
@@ -418,9 +447,8 @@ def get_bookings_by_ward():
         grouped = {}
         for booking in bookings:
             ward_key = booking['ward_type']
-            if booking['ac_type'] and booking['ac_type'] != 'not_applicable':
-                ward_key = f"{booking['ward_type']}_{booking['ac_type']}"
-            elif booking['ward_type'] == 'private_room' and booking['room_config']:
+            # Private rooms must be grouped by room_config (regardless of any stored ac_type).
+            if booking['ward_type'] == 'private_room' and booking['room_config']:
                 # Map room_config to match frontend keys
                 room_map = {
                     '1_bed_no_bath': 'private_1bed_no_bath',
@@ -428,6 +456,8 @@ def get_bookings_by_ward():
                     '2_bed_with_bath': 'private_2bed_with_bath'
                 }
                 ward_key = room_map.get(booking['room_config'], booking['room_config'])
+            elif booking['ac_type'] and booking['ac_type'] != 'not_applicable':
+                ward_key = f"{booking['ward_type']}_{booking['ac_type']}"
             
             if ward_key not in grouped:
                 grouped[ward_key] = []

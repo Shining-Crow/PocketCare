@@ -17,6 +17,7 @@ def fix_database():
     - Ensures messages/chat tables exist (messages, chat_messages)
     - Ensures hospitals supports login + geo location (hospitals.password_hash, hospitals.latitude/longitude)
     - Ensures Emergency SOS tables/columns exist (emergency_requests, emergency_types)
+    - Ensures Bed Management tables exist (bed_wards, private_rooms, bed_allocation_logs, user_bed_bookings)
     """
     try:
         conn = get_db_connection()
@@ -482,6 +483,164 @@ def fix_database():
         except Exception:
             # Non-fatal; schema fix is more important than seed.
             pass
+
+        # --- Bed Management + User Bed Bookings (align with database/schema.sql) ---
+        # Note: These tables reference hospitals/users, which are expected to already exist.
+        _ensure_table(
+            'bed_wards',
+            """
+            CREATE TABLE IF NOT EXISTS bed_wards (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                hospital_id INT NOT NULL,
+                ward_type ENUM('general', 'maternity', 'pediatrics', 'icu', 'emergency', 'private_room') NOT NULL,
+                ac_type ENUM('ac', 'non_ac', 'not_applicable') DEFAULT 'not_applicable',
+                room_config VARCHAR(50) NULL,
+                total_beds INT NOT NULL DEFAULT 0,
+                available_beds INT NOT NULL DEFAULT 0,
+                reserved_beds INT NOT NULL DEFAULT 0,
+                occupied_beds INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+                INDEX idx_hospital_ward (hospital_id, ward_type),
+                INDEX idx_ward_type (ward_type),
+                UNIQUE KEY uq_hospital_ward_ac (hospital_id, ward_type, ac_type, room_config)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'private_rooms',
+            """
+            CREATE TABLE IF NOT EXISTS private_rooms (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                hospital_id INT NOT NULL,
+                room_number VARCHAR(50) NOT NULL,
+                bed_count ENUM('1', '2') NOT NULL DEFAULT '1',
+                has_attached_bathroom BOOLEAN DEFAULT FALSE,
+                ac_type ENUM('ac', 'non_ac') NOT NULL DEFAULT 'non_ac',
+                status ENUM('available', 'occupied', 'reserved', 'maintenance') DEFAULT 'available',
+                daily_rate DECIMAL(10,2) DEFAULT 0.00,
+                patient_name VARCHAR(100) NULL,
+                patient_contact VARCHAR(20) NULL,
+                admission_date DATE NULL,
+                expected_discharge_date DATE NULL,
+                notes TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+                INDEX idx_hospital_room (hospital_id, room_number),
+                INDEX idx_room_status (status),
+                UNIQUE KEY uq_hospital_room_number (hospital_id, room_number)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'bed_allocation_logs',
+            """
+            CREATE TABLE IF NOT EXISTS bed_allocation_logs (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                hospital_id INT NOT NULL,
+                ward_id INT NULL,
+                room_id INT NULL,
+                allocation_type ENUM('ward', 'private_room') NOT NULL,
+                action ENUM('allocated', 'released', 'reserved', 'cancelled') NOT NULL,
+                patient_name VARCHAR(100) NULL,
+                patient_contact VARCHAR(20) NULL,
+                allocated_by VARCHAR(100) NULL,
+                notes TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+                FOREIGN KEY (ward_id) REFERENCES bed_wards(id) ON DELETE SET NULL,
+                FOREIGN KEY (room_id) REFERENCES private_rooms(id) ON DELETE SET NULL,
+                INDEX idx_hospital_logs (hospital_id, created_at),
+                INDEX idx_allocation_type (allocation_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'user_bed_bookings',
+            """
+            CREATE TABLE IF NOT EXISTS user_bed_bookings (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                hospital_id INT NOT NULL,
+                ward_type ENUM('general', 'maternity', 'pediatrics', 'icu', 'emergency', 'private_room') NOT NULL,
+                ac_type ENUM('ac', 'non_ac', 'not_applicable') DEFAULT 'not_applicable',
+                room_config VARCHAR(50) NULL,
+                patient_name VARCHAR(100) NOT NULL,
+                patient_age INT NULL,
+                patient_gender ENUM('male', 'female', 'other') NULL,
+                patient_phone VARCHAR(20) NOT NULL,
+                patient_email VARCHAR(255) NULL,
+                emergency_contact VARCHAR(20) NULL,
+                preferred_date DATE NOT NULL,
+                expected_discharge_date DATE NULL,
+                admission_reason TEXT NULL,
+                doctor_name VARCHAR(100) NULL,
+                special_requirements TEXT NULL,
+                status ENUM('pending', 'confirmed', 'rejected', 'cancelled', 'completed') DEFAULT 'pending',
+                notes TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+                INDEX idx_user_bookings (user_id),
+                INDEX idx_hospital_bookings (hospital_id),
+                INDEX idx_booking_status (status),
+                INDEX idx_ward_type (ward_type),
+                INDEX idx_preferred_date (preferred_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        # Migration support: older deployments may have admission_date/medical_condition instead
+        if _table_exists('user_bed_bookings'):
+            # admission_date -> preferred_date
+            if _column_exists('user_bed_bookings', 'admission_date') and not _column_exists('user_bed_bookings', 'preferred_date'):
+                print("Migrating user_bed_bookings.admission_date -> preferred_date...")
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE user_bed_bookings
+                        CHANGE COLUMN admission_date preferred_date DATE NOT NULL
+                        """
+                    )
+                    conn.commit()
+                    print("✓ user_bed_bookings.preferred_date migrated")
+                except Exception as e:
+                    print(f"! Could not migrate admission_date: {e}")
+
+            # medical_condition -> admission_reason
+            if _column_exists('user_bed_bookings', 'medical_condition') and not _column_exists('user_bed_bookings', 'admission_reason'):
+                print("Migrating user_bed_bookings.medical_condition -> admission_reason...")
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE user_bed_bookings
+                        CHANGE COLUMN medical_condition admission_reason TEXT NULL
+                        """
+                    )
+                    conn.commit()
+                    print("✓ user_bed_bookings.admission_reason migrated")
+                except Exception as e:
+                    print(f"! Could not migrate medical_condition: {e}")
+
+            # Ensure newer columns exist (safe ADDs)
+            _ensure_column('user_bed_bookings', 'patient_email', "ALTER TABLE user_bed_bookings ADD COLUMN patient_email VARCHAR(255) NULL")
+            _ensure_column('user_bed_bookings', 'expected_discharge_date', "ALTER TABLE user_bed_bookings ADD COLUMN expected_discharge_date DATE NULL")
+            _ensure_column('user_bed_bookings', 'doctor_name', "ALTER TABLE user_bed_bookings ADD COLUMN doctor_name VARCHAR(100) NULL")
+            _ensure_column('user_bed_bookings', 'special_requirements', "ALTER TABLE user_bed_bookings ADD COLUMN special_requirements TEXT NULL")
+            _ensure_column('user_bed_bookings', 'notes', "ALTER TABLE user_bed_bookings ADD COLUMN notes TEXT NULL")
+
+            # Preferred date index (best-effort)
+            try:
+                cursor.execute("CREATE INDEX idx_preferred_date ON user_bed_bookings(preferred_date)")
+                conn.commit()
+            except Exception:
+                pass
         
         cursor.close()
         conn.close()

@@ -55,11 +55,15 @@ function UserProfile() {
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState(null);
+  const APPOINTMENTS_PAGE_SIZE = 2;
+  const [appointmentsVisibleCount, setAppointmentsVisibleCount] = useState(APPOINTMENTS_PAGE_SIZE);
 
   // Bed bookings state
   const [bedBookings, setBedBookings] = useState([]);
   const [bedBookingsLoading, setBedBookingsLoading] = useState(false);
   const [bedBookingsError, setBedBookingsError] = useState(null);
+  const BED_BOOKINGS_PAGE_SIZE = 2;
+  const [bedBookingsVisibleCount, setBedBookingsVisibleCount] = useState(BED_BOOKINGS_PAGE_SIZE);
 
   const fetchProfile = async () => {
     try {
@@ -147,10 +151,12 @@ function UserProfile() {
       const res = await api.get("/user/appointments");
       const items = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
       setAppointments(items);
+      setAppointmentsVisibleCount(APPOINTMENTS_PAGE_SIZE);
     } catch (error) {
       console.error("Error fetching appointments:", error);
       setAppointmentsError(error.response?.data?.error || "Failed to load appointments");
       setAppointments([]);
+      setAppointmentsVisibleCount(0);
     } finally {
       setAppointmentsLoading(false);
     }
@@ -163,10 +169,12 @@ function UserProfile() {
       const res = await api.get("/user/bed-bookings");
       const items = Array.isArray(res.data?.bookings) ? res.data.bookings : [];
       setBedBookings(items);
+      setBedBookingsVisibleCount(BED_BOOKINGS_PAGE_SIZE);
     } catch (error) {
       console.error("Error fetching bed bookings:", error);
       setBedBookingsError(error.response?.data?.error || "Failed to load bed bookings");
       setBedBookings([]);
+      setBedBookingsVisibleCount(0);
     } finally {
       setBedBookingsLoading(false);
     }
@@ -376,7 +384,7 @@ function UserProfile() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Appointments */}
               <div
                 onClick={() =>
@@ -398,6 +406,29 @@ function UserProfile() {
                   {stats.appointments}
                 </h2>
                 <p className="text-gray-600 text-sm font-medium">Appointments</p>
+              </div>
+
+              {/* Bed Bookings */}
+              <div
+                onClick={() =>
+                  document
+                    .getElementById("bed-bookings-section")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="bg-gradient-to-br from-rose-50 to-pink-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+              >
+                <div className="absolute top-4 right-4">
+                  <Bed className="w-5 h-5 text-rose-600 opacity-50" />
+                </div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
+                    <Bed className="w-6 h-6 text-rose-600" />
+                  </div>
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                  {bedBookingsLoading ? "…" : bedBookings.length}
+                </h2>
+                <p className="text-gray-600 text-sm font-medium">Bed Bookings</p>
               </div>
 
               {/* SOS History */}
@@ -712,7 +743,7 @@ function UserProfile() {
 
               {appointments.length > 0 && (
                 <div className="grid gap-3">
-                  {appointments.map((appt) => (
+                  {appointments.slice(0, appointmentsVisibleCount).map((appt) => (
                     <div
                       key={appt.id}
                       className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
@@ -777,6 +808,22 @@ function UserProfile() {
                       </div>
                     </div>
                   ))}
+
+                  {appointmentsVisibleCount < appointments.length && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAppointmentsVisibleCount((prev) =>
+                            Math.min(prev + APPOINTMENTS_PAGE_SIZE, appointments.length)
+                          )
+                        }
+                        className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Load more
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -843,7 +890,7 @@ function UserProfile() {
 
               {bedBookings.length > 0 && (
                 <div className="grid gap-3">
-                  {bedBookings.map((booking) => (
+                  {bedBookings.slice(0, bedBookingsVisibleCount).map((booking) => (
                     <div
                       key={booking.id}
                       className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
@@ -917,6 +964,22 @@ function UserProfile() {
                       </div>
                     </div>
                   ))}
+
+                  {bedBookingsVisibleCount < bedBookings.length && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBedBookingsVisibleCount((prev) =>
+                            Math.min(prev + BED_BOOKINGS_PAGE_SIZE, bedBookings.length)
+                          )
+                        }
+                        className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Load more
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

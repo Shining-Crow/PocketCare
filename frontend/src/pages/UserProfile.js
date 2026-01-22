@@ -46,9 +46,10 @@ function UserProfile() {
   const [sosHistory, setSosHistory] = useState([]);
   const [sosHistoryLoading, setSosHistoryLoading] = useState(false);
   const [sosHistoryError, setSosHistoryError] = useState(null);
+  const [resolvingSosId, setResolvingSosId] = useState(null);
   const [sosHistoryOffset, setSosHistoryOffset] = useState(0);
   const [sosHistoryHasMore, setSosHistoryHasMore] = useState(false);
-  const SOS_HISTORY_PAGE_SIZE = 10;
+  const SOS_HISTORY_PAGE_SIZE = 3;
 
   // Appointments state
   const [appointments, setAppointments] = useState([]);
@@ -226,6 +227,20 @@ function UserProfile() {
     return "bg-gray-50 text-gray-700 border-gray-200";
   };
 
+  const resolveSosRequest = async (requestId) => {
+    if (!requestId) return;
+    setSosHistoryError(null);
+    setResolvingSosId(requestId);
+    try {
+      await api.post(`/emergency/sos/${requestId}/resolve`);
+      await fetchSosHistory({ reset: true });
+    } catch (error) {
+      console.error("Error resolving SOS:", error);
+      setSosHistoryError(error.response?.data?.error || "Failed to resolve SOS request");
+    } finally {
+      setResolvingSosId(null);
+    }
+  };
   const formatDateTime = (dateString) => {
     if (!dateString) return "—";
     const d = new Date(dateString);
@@ -968,6 +983,24 @@ function UserProfile() {
                           <div className="text-sm font-semibold text-gray-900">
                             {formatDateTime(req.created_at)}
                           </div>
+
+                          {(req.status === "pending" || req.status === "acknowledged") && (
+                            <div className="mt-2 flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => resolveSosRequest(req.id)}
+                                disabled={resolvingSosId === req.id}
+                                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                <span className="inline-flex items-center justify-center gap-2">
+                                  {resolvingSosId === req.id && (
+                                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-200 border-t-white" />
+                                  )}
+                                  <span>Resolve</span>
+                                </span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 

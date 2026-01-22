@@ -27,6 +27,7 @@ function HospitalSearch() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
   const [searchRadius, setSearchRadius] = useState(50); // km
+  const [useLocationFilter, setUseLocationFilter] = useState(false); // Only filter by location when explicitly enabled
   const [showFilters, setShowFilters] = useState(false);
 
   const fetchHospitals = useCallback(async () => {
@@ -44,22 +45,52 @@ function HospitalSearch() {
         params.city = cityFilter;
       }
       
-      if (userLocation) {
+      // Only apply location filter when explicitly enabled by user
+      if (userLocation && useLocationFilter) {
         params.latitude = userLocation.latitude;
         params.longitude = userLocation.longitude;
         params.radius = searchRadius;
       }
 
       const response = await api.get("/hospitals", { params });
-      setHospitals(response.data?.hospitals || []);
+      
+      // If we have user location but not filtering, still add distance info client-side
+      let hospitalsData = response.data?.hospitals || [];
+      if (userLocation && !useLocationFilter) {
+        hospitalsData = hospitalsData.map(hospital => {
+          if (hospital.latitude && hospital.longitude) {
+            const distance = calculateDistance(
+              userLocation.latitude, userLocation.longitude,
+              hospital.latitude, hospital.longitude
+            );
+            return { ...hospital, distance: Math.round(distance * 100) / 100 };
+          }
+          return hospital;
+        }).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+      }
+      
+      setHospitals(hospitalsData);
     } catch (err) {
       console.error("Error fetching hospitals:", err);
-      setError(err.response?.data?.error || "Failed to load hospitals");
+      setError(err.response?.data?.error || err.response?.data?.msg || "Failed to load hospitals");
       setHospitals([]);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, cityFilter, userLocation, searchRadius]);
+  }, [searchQuery, cityFilter, userLocation, searchRadius, useLocationFilter]);
+
+  // Haversine formula for distance calculation
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
 
   const getUserLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -105,6 +136,11 @@ function HospitalSearch() {
     setSearchQuery("");
     setCityFilter("");
     setSearchRadius(50);
+    setUseLocationFilter(false);
+    // Trigger refetch after state updates
+    setTimeout(() => {
+      fetchHospitals();
+    }, 0);
   };
 
   const openInMaps = (hospital) => {
@@ -188,7 +224,7 @@ function HospitalSearch() {
               {/* Filters Panel */}
               {showFilters && (
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         City
@@ -203,12 +239,32 @@ function HospitalSearch() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nearby Only
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setUseLocationFilter(!useLocationFilter)}
+                        disabled={!userLocation}
+                        className={`w-full px-4 py-2 border rounded-xl font-medium transition-colors ${
+                          useLocationFilter
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-100"
+                        } ${!userLocation ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        {useLocationFilter ? "✓ Enabled" : "Disabled"}
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         Search Radius (km)
                       </label>
                       <select
                         value={searchRadius}
                         onChange={(e) => setSearchRadius(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={!useLocationFilter}
+                        className={`w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          !useLocationFilter ? "opacity-50" : ""
+                        }`}
                       >
                         <option value={10}>10 km</option>
                         <option value={25}>25 km</option>
@@ -242,7 +298,7 @@ function HospitalSearch() {
               ) : userLocation ? (
                 <div className="flex items-center gap-2 text-emerald-600 text-sm">
                   <MapPin className="w-4 h-4" />
-                  Location enabled - showing nearby hospitals
+                  Location enabled - {useLocationFilter ? `showing hospitals within ${searchRadius}km` : "sorted by distance"}
                 </div>
               ) : locationError ? (
                 <div className="flex items-center gap-2 text-amber-600 text-sm">

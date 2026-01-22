@@ -6,6 +6,7 @@
 USE pocketcare_db;
 
 -- Clear existing seed data (except hospitals - needed for foreign keys)
+DELETE FROM hospital_appointments;
 DELETE FROM bed_wards;
 DELETE FROM hospital_doctors;
 DELETE FROM doctors;
@@ -83,7 +84,23 @@ INSERT INTO hospitals (id, name, address, city, state, latitude, longitude, phon
 (2, 'Metro Clinic', '456 Park Avenue, Midtown', 'New York', 'NY', 40.7589, -73.9851, '+1-555-0201', 'contact@metroclinic.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0299', 100, 25, 10, '["Dermatology", "ENT", "Ophthalmology", "General Medicine"]', 4.9),
 (3, 'Children\'s Hospital', '789 Oak Road, North District', 'New York', 'NY', 40.8000, -73.9500, '+1-555-0301', 'info@childrenshospital.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0399', 150, 30, 15, '["Pediatrics", "Neonatology", "Child Surgery"]', 4.7),
 (4, 'Medical Center', '321 West Boulevard', 'New York', 'NY', 40.7500, -74.0200, '+1-555-0401', 'contact@medicalcenter.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0499', 250, 60, 25, '["Neurology", "Oncology", "Surgery", "ICU"]', 4.8),
-(5, 'Community Health Center', '654 East Street', 'New York', 'NY', 40.7200, -73.9800, '+1-555-0501', 'info@communityhc.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0599', 80, 20, 5, '["General Medicine", "Dental", "Physiotherapy"]', 4.5)
+(5, 'Community Health Center', '654 East Street', 'New York', 'NY', 40.7200, -73.9800, '+1-555-0501', 'info@communityhc.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0599', 80, 20, 5, '["General Medicine", "Dental", "Physiotherapy"]', 4.5),
+-- Bangladesh Hospitals (Dhaka and surrounding areas)
+(6, 'Square Hospital', 'Plot No. 18/F, Bir Uttam Qazi Nuruzzaman Sarak, West Panthapath', 'Dhaka', 'Dhaka Division', 23.7515, 90.3816, '+880-2-8159457', 'info@squarehospital.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8159458', 400, 120, 50, '["Cardiology", "Oncology", "Neurology", "Orthopedics", "ICU", "Emergency"]', 4.9),
+(7, 'United Hospital', 'Plot 15, Road 71, Gulshan-2', 'Dhaka', 'Dhaka Division', 23.7925, 90.4148, '+880-2-8836000', 'info@uhlbd.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8836001', 450, 150, 60, '["Cardiology", "Gastroenterology", "Nephrology", "Pediatrics", "Emergency"]', 4.8),
+(8, 'Apollo Hospitals Dhaka', 'Plot 81, Block E, Bashundhara R/A', 'Dhaka', 'Dhaka Division', 23.8195, 90.4325, '+880-2-8401661', 'info@apollodhaka.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8401662', 350, 100, 40, '["Cardiology", "Oncology", "Orthopedics", "Neurosurgery", "Transplant"]', 4.7),
+(9, 'Labaid Specialized Hospital', 'House 1, Road 4, Dhanmondi', 'Dhaka', 'Dhaka Division', 23.7465, 90.3755, '+880-2-9116551', 'info@labaidgroup.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-9116552', 300, 80, 35, '["Diagnostics", "Cardiology", "Gastroenterology", "Gynecology", "Surgery"]', 4.6),
+(10, 'Ibn Sina Hospital', 'House 48, Road 9/A, Dhanmondi', 'Dhaka', 'Dhaka Division', 23.7398, 90.3756, '+880-2-9126570', 'info@ibnsinatrust.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-9126571', 250, 70, 25, '["General Medicine", "Surgery", "Pediatrics", "Gynecology", "Orthopedics"]', 4.5),
+(11, 'Evercare Hospital Dhaka', '19 Gulshan South Avenue, Gulshan-1', 'Dhaka', 'Dhaka Division', 23.7808, 90.4168, '+880-2-8431661', 'info@evercarebd.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8431662', 500, 180, 70, '["Cardiology", "Oncology", "Neurology", "Transplant", "ICU", "Emergency"]', 4.8),
+(12, 'Popular Medical College Hospital', 'House 16, Road 2, Dhanmondi', 'Dhaka', 'Dhaka Division', 23.7412, 90.3728, '+880-2-8610990', 'info@popularmedical.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8610991', 200, 60, 20, '["General Medicine", "Surgery", "Gynecology", "Pediatrics", "ENT"]', 4.4),
+(13, 'BIRDEM General Hospital', '122 Kazi Nazrul Islam Avenue, Shahbag', 'Dhaka', 'Dhaka Division', 23.7389, 90.3958, '+880-2-8616641', 'info@birdem.org', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8616642', 600, 200, 80, '["Diabetes", "Endocrinology", "Nephrology", "Cardiology", "Surgery"]', 4.7),
+(14, 'Chittagong Medical College Hospital', 'KB Fazlul Kader Road, Panchlaish', 'Chittagong', 'Chittagong Division', 22.3569, 91.8317, '+880-31-2850261', 'info@cmch.gov.bd', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-31-2850262', 1000, 350, 100, '["Emergency", "Surgery", "Medicine", "Pediatrics", "Gynecology", "Orthopedics"]', 4.3),
+(15, 'Rajshahi Medical College Hospital', 'Medical College Road, Rajshahi', 'Rajshahi', 'Rajshahi Division', 24.3636, 88.6241, '+880-721-772150', 'info@rmch.gov.bd', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-721-772151', 800, 280, 60, '["Emergency", "Surgery", "Medicine", "Cardiology", "Neurology"]', 4.2),
+(16, 'Sylhet MAG Osmani Medical College Hospital', 'Medical College Road, Sylhet', 'Sylhet', 'Sylhet Division', 24.9045, 91.8611, '+880-821-713667', 'info@somch.gov.bd', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-821-713668', 700, 250, 50, '["Emergency", "Surgery", "Medicine", "Pediatrics", "ENT"]', 4.1),
+(17, 'Khulna Medical College Hospital', 'Medical College Road, Khulna', 'Khulna', 'Khulna Division', 22.8456, 89.5403, '+880-41-720551', 'info@kmch.gov.bd', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-41-720552', 650, 220, 45, '["Emergency", "Surgery", "Medicine", "Orthopedics", "Gynecology"]', 4.0),
+(18, 'Gazipur Shaheed Tajuddin Ahmad Medical College Hospital', 'Gazipur Sadar, Gazipur', 'Gazipur', 'Dhaka Division', 23.9999, 90.4203, '+880-2-9298765', 'info@gstamch.gov.bd', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-9298766', 400, 150, 30, '["Emergency", "Surgery", "Medicine", "Pediatrics"]', 4.0),
+(19, 'National Heart Foundation Hospital', 'Plot 7/2, Section 2, Mirpur', 'Dhaka', 'Dhaka Division', 23.7984, 90.3535, '+880-2-8053935', 'info@nhfbd.org', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-8053936', 300, 90, 50, '["Cardiology", "Cardiac Surgery", "Interventional Cardiology", "ICU"]', 4.9),
+(20, 'Bangladesh Eye Hospital', 'House 78, Road 5, Dhanmondi', 'Dhaka', 'Dhaka Division', 23.7425, 90.3742, '+880-2-9671891', 'info@bdeye.org', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+880-2-9671892', 150, 50, 10, '["Ophthalmology", "Eye Surgery", "Retina", "Glaucoma", "Cataract"]', 4.6)
 ON DUPLICATE KEY UPDATE
 name = VALUES(name),
 address = VALUES(address),
@@ -123,34 +140,38 @@ is_active = VALUES(is_active);
 -- SEED: hospital_doctors
 -- Hospital-specific doctors managed through Hospital Doctors Management
 -- ============================================================================
-INSERT INTO hospital_doctors (hospital_id, name, email, phone, specialty, qualification, experience, rating, consultation_fee, is_available, bio) VALUES
+INSERT INTO hospital_doctors (id, hospital_id, name, email, phone, specialty, qualification, experience, rating, consultation_fee, is_available, bio) VALUES
 -- City Hospital (hospital_id = 1)
-(1, 'Dr. Sarah Wilson', 'sarah.w@cityhospital.com', '+880 1234567890', 'Cardiology', 'MBBS, MD Cardiology', 12, 4.8, 500.00, TRUE, 'Experienced cardiologist specializing in preventive cardiology and heart disease management.'),
-(1, 'Dr. Michael Brown', 'michael.b@cityhospital.com', '+880 1234567891', 'Neurology', 'MBBS, DM Neurology', 15, 4.7, 600.00, TRUE, 'Neurologist with expertise in stroke management and neurodegenerative diseases.'),
-(1, 'Dr. Emily Davis', 'emily.d@cityhospital.com', '+880 1234567892', 'Pediatrics', 'MBBS, DCH', 8, 4.9, 400.00, TRUE, 'Pediatrician dedicated to comprehensive child healthcare and development.'),
-(1, 'Dr. James Miller', 'james.m@cityhospital.com', '+880 1234567893', 'Orthopedics', 'MBBS, MS Orthopedics', 10, 4.6, 550.00, TRUE, 'Orthopedic surgeon specializing in joint replacement and sports injuries.'),
-(1, 'Dr. Lisa Chen', 'lisa.c@cityhospital.com', '+880 1234567894', 'Oncology', 'MBBS, DM Oncology', 14, 4.8, 700.00, TRUE, 'Medical oncologist focused on personalized cancer treatment and care.'),
-(1, 'Dr. Robert Kim', 'robert.k@cityhospital.com', '+880 1234567895', 'Emergency Medicine', 'MBBS, DEM', 9, 4.5, 450.00, TRUE, 'Emergency physician with extensive trauma and critical care experience.'),
+(1, 1, 'Dr. Sarah Wilson', 'sarah.w@cityhospital.com', '+880 1234567890', 'Cardiology', 'MBBS, MD Cardiology', 12, 4.8, 500.00, TRUE, 'Experienced cardiologist specializing in preventive cardiology and heart disease management.'),
+(2, 1, 'Dr. Michael Brown', 'michael.b@cityhospital.com', '+880 1234567891', 'Neurology', 'MBBS, DM Neurology', 15, 4.7, 600.00, TRUE, 'Neurologist with expertise in stroke management and neurodegenerative diseases.'),
+(3, 1, 'Dr. Emily Davis', 'emily.d@cityhospital.com', '+880 1234567892', 'Pediatrics', 'MBBS, DCH', 8, 4.9, 400.00, TRUE, 'Pediatrician dedicated to comprehensive child healthcare and development.'),
+(4, 1, 'Dr. James Miller', 'james.m@cityhospital.com', '+880 1234567893', 'Orthopedics', 'MBBS, MS Orthopedics', 10, 4.6, 550.00, TRUE, 'Orthopedic surgeon specializing in joint replacement and sports injuries.'),
+(5, 1, 'Dr. Lisa Chen', 'lisa.c@cityhospital.com', '+880 1234567894', 'Oncology', 'MBBS, DM Oncology', 14, 4.8, 700.00, TRUE, 'Medical oncologist focused on personalized cancer treatment and care.'),
+(6, 1, 'Dr. Robert Kim', 'robert.k@cityhospital.com', '+880 1234567895', 'Emergency Medicine', 'MBBS, DEM', 9, 4.5, 450.00, TRUE, 'Emergency physician with extensive trauma and critical care experience.'),
 
 -- Metro Clinic (hospital_id = 2)
-(2, 'Dr. Amanda Taylor', 'amanda.t@metroclinic.com', '+880 2234567890', 'Dermatology', 'MBBS, MD Dermatology', 11, 4.7, 400.00, TRUE, 'Dermatologist specializing in medical and cosmetic dermatology.'),
-(2, 'Dr. Daniel Lee', 'daniel.l@metroclinic.com', '+880 2234567891', 'ENT', 'MBBS, MS ENT', 13, 4.6, 450.00, TRUE, 'ENT surgeon with expertise in sinus and throat disorders.'),
-(2, 'Dr. Rachel Green', 'rachel.g@metroclinic.com', '+880 2234567892', 'Ophthalmology', 'MBBS, DO', 9, 4.8, 500.00, TRUE, 'Eye specialist offering comprehensive vision care and surgery.'),
+(7, 2, 'Dr. Amanda Taylor', 'amanda.t@metroclinic.com', '+880 2234567890', 'Dermatology', 'MBBS, MD Dermatology', 11, 4.7, 400.00, TRUE, 'Dermatologist specializing in medical and cosmetic dermatology.'),
+(8, 2, 'Dr. Daniel Lee', 'daniel.l@metroclinic.com', '+880 2234567891', 'ENT', 'MBBS, MS ENT', 13, 4.6, 450.00, TRUE, 'ENT surgeon with expertise in sinus and throat disorders.'),
+(9, 2, 'Dr. Rachel Green', 'rachel.g@metroclinic.com', '+880 2234567892', 'Ophthalmology', 'MBBS, DO', 9, 4.8, 500.00, TRUE, 'Eye specialist offering comprehensive vision care and surgery.'),
 
 -- Children\'s Hospital (hospital_id = 3)
-(3, 'Dr. Sofia Martinez', 'sofia.m@childrenshospital.com', '+880 3234567890', 'Pediatrics', 'MBBS, MD Pediatrics', 16, 4.9, 450.00, TRUE, 'Senior pediatrician with special interest in child development and infectious diseases.'),
-(3, 'Dr. Benjamin Clark', 'benjamin.c@childrenshospital.com', '+880 3234567891', 'Pediatric Surgery', 'MBBS, MCh Pediatric Surgery', 12, 4.7, 650.00, TRUE, 'Pediatric surgeon specializing in minimally invasive procedures.'),
-(3, 'Dr. Olivia White', 'olivia.w@childrenshospital.com', '+880 3234567892', 'Neonatology', 'MBBS, DM Neonatology', 10, 4.8, 600.00, TRUE, 'Neonatologist dedicated to newborn critical care.'),
+(10, 3, 'Dr. Sofia Martinez', 'sofia.m@childrenshospital.com', '+880 3234567890', 'Pediatrics', 'MBBS, MD Pediatrics', 16, 4.9, 450.00, TRUE, 'Senior pediatrician with special interest in child development and infectious diseases.'),
+(11, 3, 'Dr. Benjamin Clark', 'benjamin.c@childrenshospital.com', '+880 3234567891', 'Pediatric Surgery', 'MBBS, MCh Pediatric Surgery', 12, 4.7, 650.00, TRUE, 'Pediatric surgeon specializing in minimally invasive procedures.'),
+(12, 3, 'Dr. Olivia White', 'olivia.w@childrenshospital.com', '+880 3234567892', 'Neonatology', 'MBBS, DM Neonatology', 10, 4.8, 600.00, TRUE, 'Neonatologist dedicated to newborn critical care.'),
 
 -- Medical Center (hospital_id = 4)
-(4, 'Dr. Andrew Harris', 'andrew.h@medicalcenter.com', '+880 4234567890', 'Neurology', 'MBBS, DM Neurology, PhD', 18, 4.9, 750.00, TRUE, 'Neurologist and researcher specializing in brain disorders and epilepsy.'),
-(4, 'Dr. Victoria Adams', 'victoria.a@medicalcenter.com', '+880 4234567891', 'Oncology', 'MBBS, MD Oncology', 15, 4.8, 700.00, TRUE, 'Oncologist with expertise in chemotherapy and immunotherapy.'),
-(4, 'Dr. Christopher Moore', 'chris.m@medicalcenter.com', '+880 4234567892', 'Cardiology', 'MBBS, DM Cardiology', 14, 4.7, 650.00, TRUE, 'Interventional cardiologist specializing in angioplasty and stenting.'),
+(13, 4, 'Dr. Andrew Harris', 'andrew.h@medicalcenter.com', '+880 4234567890', 'Neurology', 'MBBS, DM Neurology, PhD', 18, 4.9, 750.00, TRUE, 'Neurologist and researcher specializing in brain disorders and epilepsy.'),
+(14, 4, 'Dr. Victoria Adams', 'victoria.a@medicalcenter.com', '+880 4234567891', 'Oncology', 'MBBS, MD Oncology', 15, 4.8, 700.00, TRUE, 'Oncologist with expertise in chemotherapy and immunotherapy.'),
+(15, 4, 'Dr. Christopher Moore', 'chris.m@medicalcenter.com', '+880 4234567892', 'Cardiology', 'MBBS, DM Cardiology', 14, 4.7, 650.00, TRUE, 'Interventional cardiologist specializing in angioplasty and stenting.'),
 
 -- Community Health Center (hospital_id = 5)
-(5, 'Dr. Jessica Thompson', 'jessica.t@communityhc.com', '+880 5234567890', 'General Medicine', 'MBBS, MD', 10, 4.6, 300.00, TRUE, 'General physician providing comprehensive primary healthcare.'),
-(5, 'Dr. William Jackson', 'william.j@communityhc.com', '+880 5234567891', 'General Surgery', 'MBBS, MS General Surgery', 12, 4.5, 500.00, TRUE, 'General surgeon with expertise in laparoscopic procedures.'),
-(5, 'Dr. Michelle Robinson', 'michelle.r@communityhc.com', '+880 5234567892', 'Gynecology', 'MBBS, DGO', 11, 4.7, 450.00, TRUE, 'Gynecologist specializing in women\'s reproductive health.');
+(16, 5, 'Dr. Jessica Thompson', 'jessica.t@communityhc.com', '+880 5234567890', 'General Medicine', 'MBBS, MD', 10, 4.6, 300.00, TRUE, 'General physician providing comprehensive primary healthcare.'),
+(17, 5, 'Dr. William Jackson', 'william.j@communityhc.com', '+880 5234567891', 'General Surgery', 'MBBS, MS General Surgery', 12, 4.5, 500.00, TRUE, 'General surgeon with expertise in laparoscopic procedures.'),
+(18, 5, 'Dr. Michelle Robinson', 'michelle.r@communityhc.com', '+880 5234567892', 'Gynecology', 'MBBS, DGO', 11, 4.7, 450.00, TRUE, 'Gynecologist specializing in women\'s reproductive health.')
+ON DUPLICATE KEY UPDATE
+name = VALUES(name),
+email = VALUES(email),
+phone = VALUES(phone);
 
 -- ============================================================================
 -- SEED: hospital_appointments

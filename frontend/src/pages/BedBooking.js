@@ -43,7 +43,8 @@ function BedBooking() {
     expected_discharge_date: '',
     medical_condition: '',
     doctor_name: '',
-    special_requirements: ''
+    special_requirements: '',
+    notes: ''
   });
 
   const wardTypes = [
@@ -595,6 +596,19 @@ function BedBooking() {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Any special needs or requirements"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Notes (Optional)
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Anything else you want the hospital to know"
                   />
                 </div>
               </div>

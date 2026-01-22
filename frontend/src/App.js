@@ -29,6 +29,8 @@ import WeightManagement from "./pages/WeightManagement";
 import HospitalLogin from "./pages/HospitalLogin";
 import HospitalDashboard from "./pages/HospitalDashboard";
 import HospitalSearch from "./pages/HospitalSearch";
+import BedBooking from "./pages/BedBooking";
+import MyBedBookings from "./pages/MyBedBookings";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -122,6 +124,8 @@ function App() {
           <Route path="/book/:doctorId" element={<BookAppointment />} />
           <Route path="/weight-management" element={<WeightManagement />} />
           <Route path="/hospitals" element={<HospitalSearch />} />
+          <Route path="/hospitals/:hospitalId/book-bed" element={<BedBooking />} />
+          <Route path="/my-bed-bookings" element={<MyBedBookings />} />
         </Route>
 
         {/* Admin Routes */}

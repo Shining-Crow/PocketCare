@@ -421,5 +421,50 @@ CREATE TABLE IF NOT EXISTS bed_allocation_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================
+-- TABLE: user_bed_bookings
+-- Stores bed booking requests from users
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_bed_bookings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    hospital_id INT NOT NULL,
+    ward_type ENUM('general', 'maternity', 'pediatrics', 'icu', 'emergency', 'private_room') NOT NULL,
+    ac_type ENUM('ac', 'non_ac', 'not_applicable') DEFAULT 'not_applicable',
+    room_config VARCHAR(50) NULL COMMENT 'For private rooms: 1_bed_no_bath, 1_bed_with_bath, 2_bed_with_bath',
+    patient_name VARCHAR(100) NOT NULL,
+    patient_age INT NULL,
+    patient_gender ENUM('male', 'female', 'other') NULL,
+    patient_phone VARCHAR(20) NOT NULL,
+    patient_email VARCHAR(255) NULL,
+    emergency_contact VARCHAR(20) NULL,
+    preferred_date DATE NOT NULL COMMENT 'Preferred admission date',
+    expected_discharge_date DATE NULL,
+    admission_reason TEXT NULL COMMENT 'Reason for admission / medical condition',
+    doctor_name VARCHAR(100) NULL,
+    special_requirements TEXT NULL,
+    status ENUM('pending', 'confirmed', 'rejected', 'cancelled', 'completed') DEFAULT 'pending',
+    notes TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE CASCADE,
+    INDEX idx_user_bookings (user_id),
+    INDEX idx_hospital_bookings (hospital_id),
+    INDEX idx_booking_status (status),
+    INDEX idx_ward_type (ward_type),
+    INDEX idx_preferred_date (preferred_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- MIGRATION: user_bed_bookings schema update
+-- Run these commands if you have the old schema with admission_date/medical_condition
+-- ============================================================================
+-- ALTER TABLE user_bed_bookings 
+--     CHANGE COLUMN admission_date preferred_date DATE NOT NULL COMMENT 'Preferred admission date',
+--     CHANGE COLUMN medical_condition admission_reason TEXT NULL COMMENT 'Reason for admission / medical condition',
+--     ADD COLUMN patient_email VARCHAR(255) NULL AFTER patient_phone,
+--     ADD INDEX idx_preferred_date (preferred_date);
+
+-- ============================================================================
 -- END OF SCHEMA
 -- ============================================================================

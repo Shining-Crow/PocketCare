@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from utils.database import get_db_connection
 from flask_jwt_extended import jwt_required
 import pymysql
+import json
 from math import radians, cos, sin, asin, sqrt
 
 hospitals_bp = Blueprint('hospitals', __name__)
@@ -83,6 +84,18 @@ def get_hospitals():
         # Process results
         result = []
         for hospital in hospitals:
+            # Parse services JSON string to list
+            services_raw = hospital['services']
+            if isinstance(services_raw, str):
+                try:
+                    services_list = json.loads(services_raw)
+                except (json.JSONDecodeError, TypeError):
+                    services_list = []
+            elif isinstance(services_raw, list):
+                services_list = services_raw
+            else:
+                services_list = []
+            
             hospital_data = {
                 'id': hospital['id'],
                 'name': hospital['name'],
@@ -97,7 +110,7 @@ def get_hospitals():
                 'total_beds': hospital['total_beds'],
                 'available_beds': hospital['available_beds'],
                 'icu_beds': hospital['icu_beds'],
-                'services': hospital['services'],
+                'services': services_list,
                 'rating': float(hospital['rating']) if hospital['rating'] else 0.0,
                 'distance': None
             }
@@ -117,7 +130,6 @@ def get_hospitals():
             
             # Filter by service if provided
             if service:
-                services_list = hospital['services'] if isinstance(hospital['services'], list) else []
                 if not any(service.lower() in s.lower() for s in services_list):
                     continue
             
@@ -178,6 +190,18 @@ def get_hospital_details(hospital_id):
         
         doctors = cursor.fetchall()
         
+        # Parse services JSON string to list
+        services_raw = hospital['services']
+        if isinstance(services_raw, str):
+            try:
+                services_list = json.loads(services_raw)
+            except (json.JSONDecodeError, TypeError):
+                services_list = []
+        elif isinstance(services_raw, list):
+            services_list = services_raw
+        else:
+            services_list = []
+        
         hospital_data = {
             'id': hospital['id'],
             'name': hospital['name'],
@@ -192,7 +216,7 @@ def get_hospital_details(hospital_id):
             'total_beds': hospital['total_beds'],
             'available_beds': hospital['available_beds'],
             'icu_beds': hospital['icu_beds'],
-            'services': hospital['services'],
+            'services': services_list,
             'rating': float(hospital['rating']) if hospital['rating'] else 0.0,
             'doctors': doctors
         }

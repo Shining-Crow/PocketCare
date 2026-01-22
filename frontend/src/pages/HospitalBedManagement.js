@@ -7,6 +7,8 @@ const HospitalBedManagement = () => {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
   
+  // Real patient booking data from API
+  const [bookingsByWard, setBookingsByWard] = useState({});
   // AC/Non-AC toggle state for each ward type
   const [acToggle, setAcToggle] = useState({
     general: 'ac',      // 'ac' or 'non_ac'
@@ -39,54 +41,37 @@ const HospitalBedManagement = () => {
     }));
   };
   
-  // Dummy patient data for reserved beds
-  const dummyPatientData = {
-    general_ac: [
-      { bedNumber: 'GA-101', patientName: 'John Doe', age: 45, admissionDate: '2026-01-20', admissionTime: '09:30 AM', reservedUntil: '2026-01-25', doctor: 'Dr. Sarah Johnson', condition: 'Post-surgery recovery', contactNumber: '+1-555-0123', emergencyContact: '+1-555-0124' },
-      { bedNumber: 'GA-102', patientName: 'Mary Smith', age: 52, admissionDate: '2026-01-21', admissionTime: '02:15 PM', reservedUntil: '2026-01-24', doctor: 'Dr. Michael Chen', condition: 'Observation', contactNumber: '+1-555-0125', emergencyContact: '+1-555-0126' }
-    ],
-    general_non_ac: [
-      { bedNumber: 'GN-201', patientName: 'Robert Wilson', age: 38, admissionDate: '2026-01-19', admissionTime: '11:00 AM', reservedUntil: '2026-01-23', doctor: 'Dr. Emily Brown', condition: 'Minor surgery recovery', contactNumber: '+1-555-0127', emergencyContact: '+1-555-0128' }
-    ],
-    pediatrics_ac: [
-      { bedNumber: 'PA-301', patientName: 'Emma Davis', age: 8, admissionDate: '2026-01-22', admissionTime: '08:00 AM', reservedUntil: '2026-01-24', doctor: 'Dr. Lisa Anderson', condition: 'Fever monitoring', contactNumber: '+1-555-0129', emergencyContact: '+1-555-0130', guardian: 'Jennifer Davis' }
-    ],
-    pediatrics_non_ac: [
-      { bedNumber: 'PN-401', patientName: 'Oliver Martinez', age: 5, admissionDate: '2026-01-21', admissionTime: '03:45 PM', reservedUntil: '2026-01-23', doctor: 'Dr. Lisa Anderson', condition: 'Respiratory infection', contactNumber: '+1-555-0131', emergencyContact: '+1-555-0132', guardian: 'Carlos Martinez' }
-    ],
-    maternity_ac: [
-      { bedNumber: 'MA-501', patientName: 'Jessica Taylor', age: 29, admissionDate: '2026-01-22', admissionTime: '06:30 AM', reservedUntil: '2026-01-27', doctor: 'Dr. Amanda White', condition: 'Delivery - Expected', contactNumber: '+1-555-0133', emergencyContact: '+1-555-0134', dueDate: '2026-01-23' }
-    ],
-    maternity_non_ac: [
-      { bedNumber: 'MN-601', patientName: 'Sophie Garcia', age: 32, admissionDate: '2026-01-20', admissionTime: '04:20 PM', reservedUntil: '2026-01-26', doctor: 'Dr. Amanda White', condition: 'Post-delivery care', contactNumber: '+1-555-0135', emergencyContact: '+1-555-0136', deliveryDate: '2026-01-20' }
-    ],
-    icu: [
-      { bedNumber: 'ICU-701', patientName: 'William Thompson', age: 67, admissionDate: '2026-01-18', admissionTime: '01:00 AM', reservedUntil: '2026-01-30', doctor: 'Dr. Richard Lee', condition: 'Critical - Heart condition', contactNumber: '+1-555-0137', emergencyContact: '+1-555-0138', ventilator: 'Yes' }
-    ],
-    emergency: [
-      { bedNumber: 'ER-801', patientName: 'David Brown', age: 41, admissionDate: '2026-01-22', admissionTime: '11:45 PM', reservedUntil: '2026-01-23', doctor: 'Dr. James Wilson', condition: 'Accident - Stable', contactNumber: '+1-555-0139', emergencyContact: '+1-555-0140', triageLevel: 'Level 2' }
-    ],
-    private_1bed_no_bath: [
-      { bedNumber: 'PVT-A101', patientName: 'Charles Miller', age: 55, admissionDate: '2026-01-21', admissionTime: '10:00 AM', reservedUntil: '2026-01-28', doctor: 'Dr. Patricia Davis', condition: 'Recovery - Elective surgery', contactNumber: '+1-555-0141', emergencyContact: '+1-555-0142', roomRate: '$150/day' }
-    ],
-    private_1bed_with_bath: [
-      { bedNumber: 'PVT-B201', patientName: 'Linda Anderson', age: 48, admissionDate: '2026-01-20', admissionTime: '01:30 PM', reservedUntil: '2026-01-27', doctor: 'Dr. Robert Martinez', condition: 'Post-operative care', contactNumber: '+1-555-0143', emergencyContact: '+1-555-0144', roomRate: '$250/day' }
-    ],
-    private_2bed_with_bath: [
-      { bedNumber: 'PVT-C301', patientName: 'Thomas Wilson', age: 72, admissionDate: '2026-01-19', admissionTime: '09:00 AM', reservedUntil: '2026-01-29', doctor: 'Dr. Susan Clark', condition: 'Extended care', contactNumber: '+1-555-0145', emergencyContact: '+1-555-0146', roomRate: '$400/day' }
-    ]
-  };
-  
-  // Handle card click to show patient info
-  const handleCardClick = (wardType, wardLabel) => {
-    const patients = dummyPatientData[wardType] || [];
+  // Handle card click to show patient info - using real booking data from API
+  // Handle card click to show patient info - using real booking data from API
+  const handleCardClick = (currentType, wardLabel) => {
+    // currentType is already the correct key (e.g., 'general_ac', 'icu', 'private_1bed_no_bath')
+    // Just use it directly to get bookings
+    const bookings = bookingsByWard[currentType] || [];
+    
+    console.log('handleCardClick:', { currentType, wardLabel, bookings, allBookings: bookingsByWard });
+    
     setSelectedWardInfo({
-      wardType,
+      wardType: currentType,
       wardLabel,
-      patients
+      bookingKey: currentType,
+      patients: bookings
     });
     setShowPatientModal(true);
   };
+  
+  // Fetch real booking data from API
+  const fetchBookings = useCallback(async () => {
+    try {
+      console.log('Fetching bookings...');
+      const response = await api.get('/hospital/bed-bookings/by-ward');
+      console.log('Bookings response:', response.data);
+      if (response.data.success) {
+        setBookingsByWard(response.data.bookings_by_ward || {});
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+    }
+  }, []);
   
   // Ward bed management - using original structure
   const [bedStatus, setBedStatus] = useState({
@@ -110,6 +95,7 @@ const HospitalBedManagement = () => {
       const hospitalInfo = localStorage.getItem('hospitalInfo');
       if (hospitalInfo) {
         const parsed = JSON.parse(hospitalInfo);
+        console.log('[DEBUG] Logged in as hospital:', parsed.id, parsed.name);
         return parsed.id;
       }
     } catch (e) {
@@ -119,6 +105,7 @@ const HospitalBedManagement = () => {
   };
   
   const hospitalId = getHospitalId();
+  console.log('[DEBUG] hospitalId for bed management:', hospitalId);
 
   // Ward configuration with labels - updated for toggle-based wards
   const wardConfig = {
@@ -158,12 +145,14 @@ const HospitalBedManagement = () => {
 
   useEffect(() => {
     loadBedData();
+    fetchBookings();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadBedData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get(`/bed-management/bed-wards?hospital_id=${hospitalId}`);
+      console.log('[DEBUG] Loaded bed data for hospital:', hospitalId, response.data);
       if (response.data.success && response.data.wards.length > 0) {
         const newBedStatus = {
           general_ac: { total: 0, available: 0, reserved: 0 },
@@ -566,10 +555,39 @@ const HospitalBedManagement = () => {
                   <div className="text-xs text-blue-600 mt-0.5 font-semibold">Available</div>
                 </div>
                 <div className="p-2.5 bg-gradient-to-br from-yellow-100 to-yellow-50 rounded-xl shadow-sm border border-yellow-200">
-                  <div className="font-bold text-2xl text-yellow-700">{data.reserved}</div>
+                  {/* Show actual booking count if available, otherwise show reserved_beds */}
+                  <div className="font-bold text-2xl text-yellow-700">
+                    {(bookingsByWard[currentType] || []).length || data.reserved}
+                  </div>
                   <div className="text-xs text-yellow-600 mt-0.5 font-semibold">Reserved</div>
                 </div>
               </div>
+
+              {/* View Patients Button - only show if there are actual bookings */}
+              {(() => {
+                const actualBookings = bookingsByWard[currentType] || [];
+                const hasBookings = actualBookings.length > 0;
+                
+                if (hasBookings) {
+                  return (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCardClick(currentType, ward.label);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        View {actualBookings.length} Patient{actualBookings.length !== 1 ? 's' : ''}
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           );
         })}
@@ -578,12 +596,14 @@ const HospitalBedManagement = () => {
       {/* Patient Info Modal */}
       {showPatientModal && selectedWardInfo && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowPatientModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden transform animate-slideUp" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden transform animate-slideUp" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex justify-between items-center">
               <div>
                 <h3 className="text-2xl font-bold text-white">{selectedWardInfo.wardLabel}</h3>
-                <p className="text-blue-100 text-sm mt-1">Reserved Bed Information</p>
+                <p className="text-blue-100 text-sm mt-1">
+                  {selectedWardInfo.patients.length} Reserved Bed{selectedWardInfo.patients.length !== 1 ? 's' : ''}
+                </p>
               </div>
               <button
                 onClick={() => setShowPatientModal(false)}
@@ -596,7 +616,7 @@ const HospitalBedManagement = () => {
             </div>
             
             {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-160px)]">
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
               {selectedWardInfo.patients.length > 0 ? (
                 <div className="space-y-6">
                   {selectedWardInfo.patients.map((patient, idx) => (
@@ -604,187 +624,133 @@ const HospitalBedManagement = () => {
                       {/* Patient Header */}
                       <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-5 pb-4 border-b-2 border-blue-100">
                         <div className="mb-3 md:mb-0">
-                          <h4 className="text-2xl font-bold text-gray-900 mb-2">{patient.patientName}</h4>
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                            </svg>
-                            <span className="text-lg">{patient.age} years old</span>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                              {patient.patient_name?.charAt(0)?.toUpperCase() || 'P'}
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold text-gray-900">{patient.patient_name}</h4>
+                              <div className="flex items-center gap-3 text-sm text-gray-600">
+                                {patient.patient_age && <span>{patient.patient_age} years</span>}
+                                {patient.patient_gender && (
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    patient.patient_gender === 'male' ? 'bg-blue-100 text-blue-700' :
+                                    patient.patient_gender === 'female' ? 'bg-pink-100 text-pink-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {patient.patient_gender.charAt(0).toUpperCase() + patient.patient_gender.slice(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-full font-bold text-lg shadow-md">
-                          {patient.bedNumber}
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full font-bold shadow-md">
+                            {patient.bed_number}
+                          </div>
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            Confirmed
+                          </span>
                         </div>
                       </div>
                       
                       {/* Patient Details Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Admission Info */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm hover:shadow-md transition-shadow">
+                        {/* Admission Date */}
+                        <div className="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="bg-green-100 p-2 rounded-lg">
                               <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                               </svg>
                             </div>
-                            <span className="font-semibold text-gray-700">Admission</span>
+                            <span className="font-semibold text-gray-700">Admission Date</span>
                           </div>
-                          <p className="text-gray-900 font-medium">{patient.admissionDate}</p>
-                          <p className="text-gray-600 text-sm mt-1">{patient.admissionTime}</p>
+                          <p className="text-gray-900 font-medium">{patient.admission_date || 'Not specified'}</p>
                         </div>
                         
-                        {/* Reserved Until */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm hover:shadow-md transition-shadow">
+                        {/* Admission Reason */}
+                        <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="bg-orange-100 p-2 rounded-lg">
                               <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                               </svg>
                             </div>
-                            <span className="font-semibold text-gray-700">Reserved Until</span>
+                            <span className="font-semibold text-gray-700">Reason</span>
                           </div>
-                          <p className="text-gray-900 font-medium">{patient.reservedUntil}</p>
-                          <p className="text-gray-600 text-sm mt-1">Expected discharge</p>
-                        </div>
-                        
-                        {/* Doctor Info */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-blue-100 p-2 rounded-lg">
-                              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                              </svg>
-                            </div>
-                            <span className="font-semibold text-gray-700">Doctor</span>
-                          </div>
-                          <p className="text-gray-900 font-medium">{patient.doctor}</p>
-                          <p className="text-gray-600 text-sm mt-1">Attending physician</p>
-                        </div>
-                        
-                        {/* Condition */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-red-100 p-2 rounded-lg">
-                              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                              </svg>
-                            </div>
-                            <span className="font-semibold text-gray-700">Condition</span>
-                          </div>
-                          <p className="text-gray-900 font-medium">{patient.condition}</p>
+                          <p className="text-gray-900 font-medium text-sm">{patient.admission_reason}</p>
                         </div>
                         
                         {/* Contact Number */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="bg-purple-100 p-2 rounded-lg">
                               <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                               </svg>
                             </div>
-                            <span className="font-semibold text-gray-700">Contact</span>
+                            <span className="font-semibold text-gray-700">Phone</span>
                           </div>
-                          <p className="text-gray-900 font-medium">{patient.contactNumber}</p>
+                          <p className="text-gray-900 font-medium">{patient.patient_phone}</p>
                         </div>
                         
                         {/* Emergency Contact */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-red-600 shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-red-100 p-2 rounded-lg">
-                              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                              </svg>
-                            </div>
-                            <span className="font-semibold text-gray-700">Emergency</span>
-                          </div>
-                          <p className="text-gray-900 font-medium">{patient.emergencyContact}</p>
-                        </div>
-                        
-                        {/* Additional Info based on ward type */}
-                        {patient.guardian && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-indigo-100 p-2 rounded-lg">
-                                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                </svg>
-                              </div>
-                              <span className="font-semibold text-gray-700">Guardian</span>
-                            </div>
-                            <p className="text-gray-900 font-medium">{patient.guardian}</p>
-                          </div>
-                        )}
-                        
-                        {patient.dueDate && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-pink-500 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-pink-100 p-2 rounded-lg">
-                                <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                              </div>
-                              <span className="font-semibold text-gray-700">Due Date</span>
-                            </div>
-                            <p className="text-gray-900 font-medium">{patient.dueDate}</p>
-                          </div>
-                        )}
-                        
-                        {patient.deliveryDate && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-pink-500 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-pink-100 p-2 rounded-lg">
-                                <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                              </div>
-                              <span className="font-semibold text-gray-700">Delivery Date</span>
-                            </div>
-                            <p className="text-gray-900 font-medium">{patient.deliveryDate}</p>
-                          </div>
-                        )}
-                        
-                        {patient.ventilator && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow-sm hover:shadow-md transition-shadow">
+                        {patient.emergency_contact && (
+                          <div className="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow-sm">
                             <div className="flex items-center gap-2 mb-2">
                               <div className="bg-red-100 p-2 rounded-lg">
                                 <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                                </svg>
-                              </div>
-                              <span className="font-semibold text-gray-700">Ventilator</span>
-                            </div>
-                            <p className="text-gray-900 font-medium">{patient.ventilator}</p>
-                          </div>
-                        )}
-                        
-                        {patient.triageLevel && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-yellow-500 shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-yellow-100 p-2 rounded-lg">
-                                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
                               </div>
-                              <span className="font-semibold text-gray-700">Triage Level</span>
+                              <span className="font-semibold text-gray-700">Emergency</span>
                             </div>
-                            <p className="text-gray-900 font-medium">{patient.triageLevel}</p>
+                            <p className="text-gray-900 font-medium">{patient.emergency_contact}</p>
                           </div>
                         )}
                         
-                        {patient.roomRate && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm hover:shadow-md transition-shadow">
+                        {/* Patient Email */}
+                        {patient.patient_email && (
+                          <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-green-100 p-2 rounded-lg">
-                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              <div className="bg-blue-100 p-2 rounded-lg">
+                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                                 </svg>
                               </div>
-                              <span className="font-semibold text-gray-700">Room Rate</span>
+                              <span className="font-semibold text-gray-700">Email</span>
                             </div>
-                            <p className="text-gray-900 font-medium">{patient.roomRate}</p>
+                            <p className="text-gray-900 font-medium text-sm">{patient.patient_email}</p>
                           </div>
                         )}
+                        
+                        {/* Booking Info */}
+                        <div className="bg-white p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="bg-indigo-100 p-2 rounded-lg">
+                              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                              </svg>
+                            </div>
+                            <span className="font-semibold text-gray-700">Booking ID</span>
+                          </div>
+                          <p className="text-gray-900 font-medium">{patient.booking_id}</p>
+                          <p className="text-gray-500 text-xs mt-1">Booked: {patient.created_at}</p>
+                        </div>
                       </div>
+                      
+                      {/* Booked By Section */}
+                      {patient.booked_by && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-sm text-gray-500 mb-2">
+                            <span className="font-medium">Booked by:</span> {patient.booked_by.name} 
+                            {patient.booked_by.email && <span className="ml-1">({patient.booked_by.email})</span>}
+                            {patient.booked_by.phone && <span className="ml-2">• {patient.booked_by.phone}</span>}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

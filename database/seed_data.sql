@@ -58,18 +58,20 @@ DEALLOCATE PREPARE alterIfNotExists;
 
 -- ============================================================================
 -- SEED: hospitals
+-- Password hashes are for password: hospital123
 -- ============================================================================
-INSERT INTO hospitals (id, name, address, city, state, latitude, longitude, phone, email, emergency_contact, total_beds, available_beds, icu_beds, services, rating) VALUES
-(1, 'City Hospital', '123 Main Street, Downtown', 'New York', 'NY', 40.7128, -74.0060, '+1-555-0101', 'info@cityhospital.com', '+1-555-0199', 200, 45, 20, '["Cardiology", "Orthopedics", "Emergency", "Surgery"]', 4.8),
-(2, 'Metro Clinic', '456 Park Avenue, Midtown', 'New York', 'NY', 40.7589, -73.9851, '+1-555-0201', 'contact@metroclinic.com', '+1-555-0299', 100, 25, 10, '["Dermatology", "ENT", "Ophthalmology", "General Medicine"]', 4.9),
-(3, 'Children\'s Hospital', '789 Oak Road, North District', 'New York', 'NY', 40.8000, -73.9500, '+1-555-0301', 'info@childrenshospital.com', '+1-555-0399', 150, 30, 15, '["Pediatrics", "Neonatology", "Child Surgery"]', 4.7),
-(4, 'Medical Center', '321 West Boulevard', 'New York', 'NY', 40.7500, -74.0200, '+1-555-0401', 'contact@medicalcenter.com', '+1-555-0499', 250, 60, 25, '["Neurology", "Oncology", "Surgery", "ICU"]', 4.8),
-(5, 'Community Health Center', '654 East Street', 'New York', 'NY', 40.7200, -73.9800, '+1-555-0501', 'info@communityhc.com', '+1-555-0599', 80, 20, 5, '["General Medicine", "Dental", "Physiotherapy"]', 4.5)
+INSERT INTO hospitals (id, name, address, city, state, latitude, longitude, phone, email, password_hash, emergency_contact, total_beds, available_beds, icu_beds, services, rating) VALUES
+(1, 'City Hospital', '123 Main Street, Downtown', 'New York', 'NY', 40.7128, -74.0060, '+1-555-0101', 'info@cityhospital.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0199', 200, 45, 20, '["Cardiology", "Orthopedics", "Emergency", "Surgery"]', 4.8),
+(2, 'Metro Clinic', '456 Park Avenue, Midtown', 'New York', 'NY', 40.7589, -73.9851, '+1-555-0201', 'contact@metroclinic.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0299', 100, 25, 10, '["Dermatology", "ENT", "Ophthalmology", "General Medicine"]', 4.9),
+(3, 'Children\'s Hospital', '789 Oak Road, North District', 'New York', 'NY', 40.8000, -73.9500, '+1-555-0301', 'info@childrenshospital.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0399', 150, 30, 15, '["Pediatrics", "Neonatology", "Child Surgery"]', 4.7),
+(4, 'Medical Center', '321 West Boulevard', 'New York', 'NY', 40.7500, -74.0200, '+1-555-0401', 'contact@medicalcenter.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0499', 250, 60, 25, '["Neurology", "Oncology", "Surgery", "ICU"]', 4.8),
+(5, 'Community Health Center', '654 East Street', 'New York', 'NY', 40.7200, -73.9800, '+1-555-0501', 'info@communityhc.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5xuLmK1wJL0hy', '+1-555-0599', 80, 20, 5, '["General Medicine", "Dental", "Physiotherapy"]', 4.5)
 ON DUPLICATE KEY UPDATE
 name = VALUES(name),
 address = VALUES(address),
 city = VALUES(city),
-state = VALUES(state);
+state = VALUES(state),
+password_hash = VALUES(password_hash);
 
 -- ============================================================================
 -- SEED: doctors

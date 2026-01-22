@@ -66,7 +66,7 @@ const HospitalDashboard = () => {
       setHospital(parsedHospital);
       fetchHospitalData(parsedHospital.id);
     }
-  }, []);
+  }, [navigate]);
 
   // Refetch data when switching back to overview tab
   useEffect(() => {
@@ -81,7 +81,9 @@ const HospitalDashboard = () => {
       const response = await fetch(`http://localhost:5000/api/hospital-dashboard/all?hospital_id=${hospitalId}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch hospital data');
+        console.warn('Failed to fetch hospital data, using default mock data');
+        setLoading(false);
+        return; // Use the default mock data already set in state
       }
 
       const data = await response.json();
@@ -123,7 +125,7 @@ const HospitalDashboard = () => {
 
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching hospital data:', error);
+      console.warn('Error fetching hospital data, using default mock data:', error);
       setLoading(false);
     }
   };

@@ -16,6 +16,7 @@ def fix_database():
     - Ensures weight management tables exist (weight_entries, weight_goals)
     - Ensures messages/chat tables exist (messages, chat_messages)
     - Ensures hospitals supports login + geo location (hospitals.password_hash, hospitals.latitude/longitude)
+    - Ensures Emergency SOS tables/columns exist (emergency_requests, emergency_types)
     """
     try:
         conn = get_db_connection()
@@ -378,6 +379,109 @@ def fix_database():
                 conn.commit()
             except Exception:
                 pass
+
+        # --- Emergency SOS: tables + columns used by routes/emergency_sos.py ---
+        _ensure_table(
+            'emergency_types',
+            """
+            CREATE TABLE IF NOT EXISTS emergency_types (
+                code VARCHAR(50) PRIMARY KEY,
+                label VARCHAR(100) NOT NULL,
+                description VARCHAR(255) NULL,
+                sort_order INT NOT NULL DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_emergency_types_label (label),
+                INDEX idx_emergency_types_active (is_active, sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_table(
+            'emergency_requests',
+            """
+            CREATE TABLE IF NOT EXISTS emergency_requests (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                latitude DECIMAL(10,8),
+                longitude DECIMAL(11,8),
+                emergency_type VARCHAR(50) NULL,
+                note TEXT NULL,
+                status ENUM('pending', 'acknowledged', 'resolved') DEFAULT 'pending',
+                hospital_id INT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                acknowledged_at TIMESTAMP NULL,
+                resolved_at TIMESTAMP NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE SET NULL,
+                INDEX idx_user (user_id),
+                INDEX idx_status (status),
+                INDEX idx_hospital (hospital_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """,
+        )
+
+        _ensure_column(
+            'emergency_requests',
+            'emergency_type',
+            "ALTER TABLE emergency_requests ADD COLUMN emergency_type VARCHAR(50) NULL",
+        )
+        _ensure_column(
+            'emergency_requests',
+            'note',
+            "ALTER TABLE emergency_requests ADD COLUMN note TEXT NULL",
+        )
+        _ensure_column(
+            'emergency_requests',
+            'acknowledged_at',
+            "ALTER TABLE emergency_requests ADD COLUMN acknowledged_at TIMESTAMP NULL",
+        )
+        _ensure_column(
+            'emergency_requests',
+            'resolved_at',
+            "ALTER TABLE emergency_requests ADD COLUMN resolved_at TIMESTAMP NULL",
+        )
+
+        # Helpful indexes (best-effort)
+        try:
+            cursor.execute("CREATE INDEX idx_hospital ON emergency_requests(hospital_id)")
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            cursor.execute("CREATE INDEX idx_created_at ON emergency_requests(created_at)")
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            cursor.execute("CREATE INDEX idx_emergency_type ON emergency_requests(emergency_type)")
+            conn.commit()
+        except Exception:
+            pass
+
+        # Seed default emergency types (idempotent)
+        try:
+            cursor.execute(
+                """
+                INSERT INTO emergency_types (code, label, description, sort_order, is_active) VALUES
+                ('general', 'General', 'General emergency (fallback/default)', 0, TRUE),
+                ('chest-pain', 'Chest Pain', 'Chest pain / possible cardiac emergency', 10, TRUE),
+                ('breathing', 'Breathing Issue', 'Breathing difficulty / respiratory distress', 20, TRUE),
+                ('bleeding', 'Heavy Bleeding', 'Severe bleeding / hemorrhage risk', 30, TRUE),
+                ('unconscious', 'Unconscious', 'Loss of consciousness / fainting', 40, TRUE),
+                ('seizure', 'Seizure', 'Active seizure or post-seizure emergency', 50, TRUE),
+                ('other', 'Other Medical', 'Other urgent medical emergency', 60, TRUE)
+                ON DUPLICATE KEY UPDATE
+                  label = VALUES(label),
+                  description = VALUES(description),
+                  sort_order = VALUES(sort_order),
+                  is_active = VALUES(is_active)
+                """
+            )
+            conn.commit()
+        except Exception:
+            # Non-fatal; schema fix is more important than seed.
+            pass
         
         cursor.close()
         conn.close()

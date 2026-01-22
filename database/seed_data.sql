@@ -42,6 +42,24 @@ INSERT INTO specialties (name) VALUES
 ('Other')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
+-- ============================================================================
+-- SEED: emergency_types (idempotent)
+-- Codes should match what the frontend sends as emergency_type
+-- ============================================================================
+INSERT INTO emergency_types (code, label, description, sort_order, is_active) VALUES
+('general', 'General', 'General emergency (fallback/default)', 0, TRUE),
+('chest-pain', 'Chest Pain', 'Chest pain / possible cardiac emergency', 10, TRUE),
+('breathing', 'Breathing Issue', 'Breathing difficulty / respiratory distress', 20, TRUE),
+('bleeding', 'Heavy Bleeding', 'Severe bleeding / hemorrhage risk', 30, TRUE),
+('unconscious', 'Unconscious', 'Loss of consciousness / fainting', 40, TRUE),
+('seizure', 'Seizure', 'Active seizure or post-seizure emergency', 50, TRUE),
+('other', 'Other Medical', 'Other urgent medical emergency', 60, TRUE)
+ON DUPLICATE KEY UPDATE
+label = VALUES(label),
+description = VALUES(description),
+sort_order = VALUES(sort_order),
+is_active = VALUES(is_active);
+
 -- Ensure password_hash column exists in doctors table (if it doesn't already)
 SET @dbname = DATABASE();
 SET @tablename = "doctors";

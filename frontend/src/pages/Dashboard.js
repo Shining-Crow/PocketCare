@@ -14,6 +14,8 @@ import {
   Clock,
   Zap,
   AlertTriangle,
+  Stethoscope,
+  Search,
 } from "lucide-react";
 import Footer from "../components/Footer";
 
@@ -967,7 +969,7 @@ function Dashboard() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Healthcare Services
             </h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
                 {
                   icon: Calendar,
@@ -976,6 +978,22 @@ function Dashboard() {
                   color: "from-green-400 to-emerald-500",
                   bg: "bg-green-500/10",
                   onClick: () => navigate("/appointments"),
+                },
+                {
+                  icon: Stethoscope,
+                  title: "Symptom Analysis",
+                  desc: "AI symptom checker",
+                  color: "from-violet-500 to-purple-600",
+                  bg: "bg-violet-500/10",
+                  onClick: () => navigate("/symptom-checker"),
+                },
+                {
+                  icon: Search,
+                  title: "Find Doctors",
+                  desc: "Search & book",
+                  color: "from-amber-400 to-orange-500",
+                  bg: "bg-amber-500/10",
+                  onClick: () => navigate("/doctors"),
                 },
                 {
                   icon: FileText,

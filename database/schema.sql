@@ -203,14 +203,32 @@ CREATE TABLE IF NOT EXISTS emergency_requests (
     user_id INT NOT NULL,
     latitude DECIMAL(10,8),
     longitude DECIMAL(11,8),
+    emergency_type VARCHAR(50) NULL COMMENT 'Optional code like chest-pain, breathing, bleeding, unconscious, seizure, other',
+    note TEXT NULL COMMENT 'Optional extra details from user',
     status ENUM('pending', 'acknowledged', 'resolved') DEFAULT 'pending',
     hospital_id INT COMMENT 'Hospital that responded',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    acknowledged_at TIMESTAMP NULL,
     resolved_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE SET NULL,
     INDEX idx_user (user_id),
     INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- TABLE: emergency_types
+-- Lookup table for SOS type codes used by frontend/backend (optional)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS emergency_types (
+    code VARCHAR(50) PRIMARY KEY,
+    label VARCHAR(100) NOT NULL,
+    description VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_emergency_types_label (label),
+    INDEX idx_emergency_types_active (is_active, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================================

@@ -435,10 +435,11 @@ CREATE TABLE IF NOT EXISTS user_bed_bookings (
     patient_age INT NULL,
     patient_gender ENUM('male', 'female', 'other') NULL,
     patient_phone VARCHAR(20) NOT NULL,
+    patient_email VARCHAR(255) NULL,
     emergency_contact VARCHAR(20) NULL,
-    admission_date DATE NOT NULL,
+    preferred_date DATE NOT NULL COMMENT 'Preferred admission date',
     expected_discharge_date DATE NULL,
-    medical_condition TEXT NULL,
+    admission_reason TEXT NULL COMMENT 'Reason for admission / medical condition',
     doctor_name VARCHAR(100) NULL,
     special_requirements TEXT NULL,
     status ENUM('pending', 'confirmed', 'rejected', 'cancelled', 'completed') DEFAULT 'pending',
@@ -450,8 +451,19 @@ CREATE TABLE IF NOT EXISTS user_bed_bookings (
     INDEX idx_user_bookings (user_id),
     INDEX idx_hospital_bookings (hospital_id),
     INDEX idx_booking_status (status),
-    INDEX idx_ward_type (ward_type)
+    INDEX idx_ward_type (ward_type),
+    INDEX idx_preferred_date (preferred_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- MIGRATION: user_bed_bookings schema update
+-- Run these commands if you have the old schema with admission_date/medical_condition
+-- ============================================================================
+-- ALTER TABLE user_bed_bookings 
+--     CHANGE COLUMN admission_date preferred_date DATE NOT NULL COMMENT 'Preferred admission date',
+--     CHANGE COLUMN medical_condition admission_reason TEXT NULL COMMENT 'Reason for admission / medical condition',
+--     ADD COLUMN patient_email VARCHAR(255) NULL AFTER patient_phone,
+--     ADD INDEX idx_preferred_date (preferred_date);
 
 -- ============================================================================
 -- END OF SCHEMA

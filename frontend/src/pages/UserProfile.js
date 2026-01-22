@@ -17,6 +17,8 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
+  Bed,
+  Building2,
 } from "lucide-react";
 import Footer from "../components/Footer";
 import BackToDashboardButton from "../components/BackToDashboardButton";
@@ -53,6 +55,11 @@ function UserProfile() {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState(null);
 
+  // Bed bookings state
+  const [bedBookings, setBedBookings] = useState([]);
+  const [bedBookingsLoading, setBedBookingsLoading] = useState(false);
+  const [bedBookingsError, setBedBookingsError] = useState(null);
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -77,6 +84,8 @@ function UserProfile() {
       fetchSosHistory({ reset: true });
       // Load appointments
       fetchAppointments();
+      // Load bed bookings
+      fetchBedBookings();
     } catch (error) {
       console.error("Error fetching profile:", error);
       alert(error.response?.data?.error || "Failed to load profile");
@@ -144,6 +153,51 @@ function UserProfile() {
     } finally {
       setAppointmentsLoading(false);
     }
+  };
+
+  const fetchBedBookings = async () => {
+    try {
+      setBedBookingsLoading(true);
+      setBedBookingsError(null);
+      const res = await api.get("/user/bed-bookings");
+      const items = Array.isArray(res.data?.bookings) ? res.data.bookings : [];
+      setBedBookings(items);
+    } catch (error) {
+      console.error("Error fetching bed bookings:", error);
+      setBedBookingsError(error.response?.data?.error || "Failed to load bed bookings");
+      setBedBookings([]);
+    } finally {
+      setBedBookingsLoading(false);
+    }
+  };
+
+  const getBedBookingStatusBadge = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "confirmed") {
+      return "bg-emerald-50 text-emerald-800 border-emerald-200";
+    } else if (s === "pending") {
+      return "bg-amber-50 text-amber-800 border-amber-200";
+    } else if (s === "completed") {
+      return "bg-blue-50 text-blue-800 border-blue-200";
+    } else if (s === "cancelled" || s === "rejected") {
+      return "bg-red-50 text-red-800 border-red-200";
+    }
+    return "bg-gray-50 text-gray-700 border-gray-200";
+  };
+
+  const formatWardType = (wardType, acType) => {
+    const wardLabels = {
+      general: "General Ward",
+      maternity: "Maternity Ward",
+      pediatrics: "Pediatrics Ward",
+      icu: "ICU",
+      emergency: "Emergency",
+      private_room: "Private Room",
+    };
+    let label = wardLabels[wardType] || wardType;
+    if (acType === "ac") label += " (AC)";
+    else if (acType === "non_ac") label += " (Non-AC)";
+    return label;
   };
 
   const formatAppointmentDate = (dateString) => {
@@ -704,6 +758,146 @@ function UserProfile() {
                           className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           View Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bed Bookings Section */}
+            <div className="mt-10" id="bed-bookings-section">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+                    <Bed className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">My Bed Bookings</h2>
+                    <p className="text-sm text-gray-500">Your hospital bed reservations</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchBedBookings}
+                    disabled={bedBookingsLoading}
+                    className="shrink-0 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      {bedBookingsLoading && (
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                      )}
+                      <span>Refresh</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/hospital-search")}
+                    className="shrink-0 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 transition-colors"
+                  >
+                    Book New
+                  </button>
+                </div>
+              </div>
+
+              {bedBookingsError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {bedBookingsError}
+                </div>
+              )}
+
+              {!bedBookingsError && bedBookings.length === 0 && !bedBookingsLoading && (
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Bed className="w-8 h-8 text-rose-600" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-800 mb-2">No bed bookings yet</h4>
+                  <p className="text-gray-500 text-sm mb-4">
+                    Search hospitals and book a bed when you need admission
+                  </p>
+                  <button
+                    onClick={() => navigate("/hospital-search")}
+                    className="inline-flex items-center px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
+                  >
+                    Find Hospitals
+                  </button>
+                </div>
+              )}
+
+              {bedBookings.length > 0 && (
+                <div className="grid gap-3">
+                  {bedBookings.map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
+                            <Building2 className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-900">
+                              {booking.hospital_name || "Hospital"}
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              {formatWardType(booking.ward_type, booking.ac_type)}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getBedBookingStatusBadge(
+                            booking.status
+                          )}`}
+                        >
+                          {(booking.status || "pending").toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                            <User className="w-3 h-3" /> Patient
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {booking.patient_name || "—"}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> Admission Date
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatAppointmentDate(booking.preferred_date || booking.admission_date)}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> Contact
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {booking.patient_phone || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {booking.admission_reason && (
+                        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">Reason for Admission</div>
+                          <div className="mt-1 text-sm text-gray-700">
+                            {booking.admission_reason}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => navigate("/my-bed-bookings")}
+                          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          View All Bookings
                         </button>
                       </div>
                     </div>

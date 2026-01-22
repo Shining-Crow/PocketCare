@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Stethoscope,
   Search,
-  Bed,
 } from "lucide-react";
 import Footer from "../components/Footer";
 
@@ -1019,14 +1018,6 @@ function Dashboard() {
                   color: "from-indigo-500 to-fuchsia-500",
                   bg: "bg-indigo-500/10",
                   onClick: () => navigate("/weight-management"),
-                },
-                {
-                  icon: Bed,
-                  title: "My Bed Bookings",
-                  desc: "View bed reservations",
-                  color: "from-rose-400 to-pink-500",
-                  bg: "bg-rose-500/10",
-                  onClick: () => navigate("/my-bed-bookings"),
                 },
               ].map((service, idx) => (
                 <div

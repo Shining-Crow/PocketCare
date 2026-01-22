@@ -99,21 +99,35 @@ function Login() {
                 onChange={handleChange}
               />
             </div>
-            <div className="flex justify-center gap-4 mt-4">
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-md border ${role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'} font-medium`}
-                onClick={() => setRole('user')}
+            <div className="mt-4">
+              <div
+                className="w-full grid grid-cols-2 rounded-lg bg-gray-100 p-1 border border-gray-200"
+                role="group"
+                aria-label="Select login role"
               >
-                User
-              </button>
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-md border ${role === 'doctor' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'} font-medium`}
-                onClick={() => setRole('doctor')}
-              >
-                Doctor
-              </button>
+                <button
+                  type="button"
+                  className={`w-full py-2.5 rounded-md text-sm font-semibold transition-all focus:outline-none ${
+                    role === "user"
+                      ? "bg-primary text-white shadow"
+                      : "bg-transparent text-gray-700 hover:bg-white"
+                  }`}
+                  onClick={() => setRole("user")}
+                >
+                  User
+                </button>
+                <button
+                  type="button"
+                  className={`w-full py-2.5 rounded-md text-sm font-semibold transition-all focus:outline-none ${
+                    role === "doctor"
+                      ? "bg-primary text-white shadow"
+                      : "bg-transparent text-gray-700 hover:bg-white"
+                  }`}
+                  onClick={() => setRole("doctor")}
+                >
+                  Doctor
+                </button>
+              </div>
             </div>
           </div>
           <div>

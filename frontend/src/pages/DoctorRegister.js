@@ -276,9 +276,13 @@ const DoctorRegister = () => {
                 </button>
               </div>
 
-              <div className="mt-2 flex items-center justify-center border border-gray-200 rounded-md bg-white py-2">
+              <div className="mt-2 flex items-center justify-center border border-gray-200 rounded-md bg-white px-3 py-3 min-h-[96px]">
                 {captchaImage ? (
-                  <img src={captchaImage} alt="Captcha" className="h-12" />
+                  <img
+                    src={captchaImage}
+                    alt="Captcha"
+                    className="h-16 sm:h-20 w-auto max-w-full object-contain"
+                  />
                 ) : (
                   <div className="text-sm text-gray-700">
                     {captchaLoading

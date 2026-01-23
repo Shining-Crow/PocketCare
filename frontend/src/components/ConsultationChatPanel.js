@@ -56,7 +56,7 @@ export default function ConsultationChatPanel({
       const msg = e.response?.data?.message;
       setError(
         [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
-          "Failed to load chats"
+          "Failed to load chats",
       );
     } finally {
       setLoadingThreads(false);
@@ -72,14 +72,14 @@ export default function ConsultationChatPanel({
     }
     try {
       const res = await api.get(
-        `${messagesEndpointBase}/${appointmentId}/messages`
+        `${messagesEndpointBase}/${appointmentId}/messages`,
       );
       setMessages(res.data?.messages || []);
       setCanChat(res.data?.can_chat !== false);
-      
+
       // Store appointment date/time for display
       if (res.data?.appointment_date && res.data?.appointment_time) {
-        const dateStr = res.data.appointment_date.split('T')[0];
+        const dateStr = res.data.appointment_date.split("T")[0];
         const timeStr = res.data.appointment_time;
         setAppointmentDateTime(`${dateStr} ${timeStr}`);
       }
@@ -89,7 +89,7 @@ export default function ConsultationChatPanel({
       if (isInitialLoad) {
         setError(
           [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
-            "Failed to load messages"
+            "Failed to load messages",
         );
       }
       // If backend returns chat not available error, disable chat
@@ -119,15 +119,18 @@ export default function ConsultationChatPanel({
         `${messagesEndpointBase}/${selected.appointment_id}/messages`,
         {
           message: text,
-        }
+        },
       );
       // Silent refresh after sending message
-      await Promise.all([loadMessages(selected.appointment_id, false), loadThreads()]);
+      await Promise.all([
+        loadMessages(selected.appointment_id, false),
+        loadThreads(),
+      ]);
     } catch (e) {
       const msg = e.response?.data?.message;
       setError(
         [e.response?.data?.error, msg].filter(Boolean).join(": ") ||
-          "Failed to send message"
+          "Failed to send message",
       );
       // If time restriction error, disable chat
       if (e.response?.data?.can_chat === false) {
@@ -187,10 +190,10 @@ export default function ConsultationChatPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 min-h-[420px]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 h-full min-h-0">
         {/* Thread list */}
-        <div className="border-b lg:border-b-0 lg:border-r border-gray-200">
-          <div className="p-4">
+        <div className="border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col min-h-0">
+          <div className="p-4 flex-1 min-h-0 overflow-y-auto">
             {loadingThreads ? (
               <p className="text-sm text-gray-500">Loading chats…</p>
             ) : threads.length === 0 ? (
@@ -244,8 +247,8 @@ export default function ConsultationChatPanel({
         </div>
 
         {/* Messages */}
-        <div className="lg:col-span-2 flex flex-col">
-          <div className="px-5 py-4 border-b border-gray-200">
+        <div className="lg:col-span-2 flex flex-col min-h-0">
+          <div className="px-5 py-4 border-b border-gray-200 bg-white">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {title}
             </p>
@@ -260,7 +263,7 @@ export default function ConsultationChatPanel({
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-white">
             {!selected ? (
               <div className="h-full flex items-center justify-center text-gray-500">
                 <div className="text-center">
@@ -284,14 +287,15 @@ export default function ConsultationChatPanel({
                   </p>
                   {appointmentDateTime && (
                     <p className="text-sm font-medium text-amber-700 bg-amber-100 px-4 py-2 rounded-lg inline-block">
-                      {new Date(appointmentDateTime).toLocaleString('en-US', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short'
+                      {new Date(appointmentDateTime).toLocaleString("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
                       })}
                     </p>
                   )}
                   <p className="text-xs text-gray-500 mt-4">
-                    This ensures meaningful communication during and after your consultation.
+                    This ensures meaningful communication during and after your
+                    consultation.
                   </p>
                 </div>
               </div>
@@ -347,9 +351,11 @@ export default function ConsultationChatPanel({
                 onKeyDown={(e) => e.key === "Enter" && canChat && sendMessage()}
                 disabled={!selected || !canChat}
                 placeholder={
-                  !selected ? "Select a chat first" :
-                  !canChat ? "Chat available after appointment time" :
-                  "Type a message…"
+                  !selected
+                    ? "Select a chat first"
+                    : !canChat
+                      ? "Chat available after appointment time"
+                      : "Type a message…"
                 }
                 className="flex-1 px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               />

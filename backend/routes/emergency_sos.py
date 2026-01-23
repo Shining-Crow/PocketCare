@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from flask import Blueprint, jsonify, request
@@ -429,6 +429,8 @@ def hospital_list_emergency_requests():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            accepted_cutoff = datetime.now() - timedelta(seconds=_SOS_ACCEPTED_VISIBLE_SECONDS)
+
             cursor.execute(
                 "SELECT latitude, longitude FROM hospitals WHERE id=%s",
                 (hospital_id,),
@@ -485,7 +487,7 @@ def hospital_list_emergency_requests():
                                         AND er.hospital_id IS NOT NULL
                                         AND er.hospital_id <> %s
                                         AND er.acknowledged_at IS NOT NULL
-                                        AND TIMESTAMPDIFF(SECOND, er.acknowledged_at, NOW()) <= %s
+                                        AND er.acknowledged_at >= %s
                                     )
                                 )
                                 HAVING distance_km <= effective_radius_km
@@ -532,7 +534,7 @@ def hospital_list_emergency_requests():
                                         AND er.hospital_id IS NOT NULL
                                         AND er.hospital_id <> %s
                                         AND er.acknowledged_at IS NOT NULL
-                                        AND TIMESTAMPDIFF(SECOND, er.acknowledged_at, NOW()) <= %s
+                                        AND er.acknowledged_at >= %s
                                     )
                                 )
                                 HAVING distance_km <= effective_radius_km
@@ -583,7 +585,7 @@ def hospital_list_emergency_requests():
                         hlat,
                         hlng,
                         hospital_id,
-                        _SOS_ACCEPTED_VISIBLE_SECONDS,
+                        accepted_cutoff,
                     ),
                 )
                 pending = cursor.fetchall()
@@ -601,7 +603,7 @@ def hospital_list_emergency_requests():
                                 hlat,
                                 hlng,
                                 hospital_id,
-                                _SOS_ACCEPTED_VISIBLE_SECONDS,
+                                accepted_cutoff,
                             ),
                         )
                         pending = cursor.fetchall()

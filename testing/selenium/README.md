@@ -6,6 +6,8 @@ These are simple end-to-end login tests for the React frontend:
 - `/admin/login`
 - `/hospital/login`
 - `/weight-management` (add entry + set goal)
+- `/symptom-checker` (form validation + submit)
+- `/dashboard` (doctor profile: edit + save)
 
 ## 1) Start the app
 
@@ -58,6 +60,8 @@ export POCKETCARE_TEST_HOSPITAL_PASSWORD="password"
 ```bash
 pytest -q testing/selenium/test_login.py
 pytest -q testing/selenium/test_weight_management.py
+pytest -q testing/selenium/test_symptom_checker.py
+pytest -q testing/selenium/test_doctor_profile_edit.py
 ```
 
 ## Options

@@ -459,6 +459,11 @@ function Dashboard() {
       return;
     }
 
+    if (latestSos?.status === 'acknowledged' && latestSos?.hospital_id) {
+      setLatestSosError('A hospital has accepted this SOS. Only the hospital can mark it resolved.');
+      return;
+    }
+
     setLatestSosError(null);
     setLatestSosResolving(true);
     try {
@@ -827,7 +832,9 @@ function Dashboard() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {(latestSos?.id && (latestSos.status === 'pending' || latestSos.status === 'acknowledged')) && (
+                    {(latestSos?.id &&
+                      (latestSos.status === 'pending' ||
+                        (latestSos.status === 'acknowledged' && !latestSos?.hospital_id))) && (
                       <button
                         type="button"
                         onClick={resolveLatestSos}

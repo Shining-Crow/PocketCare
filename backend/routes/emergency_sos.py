@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from flask import Blueprint, jsonify, request
@@ -10,6 +10,15 @@ from utils.database import get_db_connection
 
 
 emergency_sos_bp = Blueprint('emergency_sos', __name__)
+
+# SOS visibility expansion (for pending/unacknowledged requests)
+# Rationale: if no nearby hospital sees/accepts a request quickly, widen the
+# radius gradually so hospitals farther away can respond.
+_SOS_BASE_RADIUS_KM_DEFAULT = 10.0
+_SOS_EXPAND_EVERY_SECONDS = 180  # 3 minutes
+_SOS_EXPAND_STEP_KM = 10.0
+_SOS_MAX_RADIUS_KM = 50.0
+_SOS_ACCEPTED_VISIBLE_SECONDS = 60
 
 
 def _is_missing_emergency_types(err: Exception) -> bool:
@@ -367,12 +376,45 @@ def user_resolve_emergency_sos(request_id: int):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # If a hospital has already accepted the request, only that hospital can mark it resolved.
+            cursor.execute(
+                """
+                SELECT status, hospital_id
+                FROM emergency_requests
+                WHERE id=%s AND user_id=%s
+                """,
+                (request_id, user_id),
+            )
+            existing = cursor.fetchone() or {}
+            status = (existing.get('status') or '').lower()
+            hospital_id = existing.get('hospital_id')
+
+            if not status:
+                return jsonify({'error': 'Request not found'}), 404
+
+            if status == 'acknowledged' and hospital_id:
+                return (
+                    jsonify(
+                        {
+                            'error': 'This SOS was accepted by a hospital. Only the hospital can mark it resolved.',
+                            'status': status,
+                            'hospital_id': hospital_id,
+                        }
+                    ),
+                    409,
+                )
+
+            # Users can only resolve while still pending (or acknowledged but not assigned).
+            if status not in ('pending', 'acknowledged'):
+                return jsonify({'error': 'Request is not eligible to resolve', 'status': status}), 409
+
             try:
                 cursor.execute(
                     """
                     UPDATE emergency_requests
                     SET status='resolved', resolved_at=%s
                     WHERE id=%s AND user_id=%s AND status IN ('pending', 'acknowledged')
+                      AND (hospital_id IS NULL OR hospital_id = 0)
                     """,
                     (datetime.now(), request_id, user_id),
                 )
@@ -392,7 +434,7 @@ def user_resolve_emergency_sos(request_id: int):
             connection.commit()
 
             if cursor.rowcount == 0:
-                return jsonify({'error': 'Request not found or not eligible to resolve'}), 404
+                return jsonify({'error': 'Request not found or not eligible to resolve'}), 409
 
         return jsonify({'success': True, 'request_id': request_id, 'status': 'resolved'}), 200
     except Exception as e:
@@ -414,12 +456,14 @@ def hospital_list_emergency_requests():
     if hospital_id is None:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    radius_km = _as_float(request.args.get('radius_km')) or 10.0
+    radius_km = _as_float(request.args.get('radius_km')) or _SOS_BASE_RADIUS_KM_DEFAULT
     include_assigned = str(request.args.get('include_assigned', '1')).lower() in ('1', 'true', 'yes', 'y', 'on')
 
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            accepted_cutoff = datetime.now() - timedelta(seconds=_SOS_ACCEPTED_VISIBLE_SECONDS)
+
             cursor.execute(
                 "SELECT latitude, longitude FROM hospitals WHERE id=%s",
                 (hospital_id,),
@@ -452,9 +496,14 @@ def hospital_list_emergency_requests():
                   er.note,
                   er.status,
                   er.hospital_id,
+                                    h_acc.name AS accepted_hospital_name,
                   er.created_at,
                   er.acknowledged_at,
                   er.resolved_at,
+                                    LEAST(
+                                        (%s + (%s * FLOOR(TIMESTAMPDIFF(SECOND, er.created_at, NOW()) / %s))),
+                                        %s
+                                    ) AS effective_radius_km,
                   (6371 * 2 * ASIN(SQRT(
                       POWER(SIN(RADIANS(er.latitude - %s) / 2), 2) +
                       COS(RADIANS(%s)) * COS(RADIANS(er.latitude)) *
@@ -463,8 +512,18 @@ def hospital_list_emergency_requests():
                 FROM emergency_requests er
                 JOIN users u ON u.id = er.user_id
                 LEFT JOIN emergency_types et ON et.code = er.emergency_type
-                WHERE er.status = 'pending'
-                HAVING distance_km <= %s
+                                LEFT JOIN hospitals h_acc ON h_acc.id = er.hospital_id
+                                WHERE (
+                                    er.status = 'pending'
+                                    OR (
+                                        er.status = 'acknowledged'
+                                        AND er.hospital_id IS NOT NULL
+                                        AND er.hospital_id <> %s
+                                        AND er.acknowledged_at IS NOT NULL
+                                        AND er.acknowledged_at >= %s
+                                    )
+                                )
+                                HAVING distance_km <= effective_radius_km
                 ORDER BY er.created_at DESC
                 LIMIT 200
             """
@@ -485,9 +544,14 @@ def hospital_list_emergency_requests():
                   er.note,
                   er.status,
                   er.hospital_id,
+                                    h_acc.name AS accepted_hospital_name,
                   er.created_at,
                   er.acknowledged_at,
                   er.resolved_at,
+                                    LEAST(
+                                        (%s + (%s * FLOOR(TIMESTAMPDIFF(SECOND, er.created_at, NOW()) / %s))),
+                                        %s
+                                    ) AS effective_radius_km,
                   (6371 * 2 * ASIN(SQRT(
                       POWER(SIN(RADIANS(er.latitude - %s) / 2), 2) +
                       COS(RADIANS(%s)) * COS(RADIANS(er.latitude)) *
@@ -495,8 +559,18 @@ def hospital_list_emergency_requests():
                   ))) AS distance_km
                 FROM emergency_requests er
                 JOIN users u ON u.id = er.user_id
-                WHERE er.status = 'pending'
-                HAVING distance_km <= %s
+                                LEFT JOIN hospitals h_acc ON h_acc.id = er.hospital_id
+                                WHERE (
+                                    er.status = 'pending'
+                                    OR (
+                                        er.status = 'acknowledged'
+                                        AND er.hospital_id IS NOT NULL
+                                        AND er.hospital_id <> %s
+                                        AND er.acknowledged_at IS NOT NULL
+                                        AND er.acknowledged_at >= %s
+                                    )
+                                )
+                                HAVING distance_km <= effective_radius_km
                 ORDER BY er.created_at DESC
                 LIMIT 200
             """
@@ -515,6 +589,10 @@ def hospital_list_emergency_requests():
                   NULL AS note,
                   er.status,
                   er.created_at,
+                                    LEAST(
+                                        (%s + (%s * FLOOR(TIMESTAMPDIFF(SECOND, er.created_at, NOW()) / %s))),
+                                        %s
+                                    ) AS effective_radius_km,
                   (6371 * 2 * ASIN(SQRT(
                       POWER(SIN(RADIANS(er.latitude - %s) / 2), 2) +
                       COS(RADIANS(%s)) * COS(RADIANS(er.latitude)) *
@@ -523,27 +601,75 @@ def hospital_list_emergency_requests():
                 FROM emergency_requests er
                 JOIN users u ON u.id = er.user_id
                 WHERE er.status = 'pending'
-                HAVING distance_km <= %s
+                                HAVING distance_km <= effective_radius_km
                 ORDER BY er.created_at DESC
                 LIMIT 200
             """
 
             try:
-                cursor.execute(pending_sql_with_types, (hlat, hlat, hlng, radius_km))
+                cursor.execute(
+                    pending_sql_with_types,
+                    (
+                        radius_km,
+                        _SOS_EXPAND_STEP_KM,
+                        _SOS_EXPAND_EVERY_SECONDS,
+                        _SOS_MAX_RADIUS_KM,
+                        hlat,
+                        hlat,
+                        hlng,
+                        hospital_id,
+                        accepted_cutoff,
+                    ),
+                )
                 pending = cursor.fetchall()
             except Exception as e:
                 try:
                     if _is_missing_emergency_types(e):
-                        cursor.execute(pending_sql_without_types, (hlat, hlat, hlng, radius_km))
+                        cursor.execute(
+                            pending_sql_without_types,
+                            (
+                                radius_km,
+                                _SOS_EXPAND_STEP_KM,
+                                _SOS_EXPAND_EVERY_SECONDS,
+                                _SOS_MAX_RADIUS_KM,
+                                hlat,
+                                hlat,
+                                hlng,
+                                hospital_id,
+                                accepted_cutoff,
+                            ),
+                        )
                         pending = cursor.fetchall()
                     elif _is_unknown_column(e):
-                        cursor.execute(pending_sql_minimal, (hlat, hlat, hlng, radius_km))
+                        cursor.execute(
+                            pending_sql_minimal,
+                            (
+                                radius_km,
+                                _SOS_EXPAND_STEP_KM,
+                                _SOS_EXPAND_EVERY_SECONDS,
+                                _SOS_MAX_RADIUS_KM,
+                                hlat,
+                                hlat,
+                                hlng,
+                            ),
+                        )
                         pending = cursor.fetchall()
                     else:
                         raise
                 except Exception as e2:
                     if _is_unknown_column(e2):
-                        cursor.execute(pending_sql_minimal, (hlat, hlat, hlng, radius_km))
+                        cursor.execute(
+                            pending_sql_minimal,
+                            (
+                                radius_km,
+                                _SOS_EXPAND_STEP_KM,
+                                _SOS_EXPAND_EVERY_SECONDS,
+                                _SOS_MAX_RADIUS_KM,
+                                hlat,
+                                hlat,
+                                hlng,
+                            ),
+                        )
                         pending = cursor.fetchall()
                     else:
                         raise
@@ -655,6 +781,12 @@ def hospital_list_emergency_requests():
                     'success': True,
                     'hospital_id': hospital_id,
                     'radius_km': radius_km,
+                    'auto_expand': {
+                        'enabled': True,
+                        'expand_every_seconds': _SOS_EXPAND_EVERY_SECONDS,
+                        'expand_step_km': _SOS_EXPAND_STEP_KM,
+                        'max_radius_km': _SOS_MAX_RADIUS_KM,
+                    },
                     'pending': pending,
                     'assigned': assigned,
                 }
@@ -693,6 +825,32 @@ def hospital_accept_emergency_request(request_id: int):
             connection.commit()
 
             if cursor.rowcount == 0:
+                # Race-condition friendly message: request exists but was already accepted.
+                try:
+                    cursor.execute(
+                        """
+                        SELECT status, hospital_id, acknowledged_at
+                        FROM emergency_requests
+                        WHERE id=%s
+                        """,
+                        (request_id,),
+                    )
+                    row = cursor.fetchone() or {}
+                    if row.get('status') == 'acknowledged':
+                        return (
+                            jsonify(
+                                {
+                                    'error': 'Request already accepted by another hospital',
+                                    'status': row.get('status'),
+                                    'hospital_id': row.get('hospital_id'),
+                                    'acknowledged_at': row.get('acknowledged_at'),
+                                }
+                            ),
+                            409,
+                        )
+                except Exception:
+                    pass
+
                 return jsonify({'error': 'Request not found or not pending'}), 404
 
         return jsonify({'success': True, 'request_id': request_id, 'status': 'acknowledged'}), 200

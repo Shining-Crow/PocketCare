@@ -49,6 +49,8 @@ const HospitalEmergencySOS = () => {
   const [pending, setPending] = useState([]);
   const [assigned, setAssigned] = useState([]);
 
+  const [currentHospitalId, setCurrentHospitalId] = useState(null);
+
   const [radiusKm, setRadiusKm] = useState(10);
   const [activeTab, setActiveTab] = useState(TAB.PENDING);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -73,6 +75,7 @@ const HospitalEmergencySOS = () => {
       });
       setPending(Array.isArray(res.data?.pending) ? res.data.pending : []);
       setAssigned(Array.isArray(res.data?.assigned) ? res.data.assigned : []);
+      setCurrentHospitalId(toNumberOrNull(res.data?.hospital_id));
       setLastUpdatedAt(new Date());
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to fetch emergency requests';
@@ -223,7 +226,7 @@ const HospitalEmergencySOS = () => {
       return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Resolved</span>;
     }
     if (status === 'acknowledged') {
-      return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Assigned</span>;
+      return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Accepted</span>;
     }
     return <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Pending</span>;
   };
@@ -272,7 +275,7 @@ const HospitalEmergencySOS = () => {
               !
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Within {radiusKm} km radius</p>
+          <p className="text-xs text-gray-500 mt-2">Base radius: {radiusKm} km (auto-expands over time)</p>
         </div>
 
         <div className="p-5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
@@ -411,7 +414,15 @@ const HospitalEmergencySOS = () => {
             const lat = toNumberOrNull(r.latitude);
             const lng = toNumberOrNull(r.longitude);
             const distanceKm = typeof r.distance_km === 'number' ? r.distance_km : toNumberOrNull(r.distance_km);
+            const effectiveRadiusKm = toNumberOrNull(r.effective_radius_km);
+            const hasExpanded = effectiveRadiusKm != null && effectiveRadiusKm > radiusKm + 1e-6;
             const isBusy = busyId === r.id;
+            const isAcceptedByOtherHospital =
+              r.status === 'acknowledged' &&
+              toNumberOrNull(r.hospital_id) != null &&
+              currentHospitalId != null &&
+              toNumberOrNull(r.hospital_id) !== currentHospitalId;
+            const canResolve = r.status === 'acknowledged' && !isAcceptedByOtherHospital;
 
             return (
               <div
@@ -436,6 +447,11 @@ const HospitalEmergencySOS = () => {
                     <div className="mt-1 text-sm text-gray-700">
                       <span className="font-medium">Type:</span> {r.emergency_type_label || r.emergency_type || 'Emergency'}
                     </div>
+                    {isAcceptedByOtherHospital ? (
+                      <div className="mt-1 text-sm text-blue-700">
+                        Accepted by {r.accepted_hospital_name || `Hospital #${r.hospital_id}`} • this card will disappear shortly
+                      </div>
+                    ) : null}
                     {r.note ? <div className="mt-1 text-sm text-gray-600">{r.note}</div> : null}
 
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -448,6 +464,13 @@ const HospitalEmergencySOS = () => {
                         <div className="text-sm font-medium text-gray-900">
                           {distanceKm == null ? '—' : `${distanceKm.toFixed(1)} km`}
                         </div>
+                        {effectiveRadiusKm != null ? (
+                          <div className={`text-xs mt-1 ${hasExpanded ? 'text-orange-700' : 'text-gray-500'}`}>
+                            {hasExpanded
+                              ? `Expanded radius: ${effectiveRadiusKm.toFixed(0)} km`
+                              : `Visibility radius: ${effectiveRadiusKm.toFixed(0)} km`}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
                         <div className="text-xs text-gray-500">Contact</div>
@@ -467,7 +490,7 @@ const HospitalEmergencySOS = () => {
                       </button>
                     ) : null}
 
-                    {r.status === 'acknowledged' ? (
+                    {canResolve ? (
                       <button
                         disabled={isBusy}
                         onClick={() => resolveRequest(r.id)}

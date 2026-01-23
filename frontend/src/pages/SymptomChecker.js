@@ -10,15 +10,15 @@ function UrgencyPill({ level }) {
     v === "high"
       ? "bg-red-100 text-red-700 border-red-200"
       : v === "low"
-      ? "bg-green-100 text-green-700 border-green-200"
-      : "bg-yellow-100 text-yellow-800 border-yellow-200";
+        ? "bg-green-100 text-green-700 border-green-200"
+        : "bg-yellow-100 text-yellow-800 border-yellow-200";
 
   const label =
     v === "high"
       ? "High urgency"
       : v === "low"
-      ? "Low urgency"
-      : "Medium urgency";
+        ? "Low urgency"
+        : "Medium urgency";
 
   return (
     <span
@@ -45,7 +45,7 @@ export default function SymptomChecker() {
   const disclaimer = useMemo(
     () =>
       "This tool provides informational guidance only and is not a medical diagnosis. If symptoms are severe or worsening, seek professional help.",
-    []
+    [],
   );
 
   const fetchHistory = async () => {
@@ -124,6 +124,7 @@ export default function SymptomChecker() {
                   value={symptoms}
                   onChange={(e) => setSymptoms(e.target.value)}
                   disabled={loading}
+                  data-testid="sc-symptoms"
                 />
               </div>
 
@@ -140,6 +141,7 @@ export default function SymptomChecker() {
                       value={duration}
                       onChange={(e) => setDuration(e.target.value)}
                       disabled={loading}
+                      data-testid="sc-duration"
                     />
                   </div>
                 </div>
@@ -156,6 +158,7 @@ export default function SymptomChecker() {
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
                     disabled={loading}
+                    data-testid="sc-age"
                   />
                 </div>
 
@@ -168,6 +171,7 @@ export default function SymptomChecker() {
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
                     disabled={loading}
+                    data-testid="sc-gender"
                   >
                     <option value="">Prefer not to say</option>
                     <option value="male">Male</option>
@@ -178,7 +182,10 @@ export default function SymptomChecker() {
               </div>
 
               {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">
+                <div
+                  className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm"
+                  data-testid="sc-error"
+                >
                   {error}
                 </div>
               )}
@@ -187,6 +194,7 @@ export default function SymptomChecker() {
                 type="submit"
                 disabled={loading}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-3 disabled:opacity-60"
+                data-testid="sc-submit"
               >
                 <Stethoscope className="w-4 h-4" />
                 {loading ? "Analyzing…" : "Analyze"}
@@ -197,7 +205,10 @@ export default function SymptomChecker() {
 
             {/* Result */}
             {result && (
-              <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
+              <div
+                className="mt-6 rounded-2xl border border-gray-200 bg-white p-5"
+                data-testid="sc-result"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <UrgencyPill level={result.urgency_level} />
@@ -215,8 +226,8 @@ export default function SymptomChecker() {
                     onClick={() =>
                       navigate(
                         `/doctors?specialty=${encodeURIComponent(
-                          result.recommended_specialty || ""
-                        )}`
+                          result.recommended_specialty || "",
+                        )}`,
                       )
                     }
                   >

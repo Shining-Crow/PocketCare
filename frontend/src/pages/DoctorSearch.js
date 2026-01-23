@@ -83,18 +83,17 @@ export default function DoctorSearch() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
       <div className="flex-grow">
         <div className="p-3 max-w-7xl mx-auto pb-14">
-          <div className="mb-8 flex items-center gap-3">
-            <BackToDashboardButton />
-            <h2 className="text-2xl font-semibold text-gray-800">
-              Available Doctors
-            </h2>
-            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-              {doctors.length} found
-            </span>
-          </div>
-
           {/* Filter Bar */}
           <div className="w-full rounded-2xl bg-white border border-gray-200 shadow-sm p-4 mb-6">
+            <div className="mb-5 flex items-center gap-3">
+              <BackToDashboardButton />
+              <h2 className="text-2xl font-semibold text-gray-800">
+                Available Doctors
+              </h2>
+              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                {doctors.length} found
+              </span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Search */}
               <div className="relative">

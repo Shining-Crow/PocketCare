@@ -55,7 +55,7 @@ export default function WeightManagement() {
 
   const bmiPreview = useMemo(
     () => computeBmi(form.weight_kg, form.height_cm),
-    [form.weight_kg, form.height_cm]
+    [form.weight_kg, form.height_cm],
   );
 
   const latestEntry = entries.length ? entries[entries.length - 1] : null;
@@ -85,7 +85,7 @@ export default function WeightManagement() {
       setGoal(goalRes.data?.goal || null);
     } catch (e) {
       setError(
-        e?.response?.data?.error || "Failed to load weight management data"
+        e?.response?.data?.error || "Failed to load weight management data",
       );
     } finally {
       setLoading(false);
@@ -286,7 +286,7 @@ export default function WeightManagement() {
 
   const editBmiPreview = useMemo(
     () => computeBmi(editForm.weight_kg, editForm.height_cm),
-    [editForm.weight_kg, editForm.height_cm]
+    [editForm.weight_kg, editForm.height_cm],
   );
 
   const onSaveEdit = async (e) => {
@@ -373,7 +373,10 @@ export default function WeightManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Latest Weight</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p
+                  className="text-2xl font-bold text-gray-900"
+                  data-testid="wm-latest-weight"
+                >
                   {latestEntry ? `${latestEntry.weight_kg} kg` : "—"}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -447,6 +450,7 @@ export default function WeightManagement() {
                       setForm((p) => ({ ...p, entry_date: e.target.value }))
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    data-testid="wm-entry-date"
                     required
                   />
                 </div>
@@ -465,6 +469,7 @@ export default function WeightManagement() {
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="optional"
+                    data-testid="wm-entry-age"
                   />
                 </div>
               </div>
@@ -484,6 +489,7 @@ export default function WeightManagement() {
                       setForm((p) => ({ ...p, weight_kg: e.target.value }))
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    data-testid="wm-entry-weight"
                     required
                   />
                 </div>
@@ -501,6 +507,7 @@ export default function WeightManagement() {
                       setForm((p) => ({ ...p, height_cm: e.target.value }))
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    data-testid="wm-entry-height"
                     required
                   />
                 </div>
@@ -509,7 +516,9 @@ export default function WeightManagement() {
               <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
                 <p className="text-sm text-gray-700">
                   BMI preview:{" "}
-                  <span className="font-semibold">{bmiPreview ?? "—"}</span>
+                  <span className="font-semibold" data-testid="wm-bmi-preview">
+                    {bmiPreview ?? "—"}
+                  </span>
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   BMI is a general indicator; it doesn’t diagnose health.
@@ -520,6 +529,7 @@ export default function WeightManagement() {
                 type="submit"
                 disabled={savingEntry}
                 className="w-full rounded-xl bg-blue-600 text-white px-4 py-3 font-semibold hover:bg-blue-700 disabled:opacity-60 transition"
+                data-testid="wm-save-entry"
               >
                 {savingEntry ? "Saving…" : "Save Entry"}
               </button>
@@ -531,7 +541,10 @@ export default function WeightManagement() {
             <h2 className="text-lg font-bold text-gray-900 mb-4">Set Goal</h2>
 
             {goal ? (
-              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div
+                className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+                data-testid="wm-active-goal"
+              >
                 <p className="text-sm text-emerald-800 font-semibold">
                   Active goal
                 </p>
@@ -566,6 +579,7 @@ export default function WeightManagement() {
                       }))
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    data-testid="wm-goal-target-weight"
                     required
                   />
                 </div>
@@ -584,6 +598,7 @@ export default function WeightManagement() {
                     }
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     placeholder="optional"
+                    data-testid="wm-goal-target-date"
                   />
                 </div>
               </div>
@@ -592,6 +607,7 @@ export default function WeightManagement() {
                 type="submit"
                 disabled={savingGoal}
                 className="w-full rounded-xl bg-emerald-600 text-white px-4 py-3 font-semibold hover:bg-emerald-700 disabled:opacity-60 transition"
+                data-testid="wm-set-goal"
               >
                 {savingGoal ? "Saving…" : "Set Goal"}
               </button>

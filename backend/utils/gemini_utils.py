@@ -120,3 +120,54 @@ def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -
     if not text:
         raise RuntimeError("Empty response from Gemini")
     return text.strip()
+
+
+def explain_bytes_with_gemini(
+    file_bytes: bytes,
+    *,
+    mime_type: str,
+    model: str = "gemini-3-flash-preview",
+) -> str:
+    """Analyze an image/PDF directly with Gemini for better layout-aware extraction.
+
+    This is intended for medical report understanding where tables/columns matter.
+    """
+
+    if not file_bytes:
+        raise ValueError("File bytes are empty")
+    if not (mime_type or "").strip():
+        raise ValueError("mime_type is required")
+
+    from google import genai
+    from google.genai import types
+
+    api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    client = genai.Client(api_key=api_key)
+
+    prompt = (
+        "You are a helpful medical assistant. Analyze the attached medical report file.\n"
+        "Rules:\n"
+        "- Be accurate with numbers and units; keep them tied to the correct labels/rows/columns.\n"
+        "- If a value is unclear/blurred, say so instead of guessing.\n"
+        "- Do NOT invent details not present.\n"
+        "- Do NOT provide a diagnosis or medication guidance.\n"
+        "Output format:\n"
+        "1) Summary (1-3 bullets)\n"
+        "2) Key details (bullets; include dates, test names, and measured values)\n"
+        "3) Notable findings (bullets; highlight abnormal/flagged values only if shown)\n"
+        "4) Next steps (2-4 bullets; general and safe)\n"
+    )
+
+    contents = [
+        types.Part.from_text(prompt),
+        types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+    ]
+
+    response = client.models.generate_content(model=model, contents=contents)
+    text = getattr(response, "text", None)
+    if not text:
+        raise RuntimeError("Empty response from Gemini")
+    return text.strip()

@@ -579,11 +579,11 @@ def hospital_list_emergency_requests():
                         _SOS_EXPAND_STEP_KM,
                         _SOS_EXPAND_EVERY_SECONDS,
                         _SOS_MAX_RADIUS_KM,
-                        hospital_id,
-                        _SOS_ACCEPTED_VISIBLE_SECONDS,
                         hlat,
                         hlat,
                         hlng,
+                        hospital_id,
+                        _SOS_ACCEPTED_VISIBLE_SECONDS,
                     ),
                 )
                 pending = cursor.fetchall()
@@ -597,11 +597,11 @@ def hospital_list_emergency_requests():
                                 _SOS_EXPAND_STEP_KM,
                                 _SOS_EXPAND_EVERY_SECONDS,
                                 _SOS_MAX_RADIUS_KM,
-                                hospital_id,
-                                _SOS_ACCEPTED_VISIBLE_SECONDS,
                                 hlat,
                                 hlat,
                                 hlng,
+                                hospital_id,
+                                _SOS_ACCEPTED_VISIBLE_SECONDS,
                             ),
                         )
                         pending = cursor.fetchall()

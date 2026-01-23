@@ -272,7 +272,7 @@ const HospitalEmergencySOS = () => {
               !
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Within {radiusKm} km radius</p>
+          <p className="text-xs text-gray-500 mt-2">Base radius: {radiusKm} km (auto-expands over time)</p>
         </div>
 
         <div className="p-5 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
@@ -411,6 +411,8 @@ const HospitalEmergencySOS = () => {
             const lat = toNumberOrNull(r.latitude);
             const lng = toNumberOrNull(r.longitude);
             const distanceKm = typeof r.distance_km === 'number' ? r.distance_km : toNumberOrNull(r.distance_km);
+            const effectiveRadiusKm = toNumberOrNull(r.effective_radius_km);
+            const hasExpanded = effectiveRadiusKm != null && effectiveRadiusKm > radiusKm + 1e-6;
             const isBusy = busyId === r.id;
 
             return (
@@ -448,6 +450,13 @@ const HospitalEmergencySOS = () => {
                         <div className="text-sm font-medium text-gray-900">
                           {distanceKm == null ? '—' : `${distanceKm.toFixed(1)} km`}
                         </div>
+                        {effectiveRadiusKm != null ? (
+                          <div className={`text-xs mt-1 ${hasExpanded ? 'text-orange-700' : 'text-gray-500'}`}>
+                            {hasExpanded
+                              ? `Expanded radius: ${effectiveRadiusKm.toFixed(0)} km`
+                              : `Visibility radius: ${effectiveRadiusKm.toFixed(0)} km`}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="p-3 rounded-lg bg-gray-50 border border-gray-100">
                         <div className="text-xs text-gray-500">Contact</div>

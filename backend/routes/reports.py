@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 from config import Config
 from utils.auth_utils import jwt_required_custom
 from utils.database import execute_query
-from utils.gemini_utils import simplify_ocr_text
+from utils.gemini_utils import explain_bytes_with_gemini, simplify_ocr_text
 from utils.ocr_utils import extract_text_from_image_bytes
 from utils.pdf_utils import extract_text_from_pdf_bytes
 
@@ -149,18 +149,30 @@ def simplify_report_and_save():
 
     try:
         ocr_text, confidence = _ocr_bytes(ext=ext, data=data)
-        if not (ocr_text or "").strip():
-            return (
-                jsonify(
-                    {
-                        "error": "OCR returned no text",
-                        "message": "Try a clearer image or a different file",
-                    }
-                ),
-                400,
-            )
 
-        explanation = simplify_ocr_text(ocr_text, model=model)
+        # Keep OCR for database/search even if it's imperfect.
+        if not (ocr_text or "").strip():
+            ocr_text = "[OCR failed to extract text, but AI analysis may still succeed]"
+            confidence = None
+
+        # Accuracy upgrade: for the explanation, prefer Gemini multimodal analysis
+        # using the original file bytes so tables/columns/layout are preserved.
+        if ext == "pdf":
+            mime_type = "application/pdf"
+        elif ext == "png":
+            mime_type = "image/png"
+        else:
+            mime_type = "image/jpeg"
+
+        try:
+            explanation = explain_bytes_with_gemini(data, mime_type=mime_type, model=model)
+        except Exception:
+            # Fallback: keep the original behavior if vision/PDF analysis fails.
+            # This prevents regressions on environments/models that don't support multimodal.
+            if (ocr_text or "").strip() and not ocr_text.startswith("[OCR failed"):
+                explanation = simplify_ocr_text(ocr_text, model=model)
+            else:
+                raise
 
         report_id = execute_query(
             """

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -31,6 +31,18 @@ function MedicalReports() {
   const [historyClearing, setHistoryClearing] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(null);
   const [clearHistoryOpen, setClearHistoryOpen] = useState(false);
+
+  const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const fileLabel = useMemo(() => {
     if (!file) return "Choose a file (png/jpg/jpeg/pdf)";
@@ -166,18 +178,38 @@ function MedicalReports() {
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
+      return true;
     } catch {
       // Fallback for older browsers
-      const el = document.createElement("textarea");
-      el.value = value;
-      el.setAttribute("readonly", "");
-      el.style.position = "absolute";
-      el.style.left = "-9999px";
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
+      try {
+        const el = document.createElement("textarea");
+        el.value = value;
+        el.setAttribute("readonly", "");
+        el.style.position = "absolute";
+        el.style.left = "-9999px";
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        return true;
+      } catch {
+        return false;
+      }
     }
+  };
+
+  const onCopyExplanation = async () => {
+    const ok = await copyText(formattedExplanation || aiExplanation);
+    if (!ok) return;
+
+    setCopied(true);
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current);
+    }
+    copiedTimerRef.current = setTimeout(() => {
+      setCopied(false);
+      copiedTimerRef.current = null;
+    }, 1400);
   };
 
   const onPickFile = (e) => {
@@ -468,9 +500,7 @@ function MedicalReports() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    copyText(formattedExplanation || aiExplanation)
-                  }
+                  onClick={onCopyExplanation}
                   disabled={!formattedExplanation.trim()}
                   className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold ${
                     !formattedExplanation.trim()
@@ -480,7 +510,7 @@ function MedicalReports() {
                   title="Copy AI explanation"
                 >
                   <Copy className="h-4 w-4" />
-                  <span className="hidden sm:inline">Copy</span>
+                  <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
                 </button>
               </div>
 

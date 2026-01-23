@@ -1047,7 +1047,7 @@ function UserProfile() {
                             {formatDateTime(req.created_at)}
                           </div>
 
-                          {(req.status === "pending" || req.status === "acknowledged") && (
+                          {(req.status === "pending" || (req.status === "acknowledged" && !req.hospital_id)) && (
                             <div className="mt-2 flex justify-end">
                               <button
                                 type="button"
@@ -1064,6 +1064,11 @@ function UserProfile() {
                               </button>
                             </div>
                           )}
+                          {req.status === "acknowledged" && req.hospital_id ? (
+                            <div className="mt-2 text-xs text-blue-700">
+                              Accepted by a hospital — only the hospital can mark it resolved.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 

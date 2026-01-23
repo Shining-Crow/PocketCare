@@ -376,12 +376,45 @@ def user_resolve_emergency_sos(request_id: int):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # If a hospital has already accepted the request, only that hospital can mark it resolved.
+            cursor.execute(
+                """
+                SELECT status, hospital_id
+                FROM emergency_requests
+                WHERE id=%s AND user_id=%s
+                """,
+                (request_id, user_id),
+            )
+            existing = cursor.fetchone() or {}
+            status = (existing.get('status') or '').lower()
+            hospital_id = existing.get('hospital_id')
+
+            if not status:
+                return jsonify({'error': 'Request not found'}), 404
+
+            if status == 'acknowledged' and hospital_id:
+                return (
+                    jsonify(
+                        {
+                            'error': 'This SOS was accepted by a hospital. Only the hospital can mark it resolved.',
+                            'status': status,
+                            'hospital_id': hospital_id,
+                        }
+                    ),
+                    409,
+                )
+
+            # Users can only resolve while still pending (or acknowledged but not assigned).
+            if status not in ('pending', 'acknowledged'):
+                return jsonify({'error': 'Request is not eligible to resolve', 'status': status}), 409
+
             try:
                 cursor.execute(
                     """
                     UPDATE emergency_requests
                     SET status='resolved', resolved_at=%s
                     WHERE id=%s AND user_id=%s AND status IN ('pending', 'acknowledged')
+                      AND (hospital_id IS NULL OR hospital_id = 0)
                     """,
                     (datetime.now(), request_id, user_id),
                 )
@@ -401,7 +434,7 @@ def user_resolve_emergency_sos(request_id: int):
             connection.commit()
 
             if cursor.rowcount == 0:
-                return jsonify({'error': 'Request not found or not eligible to resolve'}), 404
+                return jsonify({'error': 'Request not found or not eligible to resolve'}), 409
 
         return jsonify({'success': True, 'request_id': request_id, 'status': 'resolved'}), 200
     except Exception as e:

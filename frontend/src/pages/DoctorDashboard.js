@@ -8,7 +8,7 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import {
   User,
   Calendar,
-  Star,
+  RefreshCw,
   Award,
   Clock,
   DollarSign,
@@ -672,18 +672,7 @@ function DoctorDashboard() {
             {/* Profile Progress Card */}
             <div className="lg:col-span-2 space-y-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <Star className="w-6 h-6 text-amber-500" />
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {doctor?.rating || "4.8"}
-                  </p>
-                  <p className="text-sm text-gray-600">Rating</p>
-                </div>
-
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
                     <Award className="w-6 h-6 text-blue-600" />
@@ -964,10 +953,11 @@ function DoctorDashboard() {
                   </h2>
                   <button
                     onClick={refreshTodaysAppointments}
-                    className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200 gap-3"
                     title="Refresh appointments"
                   >
-                    🔄 Refresh
+                    <RefreshCw className="h-4 w-4"/>
+                    Refresh
                   </button>
                 </div>
                 <div className="space-y-3">

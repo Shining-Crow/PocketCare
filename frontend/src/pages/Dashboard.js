@@ -1226,8 +1226,10 @@ function Dashboard() {
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-blue-100 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                <HeartPulse className="w-5 h-5 mr-2 text-cyan-500 animate-pulse" />
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform shadow-md">
+                  <HeartPulse className="w-6 h-6 text-white" />
+                </div>
                 Daily Health Tip
               </h3>
               {dailyTips.length ? (

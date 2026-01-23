@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { HeartPulse, Bell, Settings, LogOut, User, MessageSquare } from "lucide-react";
+import { HeartPulse, LogOut, User, MessageSquare } from "lucide-react";
 import { logout } from "../utils/auth";
 
 const UserNavbar = () => {
@@ -30,11 +30,6 @@ const UserNavbar = () => {
           </button>
 
           <div className="flex items-center space-x-2">
-            <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition group" type="button">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
             <button
               onClick={() => navigate("/messages")}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
@@ -50,12 +45,6 @@ const UserNavbar = () => {
               title="Profile"
             >
               <User className="w-5 h-5" />
-            </button>
-            <button
-              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
-              type="button"
-            >
-              <Settings className="w-5 h-5" />
             </button>
             <button
               onClick={handleLogout}

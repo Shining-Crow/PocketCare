@@ -63,6 +63,80 @@ _SPECIALTY_SYNONYMS = {
 }
 
 
+_NON_MEDICAL_PATTERNS = [
+    r"\bmath\b",
+    r"\balgebra\b",
+    r"\bcalculus\b",
+    r"\bgeometry\b",
+    r"\btrigonometry\b",
+    r"\bequation\b",
+    r"\bhomework\b",
+    r"\bassignment\b",
+    r"\bsolve\b.*\b(problem|equation)\b",
+    r"\bcan you help me\b.*\b(math|homework|assignment|equation)\b",
+    r"\bjavascript\b",
+    r"\breact\b",
+    r"\bpython\b",
+    r"\bcompile\b",
+    r"\bbug\b",
+    r"\bdebug\b",
+    r"\bprogramming\b",
+    r"\bcode\b",
+]
+
+_SYMPTOM_HINT_WORDS = [
+    "pain",
+    "fever",
+    "cough",
+    "headache",
+    "nausea",
+    "vomit",
+    "vomiting",
+    "diarrhea",
+    "diarrhoea",
+    "rash",
+    "dizzy",
+    "dizziness",
+    "chest",
+    "breath",
+    "shortness",
+    "bleeding",
+    "injury",
+    "swelling",
+    "infection",
+    "itch",
+    "itchy",
+    "sore",
+    "throat",
+    "runny",
+    "congestion",
+    "fatigue",
+    "tired",
+    "weak",
+    "anxiety",
+    "depression",
+]
+
+
+def _is_non_medical_request(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+
+    non_medical_hit = any(re.search(p, t, flags=re.IGNORECASE) for p in _NON_MEDICAL_PATTERNS)
+    if not non_medical_hit:
+        return False
+
+    # If there are clear symptom indicators, assume it's medical even if it mentions a non-medical topic.
+    if any(w in t for w in _SYMPTOM_HINT_WORDS):
+        # Still treat it as non-medical when the user explicitly asks to solve a math problem.
+        if "math problem" in t or ("solve" in t and "equation" in t):
+            return True
+        return False
+
+    return True
+
+
 def _get_allowed_specialties() -> List[str]:
     """Return canonical specialty names from DB, with a short TTL cache.
 
@@ -182,13 +256,17 @@ def _gemini_symptom_analysis(
 
     # Ask for strict JSON we can store + display.
     prompt = (
-        "You are a medical routing assistant. You do NOT diagnose. "
-        "Given the user's symptoms and context, recommend the most appropriate medical specialty "
-        "and an urgency level. Keep it safe: if red-flag symptoms are present, set urgency_level to 'high'.\n\n"
-        "Choose recommended_specialty from this exact list. If unsure, choose General Practice:\n"
+        "You are a medical routing assistant for a healthcare app. You do NOT diagnose. "
+        "First determine whether the user is describing a medical/health concern. "
+        "If the input is NOT medical (e.g., math homework, coding help, general non-health questions), "
+        "set is_medical to false, set recommended_specialty to null, and set urgency_level to 'low'. "
+        "If the input IS medical, recommend the most appropriate medical specialty and an urgency level. "
+        "Keep it safe: if red-flag symptoms are present, set urgency_level to 'high'.\n\n"
+        "If medical, choose recommended_specialty from this exact list. If unsure, choose General Practice:\n"
         f"{allowed_list}\n\n"
         "Return ONLY valid JSON with these keys exactly:\n"
         "{\n"
+        '  "is_medical": true|false,\n'
         '  "recommended_specialty": "...",\n'
         '  "urgency_level": "low|medium|high",\n'
         '  "summary": "1-3 sentences",\n'
@@ -246,6 +324,53 @@ def analyze_symptoms():
         if len(symptoms_text) < 5:
             return jsonify({"error": "Please provide a bit more detail about your symptoms."}), 400
 
+        # Guard: avoid returning medical specialties for clearly non-medical requests.
+        if _is_non_medical_request(symptoms_text):
+            analysis_obj: Dict[str, Any] = {
+                "is_medical": False,
+                "recommended_specialty": None,
+                "urgency_level": "low",
+                "summary": "This message does not describe a medical symptom or health concern.",
+                "reasoning": "The symptom checker is intended for health-related symptoms; this looks like a non-medical request.",
+                "red_flags": [],
+                "next_steps": [
+                    "If you have a health concern, describe your symptoms (e.g., pain, fever, cough) and how long they have been present.",
+                    "For math or other non-medical questions, use an educational resource or ask a tutor.",
+                ],
+                "disclaimer": "This tool provides informational guidance only and is not a medical diagnosis.",
+            }
+
+            ai_raw = json.dumps(analysis_obj, ensure_ascii=False)
+            recommended_specialty = None
+            urgency_level = "low"
+
+            insert_query = """
+                INSERT INTO symptom_logs (user_id, symptoms, ai_analysis, recommended_specialty, urgency_level, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            log_id = execute_query(
+                insert_query,
+                (
+                    user_id,
+                    symptoms_text,
+                    ai_raw,
+                    recommended_specialty,
+                    urgency_level,
+                    datetime.now(),
+                ),
+                commit=True,
+            )
+
+            return jsonify(
+                {
+                    "id": log_id,
+                    "recommended_specialty": recommended_specialty,
+                    "urgency_level": urgency_level,
+                    "analysis": analysis_obj,
+                    "raw": ai_raw,
+                }
+            )
+
         allowed_specialties = _get_allowed_specialties()
         allowed_for_ai = [s for s in allowed_specialties if (s or "").strip().lower() != "other"]
         if not allowed_for_ai:
@@ -253,13 +378,30 @@ def analyze_symptoms():
 
         ai_raw, ai_json = _gemini_symptom_analysis(data, allowed_for_ai)
 
-        recommended_specialty = _normalize_specialty(
-            (ai_json or {}).get("recommended_specialty") if ai_json else None,
-            allowed_for_ai,
-        )
-        urgency_level = _normalize_urgency(
-            (ai_json or {}).get("urgency_level") if ai_json else None
-        )
+        # If the model indicates the input isn't medical, do not force a specialty.
+        is_medical = True
+        if isinstance(ai_json, dict) and "is_medical" in ai_json:
+            is_medical = bool(ai_json.get("is_medical"))
+
+        if not is_medical:
+            recommended_specialty = None
+            urgency_level = "low"
+            if isinstance(ai_json, dict):
+                ai_json["recommended_specialty"] = None
+                ai_json["urgency_level"] = urgency_level
+                ai_json["is_medical"] = False
+        else:
+            if isinstance(ai_json, dict):
+                ai_json["is_medical"] = True
+
+        if is_medical:
+            recommended_specialty = _normalize_specialty(
+                (ai_json or {}).get("recommended_specialty") if ai_json else None,
+                allowed_for_ai,
+            )
+            urgency_level = _normalize_urgency(
+                (ai_json or {}).get("urgency_level") if ai_json else None
+            )
 
         # Store raw model output for traceability.
         insert_query = """
@@ -286,6 +428,7 @@ def analyze_symptoms():
                 "urgency_level": urgency_level,
                 "analysis": ai_json
                 or {
+                    "is_medical": True,
                     "recommended_specialty": recommended_specialty,
                     "urgency_level": urgency_level,
                     "summary": ai_raw,
@@ -346,3 +489,33 @@ def symptom_history():
 
     except Exception as e:
         return jsonify({"error": "Failed to fetch history", "message": str(e)}), 500
+
+
+@symptoms_bp.route("/history/<int:log_id>", methods=["DELETE"])
+@jwt_required_custom
+def delete_symptom_history_item(log_id: int):
+    try:
+        raw_identity = get_jwt_identity()
+        try:
+            user_id = int(raw_identity)
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid authentication identity"}), 401
+
+        existing = execute_query(
+            "SELECT id FROM symptom_logs WHERE id = %s AND user_id = %s",
+            (log_id, user_id),
+            fetch_one=True,
+        )
+        if not existing:
+            return jsonify({"error": "History item not found"}), 404
+
+        execute_query(
+            "DELETE FROM symptom_logs WHERE id = %s AND user_id = %s",
+            (log_id, user_id),
+            commit=True,
+        )
+
+        return jsonify({"ok": True, "deleted_id": log_id})
+
+    except Exception as e:
+        return jsonify({"error": "Failed to delete history item", "message": str(e)}), 500

@@ -1,10 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, AlertTriangle, Clock, Stethoscope } from "lucide-react";
+import { Activity, AlertTriangle, Clock, Stethoscope, Trash2 } from "lucide-react";
 import api from "../utils/api";
 import BackToDashboardButton from "../components/BackToDashboardButton";
+import ConfirmationModal from "../components/ConfirmationModal";
 
-function UrgencyPill({ level }) {
+function UrgencyPill({ level, isMedical = true }) {
+  if (!isMedical) {
+    return (
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-slate-100 text-slate-700 border-slate-200">
+        Not medical
+      </span>
+    );
+  }
+
   const v = (level || "").toLowerCase();
   const styles =
     v === "high"
@@ -14,11 +23,7 @@ function UrgencyPill({ level }) {
       : "bg-yellow-100 text-yellow-800 border-yellow-200";
 
   const label =
-    v === "high"
-      ? "High urgency"
-      : v === "low"
-      ? "Low urgency"
-      : "Medium urgency";
+    v === "high" ? "High urgency" : v === "low" ? "Low urgency" : "Medium urgency";
 
   return (
     <span
@@ -42,6 +47,13 @@ export default function SymptomChecker() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
 
+  const [clearModal, setClearModal] = useState({
+    isOpen: false,
+    logId: null,
+    symptomsPreview: "",
+    loading: false,
+  });
+
   const disclaimer = useMemo(
     () =>
       "This tool provides informational guidance only and is not a medical diagnosis. If symptoms are severe or worsening, seek professional help.",
@@ -54,6 +66,39 @@ export default function SymptomChecker() {
       setHistory(Array.isArray(res.data?.history) ? res.data.history : []);
     } catch {
       // keep quiet
+    }
+  };
+
+  const openClearModal = (logId, symptomsText) => {
+    const preview = (symptomsText || "").trim();
+    setClearModal({
+      isOpen: true,
+      logId,
+      symptomsPreview: preview.length > 80 ? `${preview.slice(0, 80)}…` : preview,
+      loading: false,
+    });
+  };
+
+  const closeClearModal = () => {
+    if (clearModal.loading) return;
+    setClearModal({ isOpen: false, logId: null, symptomsPreview: "", loading: false });
+  };
+
+  const confirmClearHistoryItem = async () => {
+    const logId = clearModal.logId;
+    if (!logId) return;
+
+    setClearModal((prev) => ({ ...prev, loading: true }));
+    try {
+      await api.delete(`/symptoms/history/${logId}`);
+      setHistory((prev) => prev.filter((x) => x.id !== logId));
+      if (result?.id === logId) {
+        setResult(null);
+      }
+      setClearModal({ isOpen: false, logId: null, symptomsPreview: "", loading: false });
+    } catch (err) {
+      setError(err?.response?.data?.error || "Failed to clear history item.");
+      setClearModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -91,6 +136,7 @@ export default function SymptomChecker() {
   };
 
   const analysis = result?.analysis;
+  const isMedical = analysis?.is_medical !== false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
@@ -104,9 +150,7 @@ export default function SymptomChecker() {
                 Symptom Checker
               </h1>
             </div>
-            <p className="text-sm text-gray-600 mt-1">
-              AI-powered routing to the right specialty.
-            </p>
+            <p className="text-sm text-gray-600 mt-1">AI-powered routing to the right specialty.</p>
           </div>
         </div>
 
@@ -115,9 +159,7 @@ export default function SymptomChecker() {
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <form onSubmit={analyze} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Describe your symptoms
-                </label>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">Describe your symptoms</label>
                 <textarea
                   className="w-full min-h-[120px] rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
                   placeholder="Example: I have a fever and cough for 3 days, mild shortness of breath..."
@@ -129,9 +171,7 @@ export default function SymptomChecker() {
 
               <div className="grid sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Duration
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
                   <div className="relative">
                     <Clock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
@@ -145,9 +185,7 @@ export default function SymptomChecker() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Age
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
                   <input
                     type="number"
                     min="0"
@@ -160,9 +198,7 @@ export default function SymptomChecker() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Gender
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
                   <select
                     className="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
                     value={gender}
@@ -200,38 +236,36 @@ export default function SymptomChecker() {
               <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <UrgencyPill level={result.urgency_level} />
-                    <span className="text-sm text-gray-700">
-                      Recommended specialty:{" "}
-                      <span className="font-semibold">
-                        {result.recommended_specialty}
+                    <UrgencyPill level={result.urgency_level} isMedical={isMedical} />
+                    {isMedical && result.recommended_specialty ? (
+                      <span className="text-sm text-gray-700">
+                        Recommended specialty: <span className="font-semibold">{result.recommended_specialty}</span>
                       </span>
-                    </span>
+                    ) : (
+                      <span className="text-sm text-gray-700">No medical specialty recommended.</span>
+                    )}
                   </div>
 
-                  <button
-                    type="button"
-                    className="text-sm font-semibold text-blue-600 hover:underline"
-                    onClick={() =>
-                      navigate(
-                        `/doctors?specialty=${encodeURIComponent(
-                          result.recommended_specialty || ""
-                        )}`
-                      )
-                    }
-                  >
-                    Find doctors →
-                  </button>
+                  {isMedical && result.recommended_specialty && (
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-blue-600 hover:underline"
+                      onClick={() =>
+                        navigate(`/doctors?specialty=${encodeURIComponent(result.recommended_specialty || "")}`)
+                      }
+                    >
+                      Find doctors →
+                    </button>
+                  )}
                 </div>
 
-                {result.urgency_level === "high" && (
+                {isMedical && result.urgency_level === "high" && (
                   <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5" />
                     <div>
                       <div className="font-semibold">Seek urgent care now</div>
                       <div className="text-red-700/90">
-                        If symptoms are severe, call emergency services or visit
-                        the nearest ER.
+                        If symptoms are severe, call emergency services or visit the nearest ER.
                       </div>
                     </div>
                   </div>
@@ -239,57 +273,43 @@ export default function SymptomChecker() {
 
                 {analysis?.summary && (
                   <div className="mt-4">
-                    <h3 className="text-sm font-semibold text-gray-900">
-                      Summary
-                    </h3>
-                    <p className="text-sm text-gray-700 mt-1">
-                      {analysis.summary}
-                    </p>
+                    <h3 className="text-sm font-semibold text-gray-900">Summary</h3>
+                    <p className="text-sm text-gray-700 mt-1">{analysis.summary}</p>
                   </div>
                 )}
 
                 {analysis?.reasoning && (
                   <div className="mt-4">
                     <h3 className="text-sm font-semibold text-gray-900">
-                      Why this specialty
+                      {isMedical ? "Why this specialty" : "Why this result"}
                     </h3>
-                    <p className="text-sm text-gray-700 mt-1">
-                      {analysis.reasoning}
-                    </p>
+                    <p className="text-sm text-gray-700 mt-1">{analysis.reasoning}</p>
                   </div>
                 )}
 
-                {Array.isArray(analysis?.red_flags) &&
-                  analysis.red_flags.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-sm font-semibold text-gray-900">
-                        Red flags
-                      </h3>
-                      <ul className="list-disc pl-5 text-sm text-gray-700 mt-1 space-y-1">
-                        {analysis.red_flags.map((x, i) => (
-                          <li key={i}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                {Array.isArray(analysis?.red_flags) && analysis.red_flags.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Red flags</h3>
+                    <ul className="list-disc pl-5 text-sm text-gray-700 mt-1 space-y-1">
+                      {analysis.red_flags.map((x, i) => (
+                        <li key={i}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-                {Array.isArray(analysis?.next_steps) &&
-                  analysis.next_steps.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-sm font-semibold text-gray-900">
-                        Next steps
-                      </h3>
-                      <ul className="list-disc pl-5 text-sm text-gray-700 mt-1 space-y-1">
-                        {analysis.next_steps.map((x, i) => (
-                          <li key={i}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                {Array.isArray(analysis?.next_steps) && analysis.next_steps.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Next steps</h3>
+                    <ul className="list-disc pl-5 text-sm text-gray-700 mt-1 space-y-1">
+                      {analysis.next_steps.map((x, i) => (
+                        <li key={i}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-                <p className="text-[11px] text-gray-500 mt-4">
-                  {analysis?.disclaimer || disclaimer}
-                </p>
+                <p className="text-[11px] text-gray-500 mt-4">{analysis?.disclaimer || disclaimer}</p>
               </div>
             )}
           </div>
@@ -304,43 +324,88 @@ export default function SymptomChecker() {
                 <div className="text-sm text-gray-600">No history yet.</div>
               ) : (
                 history.map((h) => (
-                  <button
+                  <div
                     key={h.id}
-                    type="button"
                     className="w-full text-left rounded-xl border border-gray-200 hover:border-orange-200 hover:bg-orange-50/50 transition px-3 py-3"
+                    role="button"
+                    tabIndex={0}
                     onClick={() =>
                       setResult({
                         id: h.id,
                         recommended_specialty: h.recommended_specialty,
                         urgency_level: h.urgency_level,
                         analysis: h.analysis || {
+                          is_medical: true,
                           summary: "(Stored analysis was not in JSON format)",
                           disclaimer,
                         },
                       })
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setResult({
+                          id: h.id,
+                          recommended_specialty: h.recommended_specialty,
+                          urgency_level: h.urgency_level,
+                          analysis: h.analysis || {
+                            is_medical: true,
+                            summary: "(Stored analysis was not in JSON format)",
+                            disclaimer,
+                          },
+                        });
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs text-gray-500">
-                        {h.created_at
-                          ? new Date(h.created_at).toLocaleString()
-                          : ""}
+                        {h.created_at ? new Date(h.created_at).toLocaleString() : ""}
                       </div>
-                      <UrgencyPill level={h.urgency_level} />
+                      <div className="flex items-center gap-2">
+                        <UrgencyPill level={h.urgency_level} isMedical={h.analysis?.is_medical !== false} />
+                        <button
+                          type="button"
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200"
+                          title="Clear this history item"
+                          aria-label="Clear this history item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openClearModal(h.id, h.symptoms);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-sm font-semibold text-gray-900 mt-2 line-clamp-2">
-                      {h.symptoms}
-                    </div>
+                    <div className="text-sm font-semibold text-gray-900 mt-2 line-clamp-2">{h.symptoms}</div>
                     <div className="text-xs text-gray-600 mt-1">
-                      {h.recommended_specialty || "General Practice"}
+                      {h.analysis?.is_medical === false
+                        ? "Not medical"
+                        : h.recommended_specialty || "General Practice"}
                     </div>
-                  </button>
+                  </div>
                 ))
               )}
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={clearModal.isOpen}
+        onClose={closeClearModal}
+        onConfirm={confirmClearHistoryItem}
+        title="Clear history item"
+        message={
+          clearModal.symptomsPreview
+            ? `Are you sure you want to remove this symptom analysis from your history?\n\n"${clearModal.symptomsPreview}"\n\nThis action cannot be undone.`
+            : "Are you sure you want to remove this symptom analysis from your history? This action cannot be undone."
+        }
+        confirmText="Clear"
+        cancelText="Cancel"
+        type="danger"
+        loading={clearModal.loading}
+      />
     </div>
   );
 }

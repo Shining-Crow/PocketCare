@@ -18,35 +18,74 @@ const HospitalBedManagement = () => {
   
   // Private room configuration toggle state
   const [privateRoomToggle, setPrivateRoomToggle] = useState('private_1bed_no_bath'); // 'private_1bed_no_bath', 'private_1bed_with_bath', or 'private_2bed_with_bath'
-  
-  // Edit mode state - tracks which cards are in edit mode
-  const [editMode, setEditMode] = useState({});
+
+  // Inline editor state (more professional + less buggy than dropdown editing)
+  const [activeEditorKey, setActiveEditorKey] = useState(null); // e.g. 'general_ac', 'icu', 'private_1bed_no_bath'
+  const [editorDraft, setEditorDraft] = useState({ total: '', reserved: '' });
+  const [savingWardKey, setSavingWardKey] = useState(null);
   
   // Patient info modal state
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [selectedWardInfo, setSelectedWardInfo] = useState(null);
   
-  // Toggle edit mode for a specific ward
-  const toggleEditMode = async (wardType, currentType) => {
-    const isCurrentlyEditing = editMode[wardType];
-    
-    // If we're closing edit mode (Done button), save the data
-    if (isCurrentlyEditing) {
-      await saveSingleWard(currentType);
+  const closeEditor = () => {
+    setActiveEditorKey(null);
+    setEditorDraft({ total: '', reserved: '' });
+  };
+
+  const openEditor = (wardKey) => {
+    const current = bedStatus[wardKey] || { total: 0, reserved: 0 };
+    setActiveEditorKey(wardKey);
+    setEditorDraft({
+      total: String(current.total ?? 0),
+      reserved: String(current.reserved ?? 0)
+    });
+  };
+
+  const parseNonNegativeInt = (value) => {
+    if (value === '') return { ok: true, value: 0 };
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed < 0) return { ok: false, value: 0 };
+    return { ok: true, value: parsed };
+  };
+
+  const saveEditor = async (wardKey) => {
+    const totalParsed = parseNonNegativeInt(editorDraft.total);
+    const reservedParsed = parseNonNegativeInt(editorDraft.reserved);
+
+    if (!totalParsed.ok || !reservedParsed.ok) {
+      setWarningMessage('Please enter valid non-negative numbers.');
+      setShowWarningModal(true);
+      return;
     }
-    
-    setEditMode(prev => ({
-      ...prev,
-      [wardType]: !prev[wardType]
-    }));
+
+    const total = totalParsed.value;
+    const reserved = reservedParsed.value;
+
+    if (reserved > total) {
+      setWarningMessage(`Reserved beds (${reserved}) cannot exceed total beds (${total})`);
+      setShowWarningModal(true);
+      return;
+    }
+
+    const available = total - reserved;
+
+    setSavingWardKey(wardKey);
+    try {
+      await saveSingleWard(wardKey, { total, reserved, available });
+      closeEditor();
+    } finally {
+      setSavingWardKey(null);
+    }
   };
   
   // Handle card click to show patient info - using real booking data from API
   // Handle card click to show patient info - using real booking data from API
-  const handleCardClick = (currentType, wardLabel) => {
+  const handleCardClick = (currentType, wardLabel, limit) => {
     // currentType is already the correct key (e.g., 'general_ac', 'icu', 'private_1bed_no_bath')
     // Just use it directly to get bookings
     const bookings = bookingsByWard[currentType] || [];
+    const limitedBookings = Number.isFinite(limit) ? bookings.slice(0, Math.max(0, limit)) : bookings;
     
     console.log('handleCardClick:', { currentType, wardLabel, bookings, allBookings: bookingsByWard });
     
@@ -54,7 +93,7 @@ const HospitalBedManagement = () => {
       wardType: currentType,
       wardLabel,
       bookingKey: currentType,
-      patients: bookings
+      patients: limitedBookings
     });
     setShowPatientModal(true);
   };
@@ -230,56 +269,9 @@ const HospitalBedManagement = () => {
     }
   }, [hospitalId]);
 
-  const updateBedCount = (type, field, value) => {
-    // Allow empty string for user to clear the input
-    if (value === '') {
-      const updatedStatus = {
-        ...bedStatus,
-        [type]: {
-          ...bedStatus[type],
-          [field]: ''
-        }
-      };
-      setBedStatus(updatedStatus);
-      return;
-    }
-
-    const newValue = parseInt(value);
-    
-    // If not a valid number, ignore
-    if (isNaN(newValue)) return;
-    
-    // Validate input
-    if (newValue < 0) return;
-
-    let updatedBedData = {
-      ...bedStatus[type],
-      [field]: newValue
-    };
-
-    // Auto-calculate available beds based on total and reserved
-    // Available = Total - Reserved - Occupied
-    // For simplicity, we assume Occupied = Total - Available - Reserved
-    // So: Available = Total - Reserved (when we only input total and reserved)
-    if (field === 'total' || field === 'reserved') {
-      const total = field === 'total' ? newValue : bedStatus[type].total;
-      const reserved = field === 'reserved' ? newValue : bedStatus[type].reserved;
-      
-      // Calculate available as total minus reserved (can be negative during editing)
-      updatedBedData.available = total - reserved;
-    }
-
-    const updatedStatus = {
-      ...bedStatus,
-      [type]: updatedBedData
-    };
-
-    setBedStatus(updatedStatus);
-  };
-
-  const saveSingleWard = async (wardType) => {
+  const saveSingleWard = async (wardType, override) => {
     try {
-      const data = bedStatus[wardType];
+      const data = override || bedStatus[wardType];
       const config = wardConfig[wardType];
       
       // Convert empty strings to 0 before saving
@@ -327,6 +319,7 @@ const HospitalBedManagement = () => {
   // Calculate total available beds
   const totalAvailableBeds = Object.values(bedStatus).reduce((sum, ward) => sum + ward.available, 0);
   const totalCapacity = Object.values(bedStatus).reduce((sum, ward) => sum + ward.total, 0);
+  const totalReservedBeds = Object.values(bedStatus).reduce((sum, ward) => sum + ward.reserved, 0);
   const sosAvailability = totalAvailableBeds > 10 ? 'high' : totalAvailableBeds > 0 ? 'medium' : 'low';
 
   if (loading) {
@@ -338,37 +331,82 @@ const HospitalBedManagement = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Bed Management</h1>
-        <p className="text-gray-600">Update real-time bed availability for accurate emergency routing</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Bed Management</h1>
+          <p className="text-gray-600">Keep bed availability accurate for emergency routing and bookings.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              loadBedData();
+              fetchBookings();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0011.95 3.95M19 9A7 7 0 006.05 5.05" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status Banner */}
-      <div className="mb-8 p-6 rounded-xl border shadow-sm" style={{
-        background: sosAvailability === 'high' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
-          sosAvailability === 'medium' ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
-            'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-        borderColor: sosAvailability === 'high' ? '#10b981' :
-          sosAvailability === 'medium' ? '#f59e0b' :
-            '#ef4444'
-      }}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between">
+      <div
+        className={
+          `mb-8 rounded-xl border border-gray-200 bg-white shadow-sm p-6 border-l-4 ` +
+          (sosAvailability === 'high'
+            ? 'border-l-emerald-500'
+            : sosAvailability === 'medium'
+              ? 'border-l-amber-500'
+              : 'border-l-red-500')
+        }
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           <div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-1">
-              {sosAvailability === 'high' ? '🚨 Ready for Emergencies' :
-                sosAvailability === 'medium' ? '⚠️ Limited Capacity' :
-                  '🔴 Full Capacity'}
-            </h3>
-            <p className="text-gray-700">
-              {sosAvailability === 'high' ? 'Hospital is optimally prepared for emergency cases' :
-                sosAvailability === 'medium' ? 'Emergency cases will be routed only for critical needs' :
-                  'No beds available for emergency routing'}
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className={
+                  `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ` +
+                  (sosAvailability === 'high'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : sosAvailability === 'medium'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-red-50 text-red-700 border-red-200')
+                }
+              >
+                {sosAvailability === 'high'
+                  ? 'Ready'
+                  : sosAvailability === 'medium'
+                    ? 'Limited'
+                    : 'Full'}
+              </span>
+              <h3 className="text-lg font-semibold text-gray-900">Emergency routing status</h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              {sosAvailability === 'high'
+                ? 'You have healthy capacity for incoming emergency cases.'
+                : sosAvailability === 'medium'
+                  ? 'Capacity is limited. Keep counts updated to avoid overbooking.'
+                  : 'No availability reported. Patients may be routed elsewhere.'}
             </p>
           </div>
-          <div className="mt-4 md:mt-0">
-            <div className="text-3xl font-bold text-gray-800">{totalAvailableBeds} / {totalCapacity}</div>
-            <p className="text-sm text-gray-600">Available beds / Total capacity</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Capacity</div>
+              <div className="text-xl font-bold text-gray-900">{totalCapacity}</div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-xs text-blue-700">Available</div>
+              <div className="text-xl font-bold text-blue-800">{totalAvailableBeds}</div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="text-xs text-amber-700">Reserved</div>
+              <div className="text-xl font-bold text-amber-800">{totalReservedBeds}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -388,132 +426,114 @@ const HospitalBedManagement = () => {
             // For wards without toggle
             currentType = ward.type;
           }
-          
-          // Create unique card ID for edit mode using index and currentType
-          const cardId = `${currentType}_${index}`;
-          
           const data = bedStatus[currentType];
+          const isEditing = activeEditorKey === currentType;
+          const isSaving = savingWardKey === currentType;
+
+          const currentBookings = bookingsByWard[currentType] || [];
+          const bookingCountForCard = currentBookings.length;
+
+          const totalDraft = isEditing ? parseNonNegativeInt(editorDraft.total) : { ok: true, value: data.total };
+          const reservedDraft = isEditing ? parseNonNegativeInt(editorDraft.reserved) : { ok: true, value: data.reserved };
+          const previewTotal = totalDraft.value;
+          const previewReserved = reservedDraft.value;
+          const previewAvailable = previewTotal - previewReserved;
+          const hasDraftError = isEditing && (!totalDraft.ok || !reservedDraft.ok || previewReserved > previewTotal);
+
+          const availableForBadge = isEditing ? Math.max(0, previewAvailable) : data.available;
 
           return (
             <div 
-              key={cardId} 
-              className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/40 rounded-2xl shadow-md p-5 border-2 border-gray-100 hover:shadow-2xl hover:border-blue-400 hover:-translate-y-1 transition-all duration-300 flex flex-col min-h-[320px] backdrop-blur-sm"
+              key={ward.type || index} 
+              className="bg-white rounded-xl shadow-sm p-5 border border-gray-200 hover:shadow-md transition-shadow flex flex-col min-h-[320px]"
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900">{ward.label}</h3>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleEditMode(cardId, currentType);
-                        }}
-                        className="ml-2 px-3 py-1.5 text-sm font-semibold text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-1"
-                      >
-                        {editMode[cardId] ? (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Done
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            Edit
-                          </>
-                        )}
-                      </button>
-                      
-                      {/* Dropdown Edit Menu */}
-                      {editMode[cardId] && (
-                        <div 
-                          className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border-2 border-blue-200 p-4 z-50 animate-slideDown"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="space-y-4">
-                            {/* Total Beds */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Total Beds
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={data.total}
-                                onChange={(e) => updateBedCount(currentType, 'total', e.target.value)}
-                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-
-                            {/* Reserved Beds */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Reserved Beds
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max={data.total}
-                                value={data.reserved}
-                                onChange={(e) => updateBedCount(currentType, 'reserved', e.target.value)}
-                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isEditing) {
+                          closeEditor();
+                        } else {
+                          openEditor(currentType);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="ml-2 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isEditing ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Close
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Edit
+                        </>
                       )}
-                    </div>
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-600 font-medium">Total Capacity: {data.total} beds</p>
+                  <p className="text-sm text-gray-600">Total capacity: {isEditing ? previewTotal : data.total} beds</p>
                 </div>
                 <div className="text-right ml-4">
-                  <div className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap inline-block shadow-md ${
-                    data.available > 5 
-                      ? 'bg-gradient-to-r from-green-400 to-green-500 text-white border-2 border-green-300' 
-                      : data.available > 0 
-                        ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white border-2 border-yellow-300' 
-                        : 'bg-gradient-to-r from-red-400 to-red-500 text-white border-2 border-red-300'
-                  }`}>
-                    {data.available} Available
+                  <div
+                    className={
+                      `px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap inline-flex items-center border ` +
+                      (availableForBadge > 5
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : availableForBadge > 0
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-red-50 text-red-700 border-red-200')
+                    }
+                  >
+                    {availableForBadge} available
                   </div>
                 </div>
               </div>
 
               {/* AC/Non-AC Toggle Buttons for General, Pediatrics, and Maternity */}
               {ward.toggleType === 'ac' && (
-                <div className="mb-3 flex gap-2 justify-start">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAcToggle({ ...acToggle, [ward.type]: 'ac' });
-                    }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                      acToggle[ward.type] === 'ac'
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                    }`}
-                  >
-                    AC
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAcToggle({ ...acToggle, [ward.type]: 'non_ac' });
-                    }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                      acToggle[ward.type] === 'non_ac'
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                    }`}
-                  >
-                    Non-AC
-                  </button>
+                <div className="mb-3">
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith(`${ward.type}_`)) closeEditor();
+                        setAcToggle({ ...acToggle, [ward.type]: 'ac' });
+                      }}
+                      className={
+                        `px-3 py-1.5 rounded-md text-sm font-semibold transition ` +
+                        (acToggle[ward.type] === 'ac'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      AC
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith(`${ward.type}_`)) closeEditor();
+                        setAcToggle({ ...acToggle, [ward.type]: 'non_ac' });
+                      }}
+                      className={
+                        `px-3 py-1.5 rounded-md text-sm font-semibold transition ` +
+                        (acToggle[ward.type] === 'non_ac'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      Non-AC
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -525,13 +545,15 @@ const HospitalBedManagement = () => {
                       key={option.value}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith('private_')) closeEditor();
                         setPrivateRoomToggle(option.value);
                       }}
-                      className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all whitespace-nowrap shadow-sm ${
-                        privateRoomToggle === option.value
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                      }`}
+                      className={
+                        `px-3 py-1.5 rounded-lg font-semibold text-xs transition whitespace-nowrap border ` +
+                        (privateRoomToggle === option.value
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300')
+                      }
                     >
                       {option.label}
                     </button>
@@ -539,11 +561,73 @@ const HospitalBedManagement = () => {
                 </div>
               )}
 
+              {/* Inline Editor */}
+              {isEditing && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Total beds</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editorDraft.total}
+                        onChange={(e) => setEditorDraft((prev) => ({ ...prev, total: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Reserved beds</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editorDraft.reserved}
+                        onChange={(e) => setEditorDraft((prev) => ({ ...prev, reserved: e.target.value }))}
+                        className={
+                          `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium ` +
+                          (hasDraftError ? 'border-red-300' : 'border-gray-300')
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className={`text-xs ${hasDraftError ? 'text-red-600' : 'text-gray-500'}`}>
+                      Available will be: {Math.max(0, previewAvailable)}
+                    </p>
+                    {hasDraftError && (
+                      <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
+                        Reserved cannot exceed total
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={closeEditor}
+                      disabled={isSaving}
+                      className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveEditor(currentType)}
+                      disabled={isSaving || hasDraftError}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Info Section for cards without toggles */}
               {!ward.hasToggle && (
-                <div className="mb-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <span className="font-medium">
@@ -557,47 +641,31 @@ const HospitalBedManagement = () => {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t-2 border-gray-200 mt-auto">
-                <div className="p-2.5 bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl shadow-sm border border-gray-200">
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="font-bold text-2xl text-gray-900">{data.total}</div>
-                  <div className="text-xs text-gray-600 mt-0.5 font-semibold">Total Beds</div>
+                  <div className="text-xs text-gray-600 mt-0.5 font-semibold">Total</div>
                 </div>
-                <div className="p-2.5 bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl shadow-sm border border-blue-200">
-                  <div className="font-bold text-2xl text-blue-700">{data.available}</div>
-                  <div className="text-xs text-blue-600 mt-0.5 font-semibold">Available</div>
+                <div className="p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="font-bold text-2xl text-blue-800">{data.available}</div>
+                  <div className="text-xs text-blue-700 mt-0.5 font-semibold">Available</div>
                 </div>
-                <div className="p-2.5 bg-gradient-to-br from-yellow-100 to-yellow-50 rounded-xl shadow-sm border border-yellow-200">
-                  {/* Show actual booking count if available, otherwise show reserved_beds */}
-                  <div className="font-bold text-2xl text-yellow-700">
-                    {(bookingsByWard[currentType] || []).length || data.reserved}
+                <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="font-bold text-2xl text-amber-800">
+                    {data.reserved}
                   </div>
-                  <div className="text-xs text-yellow-600 mt-0.5 font-semibold">Reserved</div>
+                  <div className="text-xs text-amber-700 mt-0.5 font-semibold">Reserved</div>
                 </div>
               </div>
 
               {/* View Patients Button - only show if there are actual bookings */}
               {(() => {
-                const currentBookings = bookingsByWard[currentType] || [];
+                const hasBookings = bookingCountForCard > 0;
 
-                let bookingKeyForModal = currentType;
-                let totalBookingsCount = currentBookings.length;
-
-                // Private rooms have multiple sub-types; show the button if any option has bookings.
-                if (ward.toggleType === 'private' && ward.options) {
-                  const privateKeys = ward.options.map((o) => o.value);
-                  const total = privateKeys.reduce(
-                    (sum, key) => sum + ((bookingsByWard[key] || []).length || 0),
-                    0
-                  );
-                  totalBookingsCount = total;
-
-                  // If current selection has no bookings, default the modal to the first option that does.
-                  if (currentBookings.length === 0) {
-                    const firstWithBookings = privateKeys.find((k) => (bookingsByWard[k] || []).length > 0);
-                    if (firstWithBookings) bookingKeyForModal = firstWithBookings;
-                  }
-                }
-
-                const hasBookings = totalBookingsCount > 0;
+                // Show count based on reserved (if set) but never exceed the actual booking list length.
+                const reservedForWard = Number.parseInt(data.reserved, 10) || 0;
+                const displayCount = reservedForWard > 0
+                  ? Math.min(reservedForWard, bookingCountForCard)
+                  : bookingCountForCard;
 
                 if (hasBookings) {
                   return (
@@ -605,14 +673,14 @@ const HospitalBedManagement = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCardClick(bookingKeyForModal, ward.label);
+                          handleCardClick(currentType, ward.label, displayCount);
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                         </svg>
-                        View {totalBookingsCount} Patient{totalBookingsCount !== 1 ? 's' : ''}
+                        View {displayCount} Patient{displayCount !== 1 ? 's' : ''}
                       </button>
                     </div>
                   );
@@ -629,16 +697,20 @@ const HospitalBedManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowPatientModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden transform animate-slideUp" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex justify-between items-center">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 bg-white">
               <div>
-                <h3 className="text-2xl font-bold text-white">{selectedWardInfo.wardLabel}</h3>
-                <p className="text-blue-100 text-sm mt-1">
-                  {selectedWardInfo.patients.length} Reserved Bed{selectedWardInfo.patients.length !== 1 ? 's' : ''}
-                </p>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">{selectedWardInfo.wardLabel}</h3>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                    {selectedWardInfo.patients.length} reserved
+                  </span>
+                </div>
+                <p className="text-gray-600 text-sm">Patient reservations for this ward</p>
               </div>
               <button
                 onClick={() => setShowPatientModal(false)}
-                className="text-white hover:bg-blue-800 rounded-lg p-2 transition"
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition"
+                aria-label="Close"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -651,12 +723,12 @@ const HospitalBedManagement = () => {
               {selectedWardInfo.patients.length > 0 ? (
                 <div className="space-y-6">
                   {selectedWardInfo.patients.map((patient, idx) => (
-                    <div key={idx} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+                    <div key={idx} className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                       {/* Patient Header */}
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-5 pb-4 border-b-2 border-blue-100">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-5 pb-4 border-b border-gray-200">
                         <div className="mb-3 md:mb-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
                               {patient.patient_name?.charAt(0)?.toUpperCase() || 'P'}
                             </div>
                             <div>
@@ -665,9 +737,9 @@ const HospitalBedManagement = () => {
                                 {patient.patient_age && <span>{patient.patient_age} years</span>}
                                 {patient.patient_gender && (
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    patient.patient_gender === 'male' ? 'bg-blue-100 text-blue-700' :
-                                    patient.patient_gender === 'female' ? 'bg-pink-100 text-pink-700' :
-                                    'bg-gray-100 text-gray-700'
+                                    patient.patient_gender === 'male' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                    patient.patient_gender === 'female' ? 'bg-pink-50 text-pink-700 border border-pink-200' :
+                                    'bg-gray-50 text-gray-700 border border-gray-200'
                                   }`}>
                                     {patient.patient_gender.charAt(0).toUpperCase() + patient.patient_gender.slice(1)}
                                   </span>
@@ -677,10 +749,10 @@ const HospitalBedManagement = () => {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full font-bold shadow-md">
+                          <div className="bg-blue-600 text-white px-4 py-2 rounded-full font-bold shadow-sm">
                             {patient.bed_number}
                           </div>
-                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Confirmed
                           </span>
                         </div>
@@ -689,9 +761,9 @@ const HospitalBedManagement = () => {
                       {/* Patient Details Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {/* Admission Date */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-green-100 p-2 rounded-lg">
+                            <div className="bg-white p-2 rounded-lg border border-gray-200">
                               <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                               </svg>
@@ -702,9 +774,9 @@ const HospitalBedManagement = () => {
                         </div>
                         
                         {/* Admission Reason */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-orange-500 shadow-sm">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-orange-100 p-2 rounded-lg">
+                            <div className="bg-white p-2 rounded-lg border border-gray-200">
                               <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                               </svg>
@@ -715,9 +787,9 @@ const HospitalBedManagement = () => {
                         </div>
                         
                         {/* Contact Number */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-purple-100 p-2 rounded-lg">
+                            <div className="bg-white p-2 rounded-lg border border-gray-200">
                               <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
                               </svg>
@@ -729,9 +801,9 @@ const HospitalBedManagement = () => {
                         
                         {/* Emergency Contact */}
                         {patient.emergency_contact && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow-sm">
+                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-red-100 p-2 rounded-lg">
+                              <div className="bg-white p-2 rounded-lg border border-gray-200">
                                 <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
@@ -744,9 +816,9 @@ const HospitalBedManagement = () => {
                         
                         {/* Patient Email */}
                         {patient.patient_email && (
-                          <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
+                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="bg-blue-100 p-2 rounded-lg">
+                              <div className="bg-white p-2 rounded-lg border border-gray-200">
                                 <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                                 </svg>
@@ -758,9 +830,9 @@ const HospitalBedManagement = () => {
                         )}
                         
                         {/* Booking Info */}
-                        <div className="bg-white p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-indigo-100 p-2 rounded-lg">
+                            <div className="bg-white p-2 rounded-lg border border-gray-200">
                               <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                               </svg>
@@ -804,29 +876,45 @@ const HospitalBedManagement = () => {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform animate-slideUp overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Update saved</h3>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-gray-700">Bed status has been updated successfully.</p>
+                  <p className="text-sm text-gray-500 mt-1">Emergency routing will use the latest availability.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                >
+                  Done
+                </button>
               </div>
             </div>
-            
-            {/* Success Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
-              <p className="text-gray-600">Bed status has been updated successfully</p>
-            </div>
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition duration-200 transform hover:scale-105"
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
@@ -834,29 +922,45 @@ const HospitalBedManagement = () => {
       {/* Warning Modal */}
       {showWarningModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">
-            {/* Warning Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-red-100 rounded-full p-3">
-                <svg className="w-16 h-16 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform animate-slideUp overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Validation error</h3>
+              <button
+                onClick={() => setShowWarningModal(false)}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-gray-700">{warningMessage}</p>
+                  <p className="text-sm text-gray-500 mt-1">Please correct the values and try again.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowWarningModal(false)}
+                  className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Close
+                </button>
               </div>
             </div>
-            
-            {/* Warning Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Validation Error</h3>
-              <p className="text-gray-600">{warningMessage}</p>
-            </div>
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowWarningModal(false)}
-              className="w-full py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition duration-200 transform hover:scale-105"
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
@@ -904,8 +1008,6 @@ const HospitalBedManagement = () => {
         
         .animate-slideDown {
           animation: slideDown 0.2s ease-out;
-        }
-          animation: slideUp 0.3s ease-out;
         }
       `}</style>
     </div>

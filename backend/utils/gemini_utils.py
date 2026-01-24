@@ -98,12 +98,42 @@ def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -
     if len(trimmed) > max_chars:
         trimmed = trimmed[:max_chars] + "\n\n[TRUNCATED]"
 
+    # First, validate if the document is medical-related
+    validation_prompt = (
+        "You are a strict document classifier. Analyze the following OCR text and determine if it is from a MEDICAL/HEALTHCARE document.\n\n"
+        "MEDICAL documents: lab reports, blood tests, X-rays, MRI/CT scans, "
+        "prescriptions, medical bills from hospitals/clinics, discharge summaries, doctor's notes, "
+        "pathology reports, vaccination records, health insurance claims, medical certificates, "
+        "or any document directly related to patient healthcare or medical diagnosis.\n\n"
+        "NON-MEDICAL documents: regular invoices, shopping receipts, calendars, "
+        "event notices, personal letters, academic transcripts, ID cards, travel tickets, "
+        "utility bills, tax forms, bank statements, resumes, contracts, or any document "
+        "that is NOT directly related to medical/healthcare purposes.\n\n"
+        "IMPORTANT: Be strict. If you are unsure or the document is ambiguous, treat it as non-medical.\n\n"
+        "If this IS a medical document, respond with exactly: MEDICAL\n"
+        "If this is NOT a medical document, respond with a helpful message in this format:\n"
+        "NOT_MEDICAL: This appears to be a [document type]. Only health-related documents like lab reports, prescriptions, or medical records can be simplified here.\n\n"
+        f"OCR TEXT:\n{trimmed}"
+    )
+
+    validation_response = client.models.generate_content(model=model, contents=validation_prompt)
+    validation_text = (getattr(validation_response, "text", None) or "").strip()
+    
+    # Only proceed if the response is clearly MEDICAL
+    if not validation_text.upper().startswith("MEDICAL"):
+        # Extract the AI-generated message or use a default
+        if validation_text.upper().startswith("NOT_MEDICAL:"):
+            error_msg = validation_text[len("NOT_MEDICAL:"):].strip()
+        else:
+            error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
+        raise ValueError(error_msg)
+
+    # Proceed with medical report simplification
     prompt = (
         "You are a helpful medical assistant.\n"
         "Rewrite the following OCR text from a medical document into a simple, easy-to-understand explanation.\n"
         "Rules:\n"
         "- Use plain language and short bullet points.\n"
-        "- If the text is NOT medical (e.g., a calendar/notice), say that clearly and summarize what it actually is.\n"
         "- Do NOT invent details that are not present.\n"
         "- Do NOT provide a diagnosis.\n"
         "- If there are abnormal lab values or urgent warnings explicitly stated, highlight them as 'Important'.\n"
@@ -147,6 +177,41 @@ def explain_bytes_with_gemini(
 
     client = genai.Client(api_key=api_key)
 
+    # First, validate if the document is medical-related
+    validation_prompt = (
+        "You are a strict document classifier. Analyze the attached document and determine if it is a MEDICAL/HEALTHCARE document.\n\n"
+        "MEDICAL documents: lab reports, blood tests, X-rays, MRI/CT scans, "
+        "prescriptions, medical bills from hospitals/clinics, discharge summaries, doctor's notes, "
+        "pathology reports, vaccination records, health insurance claims, medical certificates, "
+        "or any document directly related to patient healthcare or medical diagnosis.\n\n"
+        "NON-MEDICAL documents: regular invoices, shopping receipts, calendars, "
+        "event notices, personal letters, academic transcripts, ID cards, travel tickets, "
+        "utility bills, tax forms, bank statements, resumes, contracts, or any document "
+        "that is NOT directly related to medical/healthcare purposes.\n\n"
+        "IMPORTANT: Be strict. If you are unsure or the document is ambiguous, treat it as non-medical.\n\n"
+        "If this IS a medical document, respond with exactly: MEDICAL\n"
+        "If this is NOT a medical document, respond with a helpful message in this format:\n"
+        "NOT_MEDICAL: This appears to be a [document type]. Only health-related documents like lab reports, prescriptions, or medical records can be simplified here."
+    )
+
+    validation_contents = [
+        types.Part.from_text(validation_prompt),
+        types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+    ]
+
+    validation_response = client.models.generate_content(model=model, contents=validation_contents)
+    validation_text = (getattr(validation_response, "text", None) or "").strip()
+    
+    # Only proceed if the response is clearly MEDICAL
+    if not validation_text.upper().startswith("MEDICAL"):
+        # Extract the AI-generated message or use a default
+        if validation_text.upper().startswith("NOT_MEDICAL:"):
+            error_msg = validation_text[len("NOT_MEDICAL:"):].strip()
+        else:
+            error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
+        raise ValueError(error_msg)
+
+    # Proceed with medical report analysis
     prompt = (
         "You are a helpful medical assistant. Analyze the attached medical report file.\n"
         "Rules:\n"

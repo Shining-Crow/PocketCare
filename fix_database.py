@@ -173,6 +173,11 @@ def fix_database():
         _ensure_column('users', 'gender', "ALTER TABLE users ADD COLUMN gender ENUM('male','female','other') NULL")
         _ensure_column('users', 'blood_group', "ALTER TABLE users ADD COLUMN blood_group VARCHAR(5) NULL")
         _ensure_column('users', 'address', "ALTER TABLE users ADD COLUMN address TEXT NULL")
+        _ensure_column(
+            'users',
+            'photo_url',
+            "ALTER TABLE users ADD COLUMN photo_url VARCHAR(500) NOT NULL DEFAULT '/api/auth/user-photos/user.png'",
+        )
         _ensure_column('users', 'created_at', "ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         _ensure_column('users', 'updated_at', "ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 

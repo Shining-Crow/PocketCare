@@ -95,9 +95,9 @@ function MedicalReports() {
           const re = new RegExp(
             `^${label.replace(
               /[-/\\^$*+?.()|[\]{}]/g,
-              "\\$&"
+              "\\$&",
             )}\\s*[:\\-]\\s*(.*)$`,
-            "i"
+            "i",
           );
           const m = trimmed.match(re);
           if (m) {
@@ -336,16 +336,11 @@ function MedicalReports() {
               Upload a lab report image or PDF and get a clearer, simpler
               explanation. Informational only — not a medical diagnosis.
             </p>
+            <p className="mt-2 text-sm font-semibold text-red-600">
+              AI notice: This report reading is processed with AI and may be
+              incomplete or inaccurate. Please verify with a licensed clinician.
+            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={resetAll}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <Trash2 className="h-4 w-4" />
-            Clear
-          </button>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -421,8 +416,8 @@ function MedicalReports() {
                 {ocrLoading
                   ? "Reading report…"
                   : aiLoading
-                  ? "Simplifying…"
-                  : "Simplify with AI"}
+                    ? "Simplifying…"
+                    : "Simplify with AI"}
               </button>
 
               <div className="mt-4 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">

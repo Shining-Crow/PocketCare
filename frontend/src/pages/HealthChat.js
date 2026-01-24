@@ -17,7 +17,7 @@ function HealthChat() {
       sender: "ai",
       text: "Hello! I am your AI health assistant. How can I help you today?",
     }),
-    []
+    [],
   );
 
   // Fetch chat history on mount
@@ -161,10 +161,6 @@ function HealthChat() {
                         }}
                       />
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-2">
-                      This AI is for informational purposes only and not a
-                      substitute for professional medical advice.
-                    </p>
                   </div>
 
                   <button
@@ -177,6 +173,11 @@ function HealthChat() {
                     <span className="hidden sm:inline">Send</span>
                   </button>
                 </div>
+
+                <p className="text-[11px] text-gray-500 mt-2">
+                  This AI is for informational purposes only and not a
+                  substitute for professional medical advice.
+                </p>
               </form>
             </div>
           </div>

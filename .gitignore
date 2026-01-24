@@ -4,6 +4,8 @@ backend/.venv/
 backend/env/
 backend/__pycache__/
 backend/**/__pycache__/
+__pycache__
+.venv
 *.pyc
 *.pyo
 *.pyd

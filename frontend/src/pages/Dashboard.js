@@ -1225,24 +1225,43 @@ function Dashboard() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl p-6 border border-blue-100 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform shadow-md">
-                  <HeartPulse className="w-6 h-6 text-white" />
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg hover:border-indigo-300 transition-all duration-300 group">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform shadow-md">
+                    <HeartPulse className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                      Daily Health Tip
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Quick wins to support your health
+                    </p>
+                  </div>
                 </div>
-                Daily Health Tip
-              </h3>
+              </div>
+
               {dailyTips.length ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      Today's tips
+                    </span>
+                    <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
+                      {dailyTips.length} tip{dailyTips.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
                   {dailyTips.map((tip) => (
                     <div
                       key={tip.id}
-                      className="rounded-xl bg-blue-50/60 border p-4 hover:border-indigo-300 transition-colors"
+                      className="rounded-xl bg-gradient-to-r from-gray-50 to-emerald-50 border border-gray-100 p-3 hover:border-emerald-200 transition-colors"
                     >
-                      <p className="text-gray-900 font-semibold mb-1">
+                      <p className="text-gray-900 font-semibold text-sm mb-1 truncate">
                         {tip.title}
                       </p>
-                      <p className="text-gray-700 leading-relaxed text-sm">
+                      <p className="text-gray-600 leading-relaxed text-xs break-words">
                         {tip.message}
                       </p>
                     </div>

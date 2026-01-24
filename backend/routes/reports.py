@@ -18,6 +18,60 @@ reports_bp = Blueprint("reports", __name__)
 _ALLOWED_REPORT_EXTS = {"png", "jpg", "jpeg", "pdf"}
 
 
+def _gemini_error_response(exc: Exception):
+    """Map Gemini/GenAI failures to user-friendly HTTP responses."""
+
+    # Default
+    status_code = 500
+    error = "Gemini failed"
+    message = str(exc)
+
+    # Common config issues
+    if isinstance(exc, RuntimeError) and "GEMINI_API_KEY" in str(exc):
+        return (
+            jsonify(
+                {
+                    "error": "AI unavailable",
+                    "message": "AI service is not configured on the server (missing API key).",
+                }
+            ),
+            503,
+        )
+
+    # Try to use google.api_core exceptions when available.
+    try:
+        from google.api_core.exceptions import (
+            PermissionDenied,
+            ResourceExhausted,
+            ServiceUnavailable,
+            TooManyRequests,
+        )
+
+        if isinstance(exc, (ServiceUnavailable, ResourceExhausted, TooManyRequests)):
+            status_code = 503
+            error = "AI busy"
+            message = "The AI service is currently busy (overloaded). Please try again in a moment."
+
+        if isinstance(exc, PermissionDenied):
+            status_code = 503
+            error = "AI unavailable"
+            message = (
+                "AI permission denied. The API key may be invalid or revoked. "
+                "Create a new key in Google AI Studio, set GEMINI_API_KEY in backend/.env, and restart the backend."
+            )
+    except Exception:
+        pass
+
+    # Fallback string heuristics (covers cases where upstream wraps errors)
+    raw = (str(exc) or "").lower()
+    if "model is overloaded" in raw or ("503" in raw and "unavailable" in raw):
+        status_code = 503
+        error = "AI busy"
+        message = "The AI service is currently busy (overloaded). Please try again in a moment."
+
+    return jsonify({"error": error, "message": message}), status_code
+
+
 def _as_user_id() -> int:
     ident = get_jwt_identity()
     try:
@@ -104,7 +158,7 @@ def explain_report_text():
     except ValueError as exc:
         return jsonify({"error": "Invalid input", "message": str(exc)}), 400
     except Exception as exc:
-        return jsonify({"error": "Gemini failed", "message": str(exc)}), 500
+        return _gemini_error_response(exc)
 
 
 @reports_bp.route("/simplify", methods=["POST"])
@@ -218,8 +272,17 @@ def simplify_report_and_save():
 
     except ValueError as exc:
         return jsonify({"error": "Invalid input", "message": str(exc)}), 400
+    except RuntimeError as exc:
+        # e.g. GEMINI_API_KEY not set
+        return _gemini_error_response(exc)
     except Exception as exc:
-        return jsonify({"error": "Simplify failed", "message": str(exc)}), 500
+        res, code = _gemini_error_response(exc)
+        # Keep the endpoint-specific top-level error label for non-503 errors.
+        if code >= 500 and code != 503:
+            payload = res.get_json(silent=True) or {}
+            payload["error"] = "Simplify failed"
+            return jsonify(payload), code
+        return res, code
 
 
 @reports_bp.route("/history", methods=["GET"])

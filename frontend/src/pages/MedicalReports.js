@@ -160,19 +160,6 @@ function MedicalReports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const resetAll = () => {
-    setFile(null);
-    setPreviewUrl("");
-    setOcrText("");
-    setConfidence(null);
-    setError("");
-    setOcrLoading(false);
-    setAiLoading(false);
-    setAiError("");
-    setAiExplanation("");
-    setActiveHistoryId(null);
-  };
-
   const copyText = async (text) => {
     const value = (text || "").trim();
     if (!value) return;
@@ -259,9 +246,12 @@ function MedicalReports() {
 
       await loadHistory();
     } catch (e) {
+      const status = e?.response?.status;
+      const serverMsg = e?.response?.data?.message || e?.response?.data?.error;
       const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
+        (status === 503
+          ? "AI is busy right now. Please wait a moment and try again."
+          : serverMsg) ||
         e?.message ||
         "Simplify failed";
 
@@ -505,7 +495,9 @@ function MedicalReports() {
                   title="Copy AI explanation"
                 >
                   <Copy className="h-4 w-4" />
-                  <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
+                  <span className="hidden sm:inline">
+                    {copied ? "Copied" : "Copy"}
+                  </span>
                 </button>
               </div>
 

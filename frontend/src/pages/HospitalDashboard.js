@@ -495,8 +495,8 @@ const HospitalDashboard = () => {
 
                 return (
                   <>
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
-                      <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start mb-6">
+                      <div className="lg:col-span-2 space-y-6">
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                           <KpiCard
                             title="Patients today"
@@ -541,6 +541,42 @@ const HospitalDashboard = () => {
                             tone="amber"
                           />
                         </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold text-gray-900">Occupancy trend</div>
+                              <div className="mt-1 text-xs text-gray-500">Last 7 days • Ward utilization (%)</div>
+                            </div>
+                            <div className="inline-flex items-center gap-2 text-xs text-gray-600">
+                              <Activity className="h-4 w-4" />
+                              Utilization
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            {hasOccupancyTrend ? (
+                              <ResponsiveContainer width="100%" height={240} minHeight={240}>
+                                <LineChart data={occupancyData || []}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" />
+                                  <YAxis domain={[0, 100]} />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="pediatrics" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="maternity" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                                No occupancy trend data yet.
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -581,7 +617,7 @@ const HospitalDashboard = () => {
                             />
                           </div>
                           <div className="mt-4">
-                            <ResponsiveContainer width="100%" height={160} minHeight={160}>
+                            <ResponsiveContainer width="100%" height={150} minHeight={150}>
                               <PieChart>
                                 <Pie
                                   data={occupancyDonut.length ? occupancyDonut : [{ name: 'No data', value: 1 }]}
@@ -605,41 +641,51 @@ const HospitalDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Charts */}
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
-                      <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+                      <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm self-start">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-bold text-gray-900">Occupancy trend</div>
-                            <div className="mt-1 text-xs text-gray-500">Last 7 days • Ward utilization (%)</div>
+                            <div className="text-sm font-bold text-gray-900">Recent appointments</div>
+                            <div className="mt-1 text-xs text-gray-500">Latest patient bookings and statuses</div>
                           </div>
-                          <div className="inline-flex items-center gap-2 text-xs text-gray-600">
-                            <Activity className="h-4 w-4" />
-                            Utilization
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('appointments')}
+                            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            View all
+                          </button>
                         </div>
 
-                        <div className="mt-4">
-                          {hasOccupancyTrend ? (
-                            <ResponsiveContainer width="100%" height={280} minHeight={280}>
-                              <LineChart data={occupancyData || []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis domain={[0, 100]} />
-                                <Tooltip />
-                                <Legend />
-                                <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="pediatrics" stroke="#F59E0B" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="maternity" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
-                              No occupancy trend data yet.
-                            </div>
-                          )}
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
+                          <div className="grid grid-cols-12 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
+                            <div className="col-span-5">Patient</div>
+                            <div className="col-span-3">Department</div>
+                            <div className="col-span-2">Date</div>
+                            <div className="col-span-2 text-right">Status</div>
+                          </div>
+                          <div className="divide-y divide-gray-200">
+                            {(recentAppointments || []).slice(0, 6).map((apptRow) => (
+                              <div key={apptRow.id} className="grid grid-cols-12 items-center px-4 py-3">
+                                <div className="col-span-5 min-w-0">
+                                  <div className="font-semibold text-gray-900 truncate">{apptRow.patient_name || 'Patient'}</div>
+                                  <div className="mt-0.5 text-xs text-gray-500 truncate">{apptRow.doctor_name ? `Dr. ${apptRow.doctor_name}` : 'Doctor not assigned'}</div>
+                                </div>
+                                <div className="col-span-3 text-sm text-gray-700 truncate">{apptRow.department || '—'}</div>
+                                <div className="col-span-2 text-sm text-gray-700 truncate">
+                                  {apptRow.appointment_date ? new Date(apptRow.appointment_date).toLocaleDateString() : '—'}
+                                </div>
+                                <div className="col-span-2 flex justify-end">
+                                  <StatusBadge value={apptRow.status} />
+                                </div>
+                              </div>
+                            ))}
+                            {(!recentAppointments || recentAppointments.length === 0) && (
+                              <div className="px-4 py-5 text-center text-sm text-gray-600">
+                                No recent appointments found.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -659,7 +705,7 @@ const HospitalDashboard = () => {
                                 </BarChart>
                               </ResponsiveContainer>
                             ) : (
-                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
                                 No department activity yet.
                               </div>
                             )}
@@ -722,59 +768,7 @@ const HospitalDashboard = () => {
                             )}
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Activity + quick actions */}
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                      <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-gray-900">Recent appointments</div>
-                            <div className="mt-1 text-xs text-gray-500">Latest patient bookings and statuses</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab('appointments')}
-                            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                          >
-                            View all
-                          </button>
-                        </div>
-
-                        <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
-                          <div className="grid grid-cols-12 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
-                            <div className="col-span-5">Patient</div>
-                            <div className="col-span-3">Department</div>
-                            <div className="col-span-2">Date</div>
-                            <div className="col-span-2 text-right">Status</div>
-                          </div>
-                          <div className="divide-y divide-gray-200">
-                            {(recentAppointments || []).slice(0, 6).map((apptRow) => (
-                              <div key={apptRow.id} className="grid grid-cols-12 items-center px-4 py-3">
-                                <div className="col-span-5 min-w-0">
-                                  <div className="font-semibold text-gray-900 truncate">{apptRow.patient_name || 'Patient'}</div>
-                                  <div className="mt-0.5 text-xs text-gray-500 truncate">{apptRow.doctor_name ? `Dr. ${apptRow.doctor_name}` : 'Doctor not assigned'}</div>
-                                </div>
-                                <div className="col-span-3 text-sm text-gray-700 truncate">{apptRow.department || '—'}</div>
-                                <div className="col-span-2 text-sm text-gray-700 truncate">
-                                  {apptRow.appointment_date ? new Date(apptRow.appointment_date).toLocaleDateString() : '—'}
-                                </div>
-                                <div className="col-span-2 flex justify-end">
-                                  <StatusBadge value={apptRow.status} />
-                                </div>
-                              </div>
-                            ))}
-                            {(!recentAppointments || recentAppointments.length === 0) && (
-                              <div className="px-4 py-8 text-center text-sm text-gray-600">
-                                No recent appointments found.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6">
                         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                           <div className="text-sm font-bold text-gray-900">Quick actions</div>
                           <div className="mt-1 text-xs text-gray-500">Jump to common workflows</div>

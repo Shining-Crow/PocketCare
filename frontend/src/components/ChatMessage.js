@@ -12,17 +12,15 @@ function ChatMessage({ sender, text }) {
           isUser ? "flex-row-reverse" : ""
         }`}
       >
-        {/* Avatar */}
-        <div
-          className={
-            isUser
-              ? "w-9 h-9 shrink-0 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold"
-              : "w-9 h-9 shrink-0 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold"
-          }
-          aria-hidden="true"
-        >
-          {isUser ? "U" : <Bot className="w-5 h-5" />}
-        </div>
+        {/* Avatar (AI only) */}
+        {!isUser && (
+          <div
+            className="w-9 h-9 shrink-0 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold"
+            aria-hidden="true"
+          >
+            <Bot className="w-5 h-5" />
+          </div>
+        )}
 
         {/* Bubble */}
         <div

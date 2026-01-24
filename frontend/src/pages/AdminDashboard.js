@@ -90,6 +90,20 @@ function AdminDashboard() {
   const [adminCreateError, setAdminCreateError] = useState('');
   const [adminCreateSuccess, setAdminCreateSuccess] = useState('');
 
+  // Users & Doctors Management State
+  const [usersListTab, setUsersListTab] = useState('users'); // 'users' | 'doctors'
+  const [usersList, setUsersList] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorsSearch, setDoctorsSearch] = useState('');
+  const [doctorsPage, setDoctorsPage] = useState(1);
+  const [doctorsTotalPages, setDoctorsTotalPages] = useState(1);
+  const [confirmModal, setConfirmModal] = useState({ open: false, type: '', id: null, name: '', action: '' });
+
   const [toast, setToast] = useState({ isOpen: false, type: 'success', message: '' });
 
   useEffect(() => {
@@ -179,6 +193,101 @@ function AdminDashboard() {
       console.error(err);
     }
   };
+
+  const fetchUsersList = async (page = 1, search = '') => {
+    setUsersLoading(true);
+    try {
+      const response = await api.get('/auth/admin/users', {
+        params: { page, limit: 10, search }
+      });
+      setUsersList(response.data.users || []);
+      setUsersTotalPages(response.data.total_pages || 1);
+      setUsersPage(page);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to fetch users' });
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const fetchDoctorsList = async (page = 1, search = '') => {
+    setDoctorsLoading(true);
+    try {
+      const response = await api.get('/auth/admin/doctors', {
+        params: { page, limit: 10, search }
+      });
+      setDoctorsList(response.data.doctors || []);
+      setDoctorsTotalPages(response.data.total_pages || 1);
+      setDoctorsPage(page);
+    } catch (err) {
+      console.error('Failed to fetch doctors:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to fetch doctors' });
+    } finally {
+      setDoctorsLoading(false);
+    }
+  };
+
+  const handleBlockUser = async (userId, isBlocked) => {
+    try {
+      await api.put(`/auth/admin/users/${userId}/block`, { is_blocked: isBlocked });
+      setToast({ isOpen: true, type: 'success', message: `User ${isBlocked ? 'blocked' : 'unblocked'} successfully` });
+      fetchUsersList(usersPage, usersSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to update user' });
+    }
+  };
+
+  const handleBlockDoctor = async (doctorId, isBlocked) => {
+    try {
+      await api.put(`/auth/admin/doctors/${doctorId}/block`, { is_blocked: isBlocked });
+      setToast({ isOpen: true, type: 'success', message: `Doctor ${isBlocked ? 'blocked' : 'unblocked'} successfully` });
+      fetchDoctorsList(doctorsPage, doctorsSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to update doctor:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to update doctor' });
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    try {
+      await api.delete(`/auth/admin/users/${userId}`);
+      setToast({ isOpen: true, type: 'success', message: 'User deleted successfully' });
+      setConfirmModal({ open: false, type: '', id: null, name: '', action: '' });
+      fetchUsersList(usersPage, usersSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to delete user' });
+    }
+  };
+
+  const handleDeleteDoctor = async (doctorId) => {
+    try {
+      await api.delete(`/auth/admin/doctors/${doctorId}`);
+      setToast({ isOpen: true, type: 'success', message: 'Doctor deleted successfully' });
+      setConfirmModal({ open: false, type: '', id: null, name: '', action: '' });
+      fetchDoctorsList(doctorsPage, doctorsSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to delete doctor:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to delete doctor' });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      if (usersListTab === 'users') {
+        fetchUsersList(1, usersSearch);
+      } else {
+        fetchDoctorsList(1, doctorsSearch);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, usersListTab]);
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -1138,6 +1247,288 @@ function AdminDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Users & Doctors List */}
+            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setUsersListTab('users')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+                      usersListTab === 'users'
+                        ? 'bg-white shadow text-blue-600'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    👤 Users ({stats?.total_users || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUsersListTab('doctors')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+                      usersListTab === 'doctors'
+                        ? 'bg-white shadow text-green-600'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🩺 Doctors ({stats?.total_doctors || 0})
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder={`Search ${usersListTab}...`}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm w-64"
+                    value={usersListTab === 'users' ? usersSearch : doctorsSearch}
+                    onChange={(e) => {
+                      if (usersListTab === 'users') {
+                        setUsersSearch(e.target.value);
+                      } else {
+                        setDoctorsSearch(e.target.value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (usersListTab === 'users') {
+                          fetchUsersList(1, usersSearch);
+                        } else {
+                          fetchDoctorsList(1, doctorsSearch);
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (usersListTab === 'users') {
+                        fetchUsersList(1, usersSearch);
+                      } else {
+                        fetchDoctorsList(1, doctorsSearch);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              {/* Users List */}
+              {usersListTab === 'users' && (
+                <div>
+                  {usersLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : usersList.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">No users found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Joined</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {usersList.map((user) => (
+                            <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="px-4 py-3 text-gray-600">#{user.id}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
+                              <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                              <td className="px-4 py-3 text-gray-600">{user.phone || '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  user.is_blocked 
+                                    ? 'bg-red-100 text-red-700' 
+                                    : 'bg-green-100 text-green-700'
+                                }`}>
+                                  {user.is_blocked ? 'Blocked' : 'Active'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 text-xs">
+                                {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleBlockUser(user.id, !user.is_blocked)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold ${
+                                      user.is_blocked
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                    }`}
+                                  >
+                                    {user.is_blocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmModal({ open: true, type: 'user', id: user.id, name: user.name, action: 'delete' })}
+                                    className="px-3 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* Pagination */}
+                  {usersTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => fetchUsersList(usersPage - 1, usersSearch)}
+                        disabled={usersPage <= 1}
+                        className="px-3 py-1 rounded bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-gray-600">Page {usersPage} of {usersTotalPages}</span>
+                      <button
+                        onClick={() => fetchUsersList(usersPage + 1, usersSearch)}
+                        disabled={usersPage >= usersTotalPages}
+                        className="px-3 py-1 rounded bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Doctors List */}
+              {usersListTab === 'doctors' && (
+                <div>
+                  {doctorsLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    </div>
+                  ) : doctorsList.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">No doctors found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Specialty</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Rating</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {doctorsList.map((doctor) => (
+                            <tr key={doctor.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="px-4 py-3 text-gray-600">#{doctor.id}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{doctor.name}</td>
+                              <td className="px-4 py-3 text-gray-600">{doctor.email}</td>
+                              <td className="px-4 py-3 text-gray-600">{doctor.specialty || '-'}</td>
+                              <td className="px-4 py-3 text-gray-600">⭐ {doctor.rating || 0}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  doctor.is_blocked 
+                                    ? 'bg-red-100 text-red-700' 
+                                    : 'bg-green-100 text-green-700'
+                                }`}>
+                                  {doctor.is_blocked ? 'Blocked' : 'Active'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleBlockDoctor(doctor.id, !doctor.is_blocked)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold ${
+                                      doctor.is_blocked
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                    }`}
+                                  >
+                                    {doctor.is_blocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmModal({ open: true, type: 'doctor', id: doctor.id, name: doctor.name, action: 'delete' })}
+                                    className="px-3 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* Pagination */}
+                  {doctorsTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => fetchDoctorsList(doctorsPage - 1, doctorsSearch)}
+                        disabled={doctorsPage <= 1}
+                        className="px-3 py-1 rounded bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-gray-600">Page {doctorsPage} of {doctorsTotalPages}</span>
+                      <button
+                        onClick={() => fetchDoctorsList(doctorsPage + 1, doctorsSearch)}
+                        disabled={doctorsPage >= doctorsTotalPages}
+                        className="px-3 py-1 rounded bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Confirmation Modal */}
+            {confirmModal.open && (
+              <div className="fixed inset-0 z-50 overflow-y-auto">
+                <div className="flex min-h-screen items-center justify-center px-4">
+                  <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setConfirmModal({ open: false, type: '', id: null, name: '', action: '' })} />
+                  <div className="relative bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Delete</h3>
+                    <p className="text-gray-600 mb-6">
+                      Are you sure you want to delete <span className="font-semibold">{confirmModal.name}</span>? This action cannot be undone.
+                    </p>
+                    <div className="flex items-center gap-3 justify-end">
+                      <button
+                        onClick={() => setConfirmModal({ open: false, type: '', id: null, name: '', action: '' })}
+                        className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirmModal.type === 'user') {
+                            handleDeleteUser(confirmModal.id);
+                          } else {
+                            handleDeleteDoctor(confirmModal.id);
+                          }
+                        }}
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {accountModalOpen ? (
               <div className="fixed inset-0 z-50 overflow-y-auto">

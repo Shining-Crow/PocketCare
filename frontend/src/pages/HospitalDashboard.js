@@ -547,7 +547,7 @@ const HospitalDashboard = () => {
                                 <LineChart data={occupancyData || []}>
                                   <CartesianGrid strokeDasharray="3 3" />
                                   <XAxis dataKey="name" />
-                                  <YAxis domain={[0, 100]} />
+                                  <YAxis domain={[0, 10]} />
                                   <Tooltip />
                                   <Legend />
                                   <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />

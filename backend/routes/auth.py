@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
 from flask_jwt_extended import create_access_token, get_jwt_identity
 from utils.database import execute_query
 from utils.auth_utils import hash_password, verify_password, jwt_required_custom
@@ -10,8 +10,41 @@ import secrets
 import threading
 import time
 import base64
+import os
+from pathlib import Path
+from werkzeug.utils import secure_filename
 
 auth_bp = Blueprint('auth', __name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_USER_PHOTOS_DIR = _REPO_ROOT / 'database' / 'users'
+_DEFAULT_USER_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Uploaded user images should NOT be committed. This folder is gitignored via `uploads/`.
+_UPLOADED_USER_PHOTOS_DIR = _REPO_ROOT / 'uploads' / 'users'
+_UPLOADED_USER_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _allowed_image_filename(filename: str) -> bool:
+    fn = (filename or '').lower()
+    return fn.endswith('.png') or fn.endswith('.jpg') or fn.endswith('.jpeg') or fn.endswith('.webp')
+
+
+@auth_bp.route('/user-photos/<filename>', methods=['GET'])
+def user_photos(filename):
+    """Serve user profile photos.
+
+    - Default avatar lives in `database/users` (tracked in git)
+    - Uploaded photos live in `uploads/users` (gitignored)
+    """
+    # Basic hardening: disallow path traversal.
+    if not filename or '/' in filename or '\\' in filename or '..' in filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+
+    uploaded_path = _UPLOADED_USER_PHOTOS_DIR / filename
+    if uploaded_path.exists():
+        return send_from_directory(str(_UPLOADED_USER_PHOTOS_DIR), filename)
+    return send_from_directory(str(_DEFAULT_USER_PHOTOS_DIR), filename)
 
 
 # --- Lightweight captcha + rate limiting ---
@@ -575,7 +608,8 @@ def get_profile():
         
         query = """
             SELECT id, email, name, phone, date_of_birth, gender, 
-                blood_group, address, created_at
+                blood_group, address, created_at,
+                photo_url AS profile_picture
             FROM users 
             WHERE id = %s
         """
@@ -643,6 +677,52 @@ def update_profile():
         
     except Exception as e:
         return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500
+
+
+@auth_bp.route('/profile/photo', methods=['POST'])
+@jwt_required_custom
+def update_profile_photo():
+    """Upload a new profile photo and store its URL in users.photo_url."""
+    try:
+        user_id = get_jwt_identity()
+
+        file = request.files.get('photo') or request.files.get('file')
+        if not file or not file.filename:
+            return jsonify({'error': 'Missing image file'}), 400
+
+        if not _allowed_image_filename(file.filename):
+            return jsonify({'error': 'Unsupported file type. Use png, jpg, jpeg, or webp.'}), 400
+
+        # Enforce max upload size ~2MB (best effort; relies on WSGI/server too)
+        try:
+            file.stream.seek(0, os.SEEK_END)
+            size = file.stream.tell()
+            file.stream.seek(0)
+            if size and int(size) > 2 * 1024 * 1024:
+                return jsonify({'error': 'Image size should be less than 2MB'}), 400
+        except Exception:
+            pass
+
+        original = secure_filename(file.filename)
+        ext = os.path.splitext(original)[1].lower() or '.png'
+        if ext not in {'.png', '.jpg', '.jpeg', '.webp'}:
+            ext = '.png'
+
+        unique = secrets.token_hex(6)
+        filename = f"user_{user_id}_{int(time.time())}_{unique}{ext}"
+        save_path = _UPLOADED_USER_PHOTOS_DIR / filename
+        file.save(str(save_path))
+
+        photo_url = f"/api/auth/user-photos/{filename}"
+        execute_query(
+            "UPDATE users SET photo_url = %s WHERE id = %s",
+            (photo_url, user_id),
+            commit=True,
+        )
+
+        return jsonify({'message': 'Profile photo updated', 'profile_picture': photo_url}), 200
+    except Exception as e:
+        return jsonify({'error': f'Failed to update profile photo: {str(e)}'}), 500
 
 # Admin Login
 @auth_bp.route('/admin/login', methods=['POST'])

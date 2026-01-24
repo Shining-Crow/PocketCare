@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(100) NOT NULL,
+    photo_url VARCHAR(500) NOT NULL DEFAULT '/api/auth/user-photos/user.png',
     phone VARCHAR(20),
     date_of_birth DATE,
     gender ENUM('male', 'female', 'other'),

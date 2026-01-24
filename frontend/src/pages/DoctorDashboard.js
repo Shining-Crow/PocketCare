@@ -17,7 +17,6 @@ import {
   X,
   CheckCircle,
   Users,
-  TrendingUp,
 } from "lucide-react";
 
 function DoctorDashboard() {
@@ -90,9 +89,9 @@ function DoctorDashboard() {
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     appointmentId: null,
-    patientName: '',
+    patientName: "",
     loading: false,
-    action: 'cancel' // 'cancel', 'delete', or 'accept'
+    action: "cancel", // 'cancel', 'delete', or 'accept'
   });
 
   const filteredSpecialties = useMemo(() => {
@@ -108,10 +107,10 @@ function DoctorDashboard() {
     const q = (specialtyQuery || "").trim();
     if (!q) return false;
     const existsInSelected = selectedSpecialties.some(
-      (x) => (x?.name || "").toLowerCase() === q.toLowerCase()
+      (x) => (x?.name || "").toLowerCase() === q.toLowerCase(),
     );
     const existsInList = (Array.isArray(specialties) ? specialties : []).some(
-      (s) => (s?.name || "").toLowerCase() === q.toLowerCase()
+      (s) => (s?.name || "").toLowerCase() === q.toLowerCase(),
     );
     return !existsInSelected && !existsInList;
   }, [specialtyQuery, selectedSpecialties, specialties]);
@@ -159,7 +158,7 @@ function DoctorDashboard() {
     const name = (item?.name || "").trim();
     if (!name) return;
     const exists = selectedSpecialties.some(
-      (x) => (x?.name || "").toLowerCase() === name.toLowerCase()
+      (x) => (x?.name || "").toLowerCase() === name.toLowerCase(),
     );
     if (exists) return;
 
@@ -172,8 +171,8 @@ function DoctorDashboard() {
   const removeSpecialty = (name) => {
     setSelectedSpecialties((prev) =>
       prev.filter(
-        (x) => (x?.name || "").toLowerCase() !== (name || "").toLowerCase()
-      )
+        (x) => (x?.name || "").toLowerCase() !== (name || "").toLowerCase(),
+      ),
     );
   };
 
@@ -248,17 +247,20 @@ function DoctorDashboard() {
 
         // Fetch today's appointments - use local date to avoid timezone issues
         const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
         console.log("Fetching appointments for today:", today);
         const appointmentsRes = await api.get(
-          `/doctor/appointments?date=${today}`
+          `/doctor/appointments?date=${today}`,
         );
         console.log("Doctor appointments response:", appointmentsRes.data);
         setTodayAppointments(appointmentsRes.data.appointments || []);
 
         // Fetch all appointments for the doctor
         const allAppointmentsRes = await api.get(`/doctor/appointments`);
-        console.log("All doctor appointments response:", allAppointmentsRes.data);
+        console.log(
+          "All doctor appointments response:",
+          allAppointmentsRes.data,
+        );
         setAllAppointments(allAppointmentsRes.data.appointments || []);
       } catch (error) {
         console.error("Error fetching doctor data from API:", error);
@@ -293,7 +295,7 @@ function DoctorDashboard() {
           prev.map((daySlot) => ({
             ...daySlot,
             slots: daySpecificData[daySlot.day] || [],
-          }))
+          })),
         );
       }
       // Fallback to old format if new format doesn't exist
@@ -305,7 +307,7 @@ function DoctorDashboard() {
           prev.map((daySlot) => ({
             ...daySlot,
             slots: days.includes(daySlot.day) ? [...slots] : [],
-          }))
+          })),
         );
       }
     } catch (error) {
@@ -323,9 +325,9 @@ function DoctorDashboard() {
     const refreshAppointments = async () => {
       try {
         const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
         const appointmentsRes = await api.get(
-          `/doctor/appointments?date=${today}`
+          `/doctor/appointments?date=${today}`,
         );
         setTodayAppointments(appointmentsRes.data.appointments || []);
       } catch (error) {
@@ -334,17 +336,17 @@ function DoctorDashboard() {
     };
 
     const interval = setInterval(refreshAppointments, 30000); // Refresh every 30 seconds
-    
+
     return () => clearInterval(interval); // Cleanup interval on component unmount
   }, []);
 
   const refreshTodaysAppointments = async () => {
     try {
       const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       console.log("Refreshing appointments for date:", today);
       const appointmentsRes = await api.get(
-        `/doctor/appointments?date=${today}`
+        `/doctor/appointments?date=${today}`,
       );
       console.log("Refreshed appointments response:", appointmentsRes.data);
       setTodayAppointments(appointmentsRes.data.appointments || []);
@@ -353,15 +355,13 @@ function DoctorDashboard() {
     }
   };
 
-  
-
   const openCancelModal = (appointmentId, patientName) => {
     setConfirmModal({
       isOpen: true,
       appointmentId,
       patientName,
       loading: false,
-      action: 'cancel'
+      action: "cancel",
     });
   };
 
@@ -371,7 +371,7 @@ function DoctorDashboard() {
       appointmentId,
       patientName,
       loading: false,
-      action: 'delete'
+      action: "delete",
     });
   };
 
@@ -381,7 +381,7 @@ function DoctorDashboard() {
       appointmentId,
       patientName,
       loading: false,
-      action: 'accept'
+      action: "accept",
     });
   };
 
@@ -390,36 +390,39 @@ function DoctorDashboard() {
     setConfirmModal({
       isOpen: false,
       appointmentId: null,
-      patientName: '',
+      patientName: "",
       loading: false,
-      action: 'cancel'
+      action: "cancel",
     });
   };
 
   const confirmAction = async () => {
-    setConfirmModal(prev => ({ ...prev, loading: true }));
+    setConfirmModal((prev) => ({ ...prev, loading: true }));
 
     try {
-      if (confirmModal.action === 'cancel') {
+      if (confirmModal.action === "cancel") {
         await api.put(`/appointments/${confirmModal.appointmentId}/cancel`);
-      } else if (confirmModal.action === 'delete') {
+      } else if (confirmModal.action === "delete") {
         await api.delete(`/appointments/${confirmModal.appointmentId}`);
-      } else if (confirmModal.action === 'accept') {
+      } else if (confirmModal.action === "accept") {
         await api.put(`/appointments/${confirmModal.appointmentId}/confirm`);
       }
-      
+
       // Refresh both appointment lists
       await refreshTodaysAppointments();
-      
+
       // Refresh all appointments
       const allAppointmentsRes = await api.get(`/doctor/appointments`);
       setAllAppointments(allAppointmentsRes.data.appointments || []);
-      
+
       closeModal();
     } catch (error) {
       console.error(`Error ${confirmModal.action}ing appointment:`, error);
-      alert(error.response?.data?.error || `Failed to ${confirmModal.action} appointment`);
-      setConfirmModal(prev => ({ ...prev, loading: false }));
+      alert(
+        error.response?.data?.error ||
+          `Failed to ${confirmModal.action} appointment`,
+      );
+      setConfirmModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -490,7 +493,7 @@ function DoctorDashboard() {
         alert(
           `Failed to update profile: ${
             error.response?.data?.error || error.message
-          }`
+          }`,
         );
       }
     }
@@ -520,10 +523,10 @@ function DoctorDashboard() {
   const handleSaveTimeSlots = (newSlots) => {
     setAvailabilitySlots(
       availabilitySlots.map((slot) =>
-        slot.day === selectedDay 
-          ? { ...slot, slots: [...slot.slots, ...newSlots] } 
-          : slot
-      )
+        slot.day === selectedDay
+          ? { ...slot, slots: [...slot.slots, ...newSlots] }
+          : slot,
+      ),
     );
     // Auto-save after adding slots
     saveAvailabilityToBackend();
@@ -534,8 +537,8 @@ function DoctorDashboard() {
       availabilitySlots.map((slot) =>
         slot.day === day
           ? { ...slot, slots: slot.slots.filter((s) => s !== slotToRemove) }
-          : slot
-      )
+          : slot,
+      ),
     );
     // Auto-save after removing slot
     saveAvailabilityToBackend();
@@ -544,27 +547,27 @@ function DoctorDashboard() {
   const saveAvailabilityToBackend = async () => {
     try {
       setSaving(true);
-      
+
       // Convert availability slots to day-specific format
       const daySpecificAvailability = {};
-      availabilitySlots.forEach(daySlot => {
+      availabilitySlots.forEach((daySlot) => {
         if (daySlot.slots.length > 0) {
           daySpecificAvailability[daySlot.day] = daySlot.slots;
         }
       });
 
       // For backward compatibility, also maintain the old format
-      const allSlots = availabilitySlots.flatMap(daySlot => daySlot.slots);
+      const allSlots = availabilitySlots.flatMap((daySlot) => daySlot.slots);
       const availableDays = availabilitySlots
-        .filter(daySlot => daySlot.slots.length > 0)
-        .map(daySlot => daySlot.day);
+        .filter((daySlot) => daySlot.slots.length > 0)
+        .map((daySlot) => daySlot.day);
 
       await api.put("/doctor/profile", {
         available_slots: JSON.stringify(allSlots), // Keep for backward compatibility
         available_days: JSON.stringify(availableDays), // Keep for backward compatibility
         day_specific_availability: JSON.stringify(daySpecificAvailability), // New format
       });
-      
+
       // Show success message briefly
       setTimeout(() => setSaving(false), 1000);
     } catch (error) {
@@ -572,6 +575,64 @@ function DoctorDashboard() {
       setSaving(false);
     }
   };
+
+  const profileCompletion = useMemo(() => {
+    const safeTrim = (value) => (typeof value === "string" ? value.trim() : "");
+    const hasValue = (value) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (typeof value === "number") return Number.isFinite(value);
+      return Boolean(value);
+    };
+
+    const name = safeTrim(doctor?.name) || safeTrim(editForm?.name);
+    const phone = safeTrim(doctor?.phone) || safeTrim(editForm?.phone);
+    const qualification =
+      safeTrim(doctor?.qualification) || safeTrim(editForm?.qualification);
+    const bio = safeTrim(doctor?.bio) || safeTrim(editForm?.bio);
+    const experience = doctor?.experience ?? editForm?.experience;
+    const consultationFee =
+      doctor?.consultation_fee ?? editForm?.consultation_fee;
+
+    const hasSpecialty =
+      (Array.isArray(selectedSpecialties) &&
+        selectedSpecialties.some((s) => safeTrim(s?.name))) ||
+      safeTrim(doctor?.specialty) ||
+      safeTrim(doctorSpecialtiesText);
+
+    const hasAnyAvailability = Array.isArray(availabilitySlots)
+      ? availabilitySlots.some(
+          (d) => Array.isArray(d?.slots) && d.slots.length > 0,
+        )
+      : false;
+
+    const basicDone = hasValue(name) && hasValue(phone);
+    const professionalDone =
+      hasValue(qualification) &&
+      hasValue(experience) &&
+      hasValue(consultationFee) &&
+      hasValue(hasSpecialty) &&
+      hasValue(bio);
+    const availabilityDone = hasAnyAvailability;
+
+    const items = [
+      { label: "Basic Information", done: basicDone },
+      { label: "Professional Details", done: professionalDone },
+      { label: "Set Availability", done: availabilityDone },
+    ];
+
+    const total = items.length || 1;
+    const completed = items.filter((x) => x.done).length;
+    const percent = Math.round((completed / total) * 100);
+
+    return { percent, items };
+  }, [
+    doctor,
+    editForm,
+    selectedSpecialties,
+    doctorSpecialtiesText,
+    availabilitySlots,
+  ]);
 
   if (!doctor) {
     return (
@@ -596,9 +657,11 @@ function DoctorDashboard() {
               <h1 className="text-3xl font-bold mb-2">
                 Welcome, Dr. {doctor.name}
               </h1>
-              <p className="text-blue-100">{doctorSpecialtiesText || doctor.specialty}</p>
+              <p className="text-blue-100">
+                {doctorSpecialtiesText || doctor.specialty}
+              </p>
             </div>
-            
+
             {/* Availability Toggle */}
             <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4">
               <div className="text-right">
@@ -611,7 +674,9 @@ function DoctorDashboard() {
                 onClick={async () => {
                   try {
                     const newStatus = !doctor.is_available;
-                    await api.put("/doctor/availability", { is_available: newStatus });
+                    await api.put("/doctor/availability", {
+                      is_available: newStatus,
+                    });
                     setDoctor({ ...doctor, is_available: newStatus });
                   } catch (error) {
                     console.error("Failed to toggle availability:", error);
@@ -811,7 +876,10 @@ function DoctorDashboard() {
                                     type="button"
                                     className="w-full text-left px-3 py-2 hover:bg-gray-50"
                                     onClick={() =>
-                                      addSpecialty({ id: Number(s.id), name: s.name })
+                                      addSpecialty({
+                                        id: Number(s.id),
+                                        name: s.name,
+                                      })
                                     }
                                   >
                                     {s.name}
@@ -830,11 +898,12 @@ function DoctorDashboard() {
                                   </button>
                                 )}
 
-                                {!filteredSpecialties.length && !canAddCustom && (
-                                  <div className="px-3 py-2 text-sm text-gray-500">
-                                    No matches
-                                  </div>
-                                )}
+                                {!filteredSpecialties.length &&
+                                  !canAddCustom && (
+                                    <div className="px-3 py-2 text-sm text-gray-500">
+                                      No matches
+                                    </div>
+                                  )}
                               </div>
                             )}
                           </div>
@@ -956,7 +1025,7 @@ function DoctorDashboard() {
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition border border-blue-200 gap-3"
                     title="Refresh appointments"
                   >
-                    <RefreshCw className="h-4 w-4"/>
+                    <RefreshCw className="h-4 w-4" />
                     Refresh
                   </button>
                 </div>
@@ -990,12 +1059,12 @@ function DoctorDashboard() {
                                   apt.status === "confirmed"
                                     ? "bg-green-100 text-green-700"
                                     : apt.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : apt.status === "completed"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : apt.status === "cancelled"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-gray-100 text-gray-700"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : apt.status === "completed"
+                                        ? "bg-blue-100 text-blue-700"
+                                        : apt.status === "cancelled"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-gray-100 text-gray-700"
                                 }`}
                               >
                                 {apt.status}
@@ -1011,27 +1080,34 @@ function DoctorDashboard() {
                         <div className="text-right">
                           <div className="flex items-center space-x-2">
                             <p className="font-medium text-gray-900">
-                              {apt.appointment_time?.substring(0, 5) || apt.time}
+                              {apt.appointment_time?.substring(0, 5) ||
+                                apt.time}
                             </p>
-                            {apt.status === 'cancelled' ? (
+                            {apt.status === "cancelled" ? (
                               <button
-                                onClick={() => openDeleteModal(apt.id, apt.patient_name)}
+                                onClick={() =>
+                                  openDeleteModal(apt.id, apt.patient_name)
+                                }
                                 className="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition-colors"
                                 title="Delete appointment"
                               >
                                 Delete
                               </button>
-                            ) : apt.status === 'pending' ? (
+                            ) : apt.status === "pending" ? (
                               <>
                                 <button
-                                  onClick={() => openAcceptModal(apt.id, apt.patient_name)}
+                                  onClick={() =>
+                                    openAcceptModal(apt.id, apt.patient_name)
+                                  }
                                   className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
                                   title="Accept appointment"
                                 >
                                   Accept
                                 </button>
                                 <button
-                                  onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                  onClick={() =>
+                                    openCancelModal(apt.id, apt.patient_name)
+                                  }
                                   className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
                                   title="Cancel appointment"
                                 >
@@ -1040,7 +1116,9 @@ function DoctorDashboard() {
                               </>
                             ) : (
                               <button
-                                onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                onClick={() =>
+                                  openCancelModal(apt.id, apt.patient_name)
+                                }
                                 className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
                                 title="Cancel appointment"
                               >
@@ -1072,36 +1150,40 @@ function DoctorDashboard() {
                     allAppointments.map((apt, idx) => {
                       const appointmentDate = new Date(apt.appointment_date);
                       const now = new Date();
-                      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
                       const isToday = apt.appointment_date === today;
                       const isPast = appointmentDate < now;
-                      
+
                       return (
                         <div
                           key={apt.id || idx}
                           className={`flex items-center justify-between p-4 rounded-lg border transition ${
-                            isToday 
-                              ? 'bg-blue-50 border-blue-300' 
-                              : isPast 
-                              ? 'bg-gray-50 border-gray-200' 
-                              : 'bg-green-50 border-green-200 hover:border-green-300'
+                            isToday
+                              ? "bg-blue-50 border-blue-300"
+                              : isPast
+                                ? "bg-gray-50 border-gray-200"
+                                : "bg-green-50 border-green-200 hover:border-green-300"
                           }`}
                         >
                           <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              isToday 
-                                ? 'bg-blue-100' 
-                                : isPast 
-                                ? 'bg-gray-100' 
-                                : 'bg-green-100'
-                            }`}>
-                              <User className={`w-5 h-5 ${
-                                isToday 
-                                  ? 'text-blue-600' 
-                                  : isPast 
-                                  ? 'text-gray-600' 
-                                  : 'text-green-600'
-                              }`} />
+                            <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                isToday
+                                  ? "bg-blue-100"
+                                  : isPast
+                                    ? "bg-gray-100"
+                                    : "bg-green-100"
+                              }`}
+                            >
+                              <User
+                                className={`w-5 h-5 ${
+                                  isToday
+                                    ? "text-blue-600"
+                                    : isPast
+                                      ? "text-gray-600"
+                                      : "text-green-600"
+                                }`}
+                              />
                             </div>
                             <div>
                               <p className="font-semibold text-gray-900">
@@ -1112,10 +1194,12 @@ function DoctorDashboard() {
                               </p>
                               <div className="flex items-center space-x-2 mt-1">
                                 <span className="text-xs text-gray-500">
-                                  {new Date(apt.appointment_date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
+                                  {new Date(
+                                    apt.appointment_date,
+                                  ).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
                                   })}
                                 </span>
                                 <span
@@ -1123,12 +1207,12 @@ function DoctorDashboard() {
                                     apt.status === "confirmed"
                                       ? "bg-green-100 text-green-700"
                                       : apt.status === "pending"
-                                      ? "bg-yellow-100 text-yellow-700"
-                                      : apt.status === "completed"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : apt.status === "cancelled"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-gray-100 text-gray-700"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : apt.status === "completed"
+                                          ? "bg-blue-100 text-blue-700"
+                                          : apt.status === "cancelled"
+                                            ? "bg-red-100 text-red-700"
+                                            : "bg-gray-100 text-gray-700"
                                   }`}
                                 >
                                   {apt.status}
@@ -1154,36 +1238,45 @@ function DoctorDashboard() {
                           <div className="text-right">
                             <div className="flex items-center space-x-2">
                               <p className="font-medium text-gray-900">
-                                {apt.appointment_time?.substring(0, 5) || apt.time}
+                                {apt.appointment_time?.substring(0, 5) ||
+                                  apt.time}
                               </p>
-                              {apt.status === 'cancelled' ? (
+                              {apt.status === "cancelled" ? (
                                 <button
-                                  onClick={() => openDeleteModal(apt.id, apt.patient_name)}
+                                  onClick={() =>
+                                    openDeleteModal(apt.id, apt.patient_name)
+                                  }
                                   className="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100 transition-colors"
                                   title="Delete appointment"
                                 >
                                   Delete
                                 </button>
-                              ) : apt.status === 'pending' && !isPast ? (
+                              ) : apt.status === "pending" && !isPast ? (
                                 <>
                                   <button
-                                    onClick={() => openAcceptModal(apt.id, apt.patient_name)}
+                                    onClick={() =>
+                                      openAcceptModal(apt.id, apt.patient_name)
+                                    }
                                     className="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
                                     title="Accept appointment"
                                   >
                                     Accept
                                   </button>
                                   <button
-                                    onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                    onClick={() =>
+                                      openCancelModal(apt.id, apt.patient_name)
+                                    }
                                     className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
                                     title="Cancel appointment"
                                   >
                                     Cancel
                                   </button>
                                 </>
-                              ) : apt.status !== 'cancelled' && !isPast ? (
+                              ) : apt.status !== "cancelled" && !isPast ? (
                                 <button
-                                  onClick={() => openCancelModal(apt.id, apt.patient_name)}
+                                  onClick={() =>
+                                    openCancelModal(apt.id, apt.patient_name)
+                                  }
                                   className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
                                   title="Cancel appointment"
                                 >
@@ -1213,32 +1306,33 @@ function DoctorDashboard() {
                       <span className="text-gray-600">
                         Complete your profile
                       </span>
-                      <span className="font-medium text-blue-600">85%</span>
+                      <span className="font-medium text-blue-600">
+                        {profileCompletion.percent}%
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
                         className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: "85%" }}
+                        style={{ width: `${profileCompletion.percent}%` }}
                       ></div>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center text-green-600">
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Basic Information
-                    </div>
-                    <div className="flex items-center text-green-600">
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Professional Details
-                    </div>
-                    <div className="flex items-center text-gray-400">
-                      <Clock className="w-4 h-4 mr-2" />
-                      Set Availability
-                    </div>
-                    <div className="flex items-center text-gray-400">
-                      <Clock className="w-4 h-4 mr-2" />
-                      Upload Documents
-                    </div>
+                    {profileCompletion.items.map((item) => (
+                      <div
+                        key={item.label}
+                        className={`flex items-center ${
+                          item.done ? "text-green-600" : "text-gray-400"
+                        }`}
+                      >
+                        {item.done ? (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Clock className="w-4 h-4 mr-2" />
+                        )}
+                        {item.label}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1288,7 +1382,7 @@ function DoctorDashboard() {
                   <Clock className="w-6 h-6 mr-2 text-blue-600" />
                   Set Your Availability
                 </h2>
-                <button 
+                <button
                   onClick={saveAvailabilityToBackend}
                   disabled={saving}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition font-medium flex items-center space-x-2"
@@ -1379,34 +1473,34 @@ function DoctorDashboard() {
         onClose={closeModal}
         onConfirm={confirmAction}
         title={
-          confirmModal.action === 'cancel' 
-            ? "Cancel Appointment" 
-            : confirmModal.action === 'delete'
-            ? "Delete Appointment"
-            : "Accept Appointment"
+          confirmModal.action === "cancel"
+            ? "Cancel Appointment"
+            : confirmModal.action === "delete"
+              ? "Delete Appointment"
+              : "Accept Appointment"
         }
         message={
-          confirmModal.action === 'cancel' 
+          confirmModal.action === "cancel"
             ? `Are you sure you want to cancel the appointment with ${confirmModal.patientName}? This action cannot be undone.`
-            : confirmModal.action === 'delete'
-            ? `Are you sure you want to permanently delete the cancelled appointment with ${confirmModal.patientName}? This will completely remove it from your records.`
-            : `Are you sure you want to accept and confirm the appointment with ${confirmModal.patientName}?`
+            : confirmModal.action === "delete"
+              ? `Are you sure you want to permanently delete the cancelled appointment with ${confirmModal.patientName}? This will completely remove it from your records.`
+              : `Are you sure you want to accept and confirm the appointment with ${confirmModal.patientName}?`
         }
         confirmText={
-          confirmModal.action === 'cancel' 
-            ? "Cancel Appointment" 
-            : confirmModal.action === 'delete'
-            ? "Delete Permanently"
-            : "Accept Appointment"
+          confirmModal.action === "cancel"
+            ? "Cancel Appointment"
+            : confirmModal.action === "delete"
+              ? "Delete Permanently"
+              : "Accept Appointment"
         }
         cancelText={
-          confirmModal.action === 'cancel' 
-            ? "Keep Appointment" 
-            : confirmModal.action === 'delete'
-            ? "Keep in List"
-            : "Go Back"
+          confirmModal.action === "cancel"
+            ? "Keep Appointment"
+            : confirmModal.action === "delete"
+              ? "Keep in List"
+              : "Go Back"
         }
-        type={confirmModal.action === 'accept' ? "info" : "danger"}
+        type={confirmModal.action === "accept" ? "info" : "danger"}
         loading={confirmModal.loading}
       />
     </div>

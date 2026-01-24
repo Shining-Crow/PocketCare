@@ -56,28 +56,38 @@ function UserProfile() {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState(null);
   const APPOINTMENTS_PAGE_SIZE = 2;
-  const [appointmentsVisibleCount, setAppointmentsVisibleCount] = useState(APPOINTMENTS_PAGE_SIZE);
+  const [appointmentsVisibleCount, setAppointmentsVisibleCount] = useState(
+    APPOINTMENTS_PAGE_SIZE,
+  );
 
   // Bed bookings state
   const [bedBookings, setBedBookings] = useState([]);
   const [bedBookingsLoading, setBedBookingsLoading] = useState(false);
   const [bedBookingsError, setBedBookingsError] = useState(null);
   const BED_BOOKINGS_PAGE_SIZE = 2;
-  const [bedBookingsVisibleCount, setBedBookingsVisibleCount] = useState(BED_BOOKINGS_PAGE_SIZE);
+  const [bedBookingsVisibleCount, setBedBookingsVisibleCount] = useState(
+    BED_BOOKINGS_PAGE_SIZE,
+  );
+
+  const resolveProfileImageSrc = (value) => {
+    const src = (value || "").toString().trim();
+    if (!src) return "";
+    if (src.startsWith("data:")) return src;
+    if (/^https?:\/\//i.test(src)) return src;
+
+    // If backend returns a relative path, prefix with server origin (not /api).
+    const origin = (
+      process.env.REACT_APP_API_URL || "http://localhost:5000"
+    ).replace(/\/$/, "");
+    if (src.startsWith("/")) return `${origin}${src}`;
+    return `${origin}/${src}`;
+  };
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
       const response = await api.get("/auth/profile");
       const userData = response.data.user;
-
-      // Load profile picture from localStorage
-      const savedPicture = localStorage.getItem(
-        `profilePicture_${userData.id}`
-      );
-      if (savedPicture) {
-        userData.profile_picture = savedPicture;
-      }
 
       setProfile(userData);
       setStats({
@@ -135,7 +145,9 @@ function UserProfile() {
       setSosHistoryHasMore(hasMore);
     } catch (error) {
       console.error("Error fetching SOS history:", error);
-      setSosHistoryError(error.response?.data?.error || "Failed to load SOS history");
+      setSosHistoryError(
+        error.response?.data?.error || "Failed to load SOS history",
+      );
       setSosHistory([]);
       setSosHistoryOffset(0);
       setSosHistoryHasMore(false);
@@ -149,12 +161,16 @@ function UserProfile() {
       setAppointmentsLoading(true);
       setAppointmentsError(null);
       const res = await api.get("/user/appointments");
-      const items = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
+      const items = Array.isArray(res.data?.appointments)
+        ? res.data.appointments
+        : [];
       setAppointments(items);
       setAppointmentsVisibleCount(APPOINTMENTS_PAGE_SIZE);
     } catch (error) {
       console.error("Error fetching appointments:", error);
-      setAppointmentsError(error.response?.data?.error || "Failed to load appointments");
+      setAppointmentsError(
+        error.response?.data?.error || "Failed to load appointments",
+      );
       setAppointments([]);
       setAppointmentsVisibleCount(0);
     } finally {
@@ -172,7 +188,9 @@ function UserProfile() {
       setBedBookingsVisibleCount(BED_BOOKINGS_PAGE_SIZE);
     } catch (error) {
       console.error("Error fetching bed bookings:", error);
-      setBedBookingsError(error.response?.data?.error || "Failed to load bed bookings");
+      setBedBookingsError(
+        error.response?.data?.error || "Failed to load bed bookings",
+      );
       setBedBookings([]);
       setBedBookingsVisibleCount(0);
     } finally {
@@ -244,7 +262,9 @@ function UserProfile() {
       await fetchSosHistory({ reset: true });
     } catch (error) {
       console.error("Error resolving SOS:", error);
-      setSosHistoryError(error.response?.data?.error || "Failed to resolve SOS request");
+      setSosHistoryError(
+        error.response?.data?.error || "Failed to resolve SOS request",
+      );
     } finally {
       setResolvingSosId(null);
     }
@@ -268,12 +288,14 @@ function UserProfile() {
       s === "pending"
         ? "bg-amber-50 text-amber-800 border-amber-200"
         : s === "acknowledged"
-        ? "bg-blue-50 text-blue-800 border-blue-200"
-        : s === "resolved"
-        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-        : "bg-gray-50 text-gray-700 border-gray-200";
+          ? "bg-blue-50 text-blue-800 border-blue-200"
+          : s === "resolved"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+            : "bg-gray-50 text-gray-700 border-gray-200";
     return (
-      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${styles}`}>
+      <span
+        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${styles}`}
+      >
         {s ? s.toUpperCase() : "UNKNOWN"}
       </span>
     );
@@ -314,14 +336,21 @@ function UserProfile() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result;
-      // Store in localStorage with user ID
-      localStorage.setItem(`profilePicture_${profile.id}`, base64String);
-      setProfile({ ...profile, profile_picture: base64String });
-    };
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    api
+      .post("/auth/profile/photo", formData)
+      .then((res) => {
+        const newUrl = res.data?.profile_picture;
+        if (newUrl) {
+          setProfile((prev) => ({ ...prev, profile_picture: newUrl }));
+        }
+      })
+      .catch((error) => {
+        console.error("Error updating profile photo:", error);
+        alert(error.response?.data?.error || "Failed to update profile photo");
+      });
   };
 
   const formatDate = (dateString) => {
@@ -345,46 +374,273 @@ function UserProfile() {
     );
   }
 
+  const profileImageSrc = resolveProfileImageSrc(profile.profile_picture);
+
   return (
     <div>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           {/* Main Container with Background and Shadow */}
-          <div className="bg-white rounded-3xl shadow-2xl p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <BackToDashboardButton />
-              <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-            </div>
-            {/* Profile Picture */}
-            <div className="flex flex-col items-center justify-center mb-8">
-              <div className="relative mb-4">
-                <div className="w-40 h-40 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-2xl ring-4 ring-blue-200">
-                  {profile.profile_picture ? (
-                    <img
-                      src={profile.profile_picture}
-                      alt={profile.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-20 h-20 text-blue-600" />
-                  )}
-                </div>
-                <label className="absolute bottom-0 right-0 bg-blue-600 p-3 rounded-full cursor-pointer hover:bg-blue-700 transition-all shadow-xl hover:scale-110">
-                  <Camera className="w-5 h-5 text-white" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-7">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3">
+                <BackToDashboardButton />
+                <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
               </div>
-              <p className="text-2xl text-gray-800 font-bold">{profile.name}</p>
-              <p className="text-sm text-gray-500">{profile.email}</p>
+
+              <div className="flex justify-end">
+                {!editing ? (
+                  <button
+                    onClick={handleEdit}
+                    className="bg-blue-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-blue-700 transition-all shadow-sm font-semibold"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 font-semibold"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="bg-gray-600 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 hover:bg-gray-700 transition-all shadow-sm font-semibold"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Profile Header (compact) */}
+            <div className="mb-6">
+              <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-slate-50 via-white to-white p-5 sm:p-6">
+                <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm ring-1 ring-gray-100">
+                      {profileImageSrc ? (
+                        <img
+                          src={profileImageSrc}
+                          alt={profile.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fall back to default avatar if the stored URL is stale/broken.
+                            setProfile((prev) => ({
+                              ...prev,
+                              profile_picture: "/api/auth/user-photos/user.png",
+                            }));
+                          }}
+                        />
+                      ) : (
+                        <User className="w-10 h-10 text-blue-600" />
+                      )}
+                    </div>
+                    <label className="absolute -bottom-2 -right-2 bg-blue-600 p-2 rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-md">
+                      <Camera className="w-4 h-4 text-white" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={editedData.name || ""}
+                          onChange={(e) =>
+                            setEditedData({
+                              ...editedData,
+                              name: e.target.value,
+                            })
+                          }
+                          className="w-full text-xl sm:text-2xl font-bold text-gray-900 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          placeholder="Enter your name"
+                        />
+                      ) : (
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+                          {profile.name || "Unnamed"}
+                        </h2>
+                      )}
+
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="truncate">{profile.email || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                      {/* Phone */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500">Phone</p>
+                          {editing ? (
+                            <input
+                              type="tel"
+                              value={editedData.phone || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  phone: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                              placeholder="Enter phone number"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold text-gray-900 truncate">
+                              {profile.phone || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Address */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                          <MapPin className="w-4 h-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500">Address</p>
+                          {editing ? (
+                            <input
+                              type="text"
+                              value={editedData.address || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  address: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                              placeholder="Enter your address"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold text-gray-900 truncate">
+                              {profile.address || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* DOB */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500">Date of Birth</p>
+                          {editing ? (
+                            <input
+                              type="date"
+                              value={editedData.date_of_birth || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  date_of_birth: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold text-gray-900 truncate">
+                              {profile.date_of_birth
+                                ? formatDate(profile.date_of_birth)
+                                : "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Gender */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                          <User className="w-4 h-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500">Gender</p>
+                          {editing ? (
+                            <select
+                              value={editedData.gender || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  gender: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                            >
+                              <option value="">Select gender</option>
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="other">Other</option>
+                            </select>
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold text-gray-900 capitalize truncate">
+                              {profile.gender || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Blood group */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 h-8 w-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
+                          <Droplet className="w-4 h-4 text-gray-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-gray-500">Blood Group</p>
+                          {editing ? (
+                            <select
+                              value={editedData.blood_group || ""}
+                              onChange={(e) =>
+                                setEditedData({
+                                  ...editedData,
+                                  blood_group: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                            >
+                              <option value="">Select blood group</option>
+                              <option value="A+">A+</option>
+                              <option value="A-">A-</option>
+                              <option value="B+">B+</option>
+                              <option value="B-">B-</option>
+                              <option value="AB+">AB+</option>
+                              <option value="AB-">AB-</option>
+                              <option value="O+">O+</option>
+                              <option value="O-">O-</option>
+                            </select>
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold text-gray-900 truncate">
+                              {profile.blood_group || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
               {/* Appointments */}
               <div
                 onClick={() =>
@@ -392,20 +648,22 @@ function UserProfile() {
                     .getElementById("appointments-section")
                     ?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
-                className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
               >
-                <div className="absolute top-4 right-4">
-                  <TrendingUp className="w-5 h-5 text-blue-600 opacity-50" />
+                <div className="absolute top-3 right-3">
+                  <TrendingUp className="w-4 h-4 text-blue-600 opacity-50" />
                 </div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                    <CalendarCheck className="w-6 h-6 text-blue-600" />
+                  <div className="bg-blue-50 p-2 rounded-lg border border-blue-100 group-hover:scale-110 transition-transform">
+                    <CalendarCheck className="w-5 h-5 text-blue-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                <h2 className="text-xl font-bold text-gray-900 mb-0.5">
                   {stats.appointments}
                 </h2>
-                <p className="text-gray-600 text-sm font-medium">Appointments</p>
+                <p className="text-gray-600 text-xs font-semibold">
+                  Appointments
+                </p>
               </div>
 
               {/* Bed Bookings */}
@@ -415,20 +673,22 @@ function UserProfile() {
                     .getElementById("bed-bookings-section")
                     ?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
-                className="bg-gradient-to-br from-rose-50 to-pink-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
               >
-                <div className="absolute top-4 right-4">
-                  <Bed className="w-5 h-5 text-rose-600 opacity-50" />
+                <div className="absolute top-3 right-3">
+                  <Bed className="w-4 h-4 text-rose-600 opacity-50" />
                 </div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                    <Bed className="w-6 h-6 text-rose-600" />
+                  <div className="bg-rose-50 p-2 rounded-lg border border-rose-100 group-hover:scale-110 transition-transform">
+                    <Bed className="w-5 h-5 text-rose-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                <h2 className="text-xl font-bold text-gray-900 mb-0.5">
                   {bedBookingsLoading ? "…" : bedBookings.length}
                 </h2>
-                <p className="text-gray-600 text-sm font-medium">Bed Bookings</p>
+                <p className="text-gray-600 text-xs font-semibold">
+                  Bed Bookings
+                </p>
               </div>
 
               {/* SOS History */}
@@ -438,247 +698,28 @@ function UserProfile() {
                     .getElementById("sos-history")
                     ?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
-                className="bg-gradient-to-br from-red-50 to-orange-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
+                className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-all relative overflow-hidden group cursor-pointer"
               >
-                <div className="absolute top-4 right-4">
-                  <Clock className="w-5 h-5 text-red-600 opacity-50" />
+                <div className="absolute top-3 right-3">
+                  <Clock className="w-4 h-4 text-red-600 opacity-50" />
                 </div>
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-white p-2.5 rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <div className="bg-red-50 p-2 rounded-lg border border-red-100 group-hover:scale-110 transition-transform">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-1">
+                <h2 className="text-xl font-bold text-gray-900 mb-0.5">
                   {sosHistoryLoading ? "…" : sosHistory.length}
                 </h2>
-                <p className="text-gray-600 text-sm font-medium">SOS History</p>
+                <p className="text-gray-600 text-xs font-semibold">
+                  SOS History
+                </p>
               </div>
-            </div>
-
-            {/* Edit Profile Button */}
-            <div className="flex justify-end mb-6">
-              {!editing ? (
-                <button
-                  onClick={handleEdit}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl font-medium"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit Profile
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="bg-green-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-green-600 transition-all shadow-lg disabled:opacity-50 font-medium"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    onClick={handleCancel}
-                    className="bg-gray-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 hover:bg-gray-600 transition-all shadow-lg font-medium"
-                  >
-                    <X className="w-4 h-4" />
-                    Cancel
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Profile Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Name */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-indigo-100 p-3 rounded-xl shadow-sm">
-                  <User className="w-6 h-6 text-indigo-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">Name</p>
-                  {editing ? (
-                    <input
-                      type="text"
-                      value={editedData.name || ""}
-                      onChange={(e) =>
-                        setEditedData({ ...editedData, name: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      placeholder="Enter your name"
-                    />
-                  ) : (
-                    <p className="text-gray-900 font-semibold">
-                      {profile.name || "Not set"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-blue-100 p-3 rounded-xl shadow-sm">
-                  <Mail className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Email
-                  </p>
-                  <p className="text-gray-900 font-semibold">{profile.email}</p>
-                </div>
-              </div>
-
-              {/* Phone */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-green-100 p-3 rounded-xl shadow-sm">
-                  <Phone className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Phone
-                  </p>
-                  {editing ? (
-                    <input
-                      type="tel"
-                      value={editedData.phone || ""}
-                      onChange={(e) =>
-                        setEditedData({ ...editedData, phone: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      placeholder="Enter phone number"
-                    />
-                  ) : (
-                    <p className="text-gray-900 font-semibold">
-                      {profile.phone || "Not set"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Date of Birth */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-purple-100 p-3 rounded-xl shadow-sm">
-                  <Calendar className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Date of Birth
-                  </p>
-                  {editing ? (
-                    <input
-                      type="date"
-                      value={editedData.date_of_birth || ""}
-                      onChange={(e) =>
-                        setEditedData({
-                          ...editedData,
-                          date_of_birth: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    />
-                  ) : (
-                    <p className="text-gray-900 font-semibold">
-                      {formatDate(profile.date_of_birth)}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Gender */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-pink-100 p-3 rounded-xl shadow-sm">
-                  <User className="w-6 h-6 text-pink-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Gender
-                  </p>
-                  {editing ? (
-                    <select
-                      value={editedData.gender || ""}
-                      onChange={(e) =>
-                        setEditedData({ ...editedData, gender: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    >
-                      <option value="">Select gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  ) : (
-                    <p className="text-gray-900 font-semibold capitalize">
-                      {profile.gender || "Not set"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Blood Group */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-red-100 p-3 rounded-xl shadow-sm">
-                  <Droplet className="w-6 h-6 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Blood Group
-                  </p>
-                  {editing ? (
-                    <select
-                      value={editedData.blood_group || ""}
-                      onChange={(e) =>
-                        setEditedData({
-                          ...editedData,
-                          blood_group: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    >
-                      <option value="">Select blood group</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                    </select>
-                  ) : (
-                    <p className="text-gray-900 font-semibold">
-                      {profile.blood_group || "Not set"}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Address */}
-              <div className="flex items-start gap-4 p-5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:shadow-md transition-all">
-                <div className="bg-orange-100 p-3 rounded-xl shadow-sm">
-                  <MapPin className="w-6 h-6 text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500 mb-1 font-medium">
-                    Address
-                  </p>
-                  {editing ? (
-                    <textarea
-                      value={editedData.address || ""}
-                      onChange={(e) =>
-                        setEditedData({
-                          ...editedData,
-                          address: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
-                      rows="3"
-                      placeholder="Enter your address"
-                    />
-                  ) : (
-                    <p className="text-gray-900 font-semibold">
-                      {profile.address || "Not set"}
-                    </p>
-                  )}
-                </div>
-              </div>
+              {/* Profile Details intentionally excludes basic identity fields (moved to header) */}
             </div>
 
             {/* Appointments Section */}
@@ -689,8 +730,12 @@ function UserProfile() {
                     <CalendarCheck className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">My Appointments</h2>
-                    <p className="text-sm text-gray-500">Your scheduled appointments</p>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      My Appointments
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Your scheduled appointments
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -723,91 +768,101 @@ function UserProfile() {
                 </div>
               )}
 
-              {!appointmentsError && appointments.length === 0 && !appointmentsLoading && (
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="w-8 h-8 text-blue-600" />
+              {!appointmentsError &&
+                appointments.length === 0 &&
+                !appointmentsLoading && (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Calendar className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                      No appointments yet
+                    </h4>
+                    <p className="text-gray-500 text-sm mb-4">
+                      Book an appointment with a doctor to get started
+                    </p>
+                    <button
+                      onClick={() => navigate("/doctors")}
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
+                    >
+                      Find Doctors
+                    </button>
                   </div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-2">No appointments yet</h4>
-                  <p className="text-gray-500 text-sm mb-4">
-                    Book an appointment with a doctor to get started
-                  </p>
-                  <button
-                    onClick={() => navigate("/doctors")}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
-                  >
-                    Find Doctors
-                  </button>
-                </div>
-              )}
+                )}
 
               {appointments.length > 0 && (
                 <div className="grid gap-3">
-                  {appointments.slice(0, appointmentsVisibleCount).map((appt) => (
-                    <div
-                      key={appt.id}
-                      className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
-                            <User className="w-6 h-6 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900">
-                              Dr. {appt.doctor_name || "Doctor"}
-                            </h4>
-                            <p className="text-sm text-gray-600">
-                              {appt.specialty_name || appt.specialty || "General"}
-                            </p>
-                          </div>
-                        </div>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getAppointmentStatusBadge(
-                            appt.status
-                          )}`}
-                        >
-                          {(appt.status || "scheduled").toUpperCase()}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div className="rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" /> Date
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {formatAppointmentDate(appt.appointment_date)}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Time
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {appt.time_slot || appt.appointment_time || "—"}
-                          </div>
-                        </div>
-                        {appt.notes && (
-                          <div className="rounded-xl border border-gray-200 bg-white p-3 col-span-2 md:col-span-1">
-                            <div className="text-[11px] uppercase tracking-wider text-gray-500">Notes</div>
-                            <div className="mt-1 text-sm text-gray-700 truncate">
-                              {appt.notes}
+                  {appointments
+                    .slice(0, appointmentsVisibleCount)
+                    .map((appt) => (
+                      <div
+                        key={appt.id}
+                        className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                              <User className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-900">
+                                Dr. {appt.doctor_name || "Doctor"}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {appt.specialty_name ||
+                                  appt.specialty ||
+                                  "General"}
+                              </p>
                             </div>
                           </div>
-                        )}
-                      </div>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getAppointmentStatusBadge(
+                              appt.status,
+                            )}`}
+                          >
+                            {(appt.status || "scheduled").toUpperCase()}
+                          </span>
+                        </div>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button
-                          onClick={() => navigate("/appointments")}
-                          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          View Details
-                        </button>
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" /> Date
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-gray-900">
+                              {formatAppointmentDate(appt.appointment_date)}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Time
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-gray-900">
+                              {appt.time_slot || appt.appointment_time || "—"}
+                            </div>
+                          </div>
+                          {appt.notes && (
+                            <div className="rounded-xl border border-gray-200 bg-white p-3 col-span-2 md:col-span-1">
+                              <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                                Notes
+                              </div>
+                              <div className="mt-1 text-sm text-gray-700 truncate">
+                                {appt.notes}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => navigate("/appointments")}
+                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            View Details
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
                   {appointmentsVisibleCount < appointments.length && (
                     <div className="flex justify-center pt-2">
@@ -815,7 +870,10 @@ function UserProfile() {
                         type="button"
                         onClick={() =>
                           setAppointmentsVisibleCount((prev) =>
-                            Math.min(prev + APPOINTMENTS_PAGE_SIZE, appointments.length)
+                            Math.min(
+                              prev + APPOINTMENTS_PAGE_SIZE,
+                              appointments.length,
+                            ),
                           )
                         }
                         className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -836,8 +894,12 @@ function UserProfile() {
                     <Bed className="w-5 h-5 text-rose-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">My Bed Bookings</h2>
-                    <p className="text-sm text-gray-500">Your hospital bed reservations</p>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      My Bed Bookings
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Your hospital bed reservations
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -870,100 +932,114 @@ function UserProfile() {
                 </div>
               )}
 
-              {!bedBookingsError && bedBookings.length === 0 && !bedBookingsLoading && (
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Bed className="w-8 h-8 text-rose-600" />
+              {!bedBookingsError &&
+                bedBookings.length === 0 &&
+                !bedBookingsLoading && (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-8 text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-rose-100 to-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Bed className="w-8 h-8 text-rose-600" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                      No bed bookings yet
+                    </h4>
+                    <p className="text-gray-500 text-sm mb-4">
+                      Search hospitals and book a bed when you need admission
+                    </p>
+                    <button
+                      onClick={() => navigate("/hospital-search")}
+                      className="inline-flex items-center px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
+                    >
+                      Find Hospitals
+                    </button>
                   </div>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-2">No bed bookings yet</h4>
-                  <p className="text-gray-500 text-sm mb-4">
-                    Search hospitals and book a bed when you need admission
-                  </p>
-                  <button
-                    onClick={() => navigate("/hospital-search")}
-                    className="inline-flex items-center px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-medium shadow-md hover:shadow-lg"
-                  >
-                    Find Hospitals
-                  </button>
-                </div>
-              )}
+                )}
 
               {bedBookings.length > 0 && (
                 <div className="grid gap-3">
-                  {bedBookings.slice(0, bedBookingsVisibleCount).map((booking) => (
-                    <div
-                      key={booking.id}
-                      className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
-                            <Building2 className="w-6 h-6 text-white" />
+                  {bedBookings
+                    .slice(0, bedBookingsVisibleCount)
+                    .map((booking) => (
+                      <div
+                        key={booking.id}
+                        className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm hover:shadow-md transition-all"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl flex items-center justify-center shadow-md">
+                              <Building2 className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-gray-900">
+                                {booking.hospital_name || "Hospital"}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {formatWardType(
+                                  booking.ward_type,
+                                  booking.ac_type,
+                                )}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900">
-                              {booking.hospital_name || "Hospital"}
-                            </h4>
-                            <p className="text-sm text-gray-600">
-                              {formatWardType(booking.ward_type, booking.ac_type)}
-                            </p>
-                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getBedBookingStatusBadge(
+                              booking.status,
+                            )}`}
+                          >
+                            {(booking.status || "pending").toUpperCase()}
+                          </span>
                         </div>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getBedBookingStatusBadge(
-                            booking.status
-                          )}`}
-                        >
-                          {(booking.status || "pending").toUpperCase()}
-                        </span>
-                      </div>
 
-                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div className="rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <User className="w-3 h-3" /> Patient
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                              <User className="w-3 h-3" /> Patient
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-gray-900">
+                              {booking.patient_name || "—"}
+                            </div>
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {booking.patient_name || "—"}
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" /> Admission Date
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-gray-900">
+                              {formatAppointmentDate(
+                                booking.preferred_date ||
+                                  booking.admission_date,
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> Contact
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-gray-900">
+                              {booking.patient_phone || "—"}
+                            </div>
                           </div>
                         </div>
-                        <div className="rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" /> Admission Date
+
+                        {booking.admission_reason && (
+                          <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                              Reason for Admission
+                            </div>
+                            <div className="mt-1 text-sm text-gray-700">
+                              {booking.admission_reason}
+                            </div>
                           </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {formatAppointmentDate(booking.preferred_date || booking.admission_date)}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                            <Phone className="w-3 h-3" /> Contact
-                          </div>
-                          <div className="mt-1 text-sm font-semibold text-gray-900">
-                            {booking.patient_phone || "—"}
-                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => navigate("/my-bed-bookings")}
+                            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            View All Bookings
+                          </button>
                         </div>
                       </div>
-
-                      {booking.admission_reason && (
-                        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500">Reason for Admission</div>
-                          <div className="mt-1 text-sm text-gray-700">
-                            {booking.admission_reason}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button
-                          onClick={() => navigate("/my-bed-bookings")}
-                          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          View All Bookings
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
 
                   {bedBookingsVisibleCount < bedBookings.length && (
                     <div className="flex justify-center pt-2">
@@ -971,7 +1047,10 @@ function UserProfile() {
                         type="button"
                         onClick={() =>
                           setBedBookingsVisibleCount((prev) =>
-                            Math.min(prev + BED_BOOKINGS_PAGE_SIZE, bedBookings.length)
+                            Math.min(
+                              prev + BED_BOOKINGS_PAGE_SIZE,
+                              bedBookings.length,
+                            ),
                           )
                         }
                         className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -992,8 +1071,12 @@ function UserProfile() {
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">SOS History</h2>
-                    <p className="text-sm text-gray-500">Your past emergency requests</p>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      SOS History
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Your past emergency requests
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1017,11 +1100,13 @@ function UserProfile() {
                 </div>
               )}
 
-              {!sosHistoryError && sosHistory.length === 0 && !sosHistoryLoading && (
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
-                  No SOS history yet.
-                </div>
-              )}
+              {!sosHistoryError &&
+                sosHistory.length === 0 &&
+                !sosHistoryLoading && (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                    No SOS history yet.
+                  </div>
+                )}
 
               {sosHistory.length > 0 && (
                 <div className="grid gap-3">
@@ -1033,11 +1118,18 @@ function UserProfile() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-sm font-bold text-gray-900">Request #{req.id}</div>
+                            <div className="text-sm font-bold text-gray-900">
+                              Request #{req.id}
+                            </div>
                             <SosStatusBadge status={req.status} />
                           </div>
                           <div className="mt-1 text-sm text-gray-600">
-                            Type: <span className="font-semibold text-gray-900">{req.emergency_type_label || req.emergency_type || "General"}</span>
+                            Type:{" "}
+                            <span className="font-semibold text-gray-900">
+                              {req.emergency_type_label ||
+                                req.emergency_type ||
+                                "General"}
+                            </span>
                           </div>
                         </div>
 
@@ -1047,7 +1139,9 @@ function UserProfile() {
                             {formatDateTime(req.created_at)}
                           </div>
 
-                          {(req.status === "pending" || (req.status === "acknowledged" && !req.hospital_id)) && (
+                          {(req.status === "pending" ||
+                            (req.status === "acknowledged" &&
+                              !req.hospital_id)) && (
                             <div className="mt-2 flex justify-end">
                               <button
                                 type="button"
@@ -1066,7 +1160,8 @@ function UserProfile() {
                           )}
                           {req.status === "acknowledged" && req.hospital_id ? (
                             <div className="mt-2 text-xs text-blue-700">
-                              Accepted by a hospital — only the hospital can mark it resolved.
+                              Accepted by a hospital — only the hospital can
+                              mark it resolved.
                             </div>
                           ) : null}
                         </div>
@@ -1090,15 +1185,22 @@ function UserProfile() {
                           </div>
                         </div>
                         <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                          <div className="text-[11px] uppercase tracking-wider text-gray-500">Hospital</div>
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                            Hospital
+                          </div>
                           <div className="mt-1 text-sm font-semibold text-gray-900">
                             {req.hospital_name || "—"}
                           </div>
-                          <div className="mt-0.5 text-sm text-gray-700">{req.hospital_phone || ""}</div>
+                          <div className="mt-0.5 text-sm text-gray-700">
+                            {req.hospital_phone || ""}
+                          </div>
                         </div>
                       </div>
 
-                      {(req.note || req.hospital_phone || (typeof req.latitude === "number" && typeof req.longitude === "number")) && (
+                      {(req.note ||
+                        req.hospital_phone ||
+                        (typeof req.latitude === "number" &&
+                          typeof req.longitude === "number")) && (
                         <div className="mt-4 flex flex-wrap gap-2">
                           {req.hospital_phone && (
                             <a
@@ -1108,19 +1210,22 @@ function UserProfile() {
                               Call hospital
                             </a>
                           )}
-                          {typeof req.latitude === "number" && typeof req.longitude === "number" && (
-                            <a
-                              href={`https://www.google.com/maps?q=${req.latitude},${req.longitude}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                            >
-                              View location
-                            </a>
-                          )}
+                          {typeof req.latitude === "number" &&
+                            typeof req.longitude === "number" && (
+                              <a
+                                href={`https://www.google.com/maps?q=${req.latitude},${req.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                View location
+                              </a>
+                            )}
                           {req.note && (
                             <div className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">
-                              <span className="font-semibold text-gray-800">Note: </span>
+                              <span className="font-semibold text-gray-800">
+                                Note:{" "}
+                              </span>
                               {req.note}
                             </div>
                           )}

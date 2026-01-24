@@ -1,3 +1,15 @@
+"""Emergency SOS routes (user + hospital).
+
+This module implements the backend API for PocketCare's SOS flow:
+- Users create SOS requests with location + optional type/note.
+- Users can fetch latest/history and resolve only when not handled by a hospital.
+- Hospitals discover nearby pending requests, accept them, and resolve them.
+
+Design notes:
+- Uses JWT identity strings to distinguish actors (user id vs 'hospital_<id>').
+- Uses multiple SQL variants with fallbacks to tolerate partially-migrated schemas.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -11,14 +23,19 @@ from utils.database import get_db_connection
 
 emergency_sos_bp = Blueprint('emergency_sos', __name__)
 
-# SOS visibility expansion (for pending/unacknowledged requests)
-# Rationale: if no nearby hospital sees/accepts a request quickly, widen the
-# radius gradually so hospitals farther away can respond.
+# SOS visibility expansion (hospital discovery of pending requests).
+# Rationale: if no nearby hospital sees/accepts a request quickly, gradually
+# widen the radius so farther hospitals can respond.
 _SOS_BASE_RADIUS_KM_DEFAULT = 10.0
 _SOS_EXPAND_EVERY_SECONDS = 180  # 3 minutes
 _SOS_EXPAND_STEP_KM = 10.0
 _SOS_MAX_RADIUS_KM = 50.0
 _SOS_ACCEPTED_VISIBLE_SECONDS = 60
+
+
+# --- Schema / migration compatibility helpers ---
+# These helpers are used to decide which fallback SQL query to run when a
+# deployment is missing a table/column (common during local development).
 
 
 def _is_missing_emergency_types(err: Exception) -> bool:
@@ -40,6 +57,11 @@ def _is_missing_emergency_requests(err: Exception) -> bool:
     return 'emergency_requests' in msg and ('doesn\'t exist' in msg or 'table' in msg)
 
 
+
+# --- JWT identity parsing ---
+# We distinguish user and hospital callers by the JWT identity format:
+# - Users: identity is a numeric string (e.g., "12")
+# - Hospitals: identity is prefixed (e.g., "hospital_5")
 def _parse_user_id(identity: Any) -> Optional[int]:
     if identity is None:
         return None
@@ -67,6 +89,9 @@ def _parse_hospital_id(identity: Any) -> Optional[int]:
         return None
 
 
+
+# --- Request value normalization ---
+# Convert request payload/params into safe numeric types.
 def _as_float(v: Any) -> Optional[float]:
     if v is None:
         return None
@@ -78,6 +103,7 @@ def _as_float(v: Any) -> Optional[float]:
 
 @emergency_sos_bp.route('/emergency/sos', methods=['POST', 'OPTIONS'])
 def create_emergency_sos():
+    """Create a new SOS request for the authenticated user."""
     # Allow CORS preflight without auth.
     if request.method == 'OPTIONS':
         return ('', 200)
@@ -100,6 +126,7 @@ def create_emergency_sos():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # Persist as a 'pending' request; hospitals will later accept/resolve.
             cursor.execute(
                 """
                 INSERT INTO emergency_requests (user_id, latitude, longitude, emergency_type, note, status, created_at)
@@ -120,6 +147,7 @@ def create_emergency_sos():
 
 @emergency_sos_bp.route('/emergency/sos/latest', methods=['GET', 'OPTIONS'])
 def get_latest_emergency_sos():
+    """Fetch the most recent SOS request for the authenticated user."""
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -131,6 +159,9 @@ def get_latest_emergency_sos():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+                        # Query strategy:
+                        # - Prefer the richest shape (joins emergency_types + hospitals)
+                        # - Fall back when tables/columns aren't present.
                         sql_with_types = """
                                 SELECT
                                     er.id,
@@ -203,6 +234,7 @@ def get_latest_emergency_sos():
                                 row = cursor.fetchone()
                         except Exception as e:
                                 try:
+                    # Fallbacks for older schemas.
                                         if _is_missing_emergency_types(e):
                                                 cursor.execute(sql_without_types, (user_id,))
                                                 row = cursor.fetchone()
@@ -229,6 +261,7 @@ def get_latest_emergency_sos():
 
 @emergency_sos_bp.route('/emergency/sos/history', methods=['GET', 'OPTIONS'])
 def get_emergency_sos_history():
+    """Paginated SOS history for the authenticated user."""
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -252,6 +285,9 @@ def get_emergency_sos_history():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+                        # Query strategy:
+                        # - Prefer the richest shape (joins emergency_types + hospitals)
+                        # - Fall back when tables/columns aren't present.
                         sql_with_types = """
                                 SELECT
                                     er.id,
@@ -324,6 +360,7 @@ def get_emergency_sos_history():
                                 rows = cursor.fetchall() or []
                         except Exception as e:
                                 try:
+                                # Fallbacks for older schemas.
                                         if _is_missing_emergency_types(e):
                                                 cursor.execute(sql_without_types, (user_id, limit, offset))
                                                 rows = cursor.fetchall() or []
@@ -365,6 +402,7 @@ def get_emergency_sos_history():
 
 @emergency_sos_bp.route('/emergency/sos/<int:request_id>/resolve', methods=['POST', 'OPTIONS'])
 def user_resolve_emergency_sos(request_id: int):
+    """Resolve an SOS request as the user (only if not assigned to a hospital)."""
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -409,6 +447,7 @@ def user_resolve_emergency_sos(request_id: int):
                 return jsonify({'error': 'Request is not eligible to resolve', 'status': status}), 409
 
             try:
+                # Use a guarded UPDATE to avoid races (e.g., hospital accepts while user resolves).
                 cursor.execute(
                     """
                     UPDATE emergency_requests
@@ -420,6 +459,7 @@ def user_resolve_emergency_sos(request_id: int):
                 )
             except Exception as e:
                 if _is_unknown_column(e):
+                    # Older schema without resolved_at column.
                     cursor.execute(
                         """
                         UPDATE emergency_requests
@@ -448,6 +488,11 @@ def user_resolve_emergency_sos(request_id: int):
 
 @emergency_sos_bp.route('/hospital/emergency/requests', methods=['GET', 'OPTIONS'])
 def hospital_list_emergency_requests():
+    """List SOS requests visible to the authenticated hospital.
+
+    Includes pending requests within an auto-expanding radius and (optionally)
+    the hospital's assigned requests.
+    """
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -475,7 +520,8 @@ def hospital_list_emergency_requests():
             hlat = float(hospital['latitude'])
             hlng = float(hospital['longitude'])
 
-            # Haversine distance (km)
+            # Haversine distance (km) + dynamic effective radius.
+            # effective_radius_km expands over time for older pending requests.
             pending_sql_with_types = """
                 SELECT
                   er.id,
@@ -676,6 +722,7 @@ def hospital_list_emergency_requests():
 
             assigned = []
             if include_assigned:
+                                # Assigned list (requests already accepted by this hospital).
                                 assigned_sql_with_types = """
                                         SELECT
                                             er.id,
@@ -803,6 +850,10 @@ def hospital_list_emergency_requests():
 
 @emergency_sos_bp.route('/hospital/emergency/requests/<int:request_id>/accept', methods=['POST', 'OPTIONS'])
 def hospital_accept_emergency_request(request_id: int):
+    """Accept a pending SOS request as a hospital.
+
+    Uses a status-guarded UPDATE so only one hospital can accept a request.
+    """
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -814,6 +865,7 @@ def hospital_accept_emergency_request(request_id: int):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # Guarded UPDATE prevents multiple hospitals from accepting.
             cursor.execute(
                 """
                 UPDATE emergency_requests
@@ -863,6 +915,7 @@ def hospital_accept_emergency_request(request_id: int):
 
 @emergency_sos_bp.route('/hospital/emergency/requests/<int:request_id>/resolve', methods=['POST', 'OPTIONS'])
 def hospital_resolve_emergency_request(request_id: int):
+    """Resolve an SOS request as the assigned hospital."""
     if request.method == 'OPTIONS':
         return ('', 200)
 
@@ -874,6 +927,7 @@ def hospital_resolve_emergency_request(request_id: int):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # Only the assigned hospital can resolve.
             cursor.execute(
                 """
                 UPDATE emergency_requests

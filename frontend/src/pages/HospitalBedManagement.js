@@ -18,27 +18,65 @@ const HospitalBedManagement = () => {
   
   // Private room configuration toggle state
   const [privateRoomToggle, setPrivateRoomToggle] = useState('private_1bed_no_bath'); // 'private_1bed_no_bath', 'private_1bed_with_bath', or 'private_2bed_with_bath'
-  
-  // Edit mode state - tracks which cards are in edit mode
-  const [editMode, setEditMode] = useState({});
+
+  // Inline editor state (more professional + less buggy than dropdown editing)
+  const [activeEditorKey, setActiveEditorKey] = useState(null); // e.g. 'general_ac', 'icu', 'private_1bed_no_bath'
+  const [editorDraft, setEditorDraft] = useState({ total: '', reserved: '' });
+  const [savingWardKey, setSavingWardKey] = useState(null);
   
   // Patient info modal state
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [selectedWardInfo, setSelectedWardInfo] = useState(null);
   
-  // Toggle edit mode for a specific ward
-  const toggleEditMode = async (wardType, currentType) => {
-    const isCurrentlyEditing = editMode[wardType];
-    
-    // If we're closing edit mode (Done button), save the data
-    if (isCurrentlyEditing) {
-      await saveSingleWard(currentType);
+  const closeEditor = () => {
+    setActiveEditorKey(null);
+    setEditorDraft({ total: '', reserved: '' });
+  };
+
+  const openEditor = (wardKey) => {
+    const current = bedStatus[wardKey] || { total: 0, reserved: 0 };
+    setActiveEditorKey(wardKey);
+    setEditorDraft({
+      total: String(current.total ?? 0),
+      reserved: String(current.reserved ?? 0)
+    });
+  };
+
+  const parseNonNegativeInt = (value) => {
+    if (value === '') return { ok: true, value: 0 };
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed < 0) return { ok: false, value: 0 };
+    return { ok: true, value: parsed };
+  };
+
+  const saveEditor = async (wardKey) => {
+    const totalParsed = parseNonNegativeInt(editorDraft.total);
+    const reservedParsed = parseNonNegativeInt(editorDraft.reserved);
+
+    if (!totalParsed.ok || !reservedParsed.ok) {
+      setWarningMessage('Please enter valid non-negative numbers.');
+      setShowWarningModal(true);
+      return;
     }
-    
-    setEditMode(prev => ({
-      ...prev,
-      [wardType]: !prev[wardType]
-    }));
+
+    const total = totalParsed.value;
+    const reserved = reservedParsed.value;
+
+    if (reserved > total) {
+      setWarningMessage(`Reserved beds (${reserved}) cannot exceed total beds (${total})`);
+      setShowWarningModal(true);
+      return;
+    }
+
+    const available = total - reserved;
+
+    setSavingWardKey(wardKey);
+    try {
+      await saveSingleWard(wardKey, { total, reserved, available });
+      closeEditor();
+    } finally {
+      setSavingWardKey(null);
+    }
   };
   
   // Handle card click to show patient info - using real booking data from API
@@ -230,56 +268,9 @@ const HospitalBedManagement = () => {
     }
   }, [hospitalId]);
 
-  const updateBedCount = (type, field, value) => {
-    // Allow empty string for user to clear the input
-    if (value === '') {
-      const updatedStatus = {
-        ...bedStatus,
-        [type]: {
-          ...bedStatus[type],
-          [field]: ''
-        }
-      };
-      setBedStatus(updatedStatus);
-      return;
-    }
-
-    const newValue = parseInt(value);
-    
-    // If not a valid number, ignore
-    if (isNaN(newValue)) return;
-    
-    // Validate input
-    if (newValue < 0) return;
-
-    let updatedBedData = {
-      ...bedStatus[type],
-      [field]: newValue
-    };
-
-    // Auto-calculate available beds based on total and reserved
-    // Available = Total - Reserved - Occupied
-    // For simplicity, we assume Occupied = Total - Available - Reserved
-    // So: Available = Total - Reserved (when we only input total and reserved)
-    if (field === 'total' || field === 'reserved') {
-      const total = field === 'total' ? newValue : bedStatus[type].total;
-      const reserved = field === 'reserved' ? newValue : bedStatus[type].reserved;
-      
-      // Calculate available as total minus reserved (can be negative during editing)
-      updatedBedData.available = total - reserved;
-    }
-
-    const updatedStatus = {
-      ...bedStatus,
-      [type]: updatedBedData
-    };
-
-    setBedStatus(updatedStatus);
-  };
-
-  const saveSingleWard = async (wardType) => {
+  const saveSingleWard = async (wardType, override) => {
     try {
-      const data = bedStatus[wardType];
+      const data = override || bedStatus[wardType];
       const config = wardConfig[wardType];
       
       // Convert empty strings to 0 before saving
@@ -434,102 +425,72 @@ const HospitalBedManagement = () => {
             // For wards without toggle
             currentType = ward.type;
           }
-          
-          // Create unique card ID for edit mode using index and currentType
-          const cardId = `${currentType}_${index}`;
-          
           const data = bedStatus[currentType];
+          const isEditing = activeEditorKey === currentType;
+          const isSaving = savingWardKey === currentType;
+
+          const totalDraft = isEditing ? parseNonNegativeInt(editorDraft.total) : { ok: true, value: data.total };
+          const reservedDraft = isEditing ? parseNonNegativeInt(editorDraft.reserved) : { ok: true, value: data.reserved };
+          const previewTotal = totalDraft.value;
+          const previewReserved = reservedDraft.value;
+          const previewAvailable = previewTotal - previewReserved;
+          const hasDraftError = isEditing && (!totalDraft.ok || !reservedDraft.ok || previewReserved > previewTotal);
+
+          const availableForBadge = isEditing ? Math.max(0, previewAvailable) : data.available;
 
           return (
             <div 
-              key={cardId} 
+              key={ward.type || index} 
               className="bg-white rounded-xl shadow-sm p-5 border border-gray-200 hover:shadow-md transition-shadow flex flex-col min-h-[320px]"
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900">{ward.label}</h3>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleEditMode(cardId, currentType);
-                        }}
-                        className="ml-2 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition flex items-center gap-1"
-                      >
-                        {editMode[cardId] ? (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Done
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            Edit
-                          </>
-                        )}
-                      </button>
-                      
-                      {/* Dropdown Edit Menu */}
-                      {editMode[cardId] && (
-                        <div 
-                          className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50 animate-slideDown"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="space-y-4">
-                            {/* Total Beds */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Total Beds
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={data.total}
-                                onChange={(e) => updateBedCount(currentType, 'total', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-
-                            {/* Reserved Beds */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Reserved Beds
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max={data.total}
-                                value={data.reserved}
-                                onChange={(e) => updateBedCount(currentType, 'reserved', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isEditing) {
+                          closeEditor();
+                        } else {
+                          openEditor(currentType);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="ml-2 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isEditing ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Close
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Edit
+                        </>
                       )}
-                    </div>
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-600">Total capacity: {data.total} beds</p>
+                  <p className="text-sm text-gray-600">Total capacity: {isEditing ? previewTotal : data.total} beds</p>
                 </div>
                 <div className="text-right ml-4">
                   <div
                     className={
                       `px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap inline-flex items-center border ` +
-                      (data.available > 5
+                      (availableForBadge > 5
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : data.available > 0
+                        : availableForBadge > 0
                           ? 'bg-amber-50 text-amber-700 border-amber-200'
                           : 'bg-red-50 text-red-700 border-red-200')
                     }
                   >
-                    {data.available} available
+                    {availableForBadge} available
                   </div>
                 </div>
               </div>
@@ -541,6 +502,7 @@ const HospitalBedManagement = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith(`${ward.type}_`)) closeEditor();
                         setAcToggle({ ...acToggle, [ward.type]: 'ac' });
                       }}
                       className={
@@ -555,6 +517,7 @@ const HospitalBedManagement = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith(`${ward.type}_`)) closeEditor();
                         setAcToggle({ ...acToggle, [ward.type]: 'non_ac' });
                       }}
                       className={
@@ -578,6 +541,7 @@ const HospitalBedManagement = () => {
                       key={option.value}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (activeEditorKey && activeEditorKey.startsWith('private_')) closeEditor();
                         setPrivateRoomToggle(option.value);
                       }}
                       className={
@@ -590,6 +554,68 @@ const HospitalBedManagement = () => {
                       {option.label}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {/* Inline Editor */}
+              {isEditing && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Total beds</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editorDraft.total}
+                        onChange={(e) => setEditorDraft((prev) => ({ ...prev, total: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Reserved beds</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editorDraft.reserved}
+                        onChange={(e) => setEditorDraft((prev) => ({ ...prev, reserved: e.target.value }))}
+                        className={
+                          `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium ` +
+                          (hasDraftError ? 'border-red-300' : 'border-gray-300')
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className={`text-xs ${hasDraftError ? 'text-red-600' : 'text-gray-500'}`}>
+                      Available will be: {Math.max(0, previewAvailable)}
+                    </p>
+                    {hasDraftError && (
+                      <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
+                        Reserved cannot exceed total
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={closeEditor}
+                      disabled={isSaving}
+                      className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveEditor(currentType)}
+                      disabled={isSaving || hasDraftError}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
                 </div>
               )}
 

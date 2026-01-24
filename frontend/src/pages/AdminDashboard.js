@@ -86,7 +86,6 @@ function AdminDashboard() {
   const [specialtiesDistribution, setSpecialtiesDistribution] = useState([]);
   const [specialtiesDemand, setSpecialtiesDemand] = useState([]);
   const [doctorTop, setDoctorTop] = useState([]);
-  const [doctorZero, setDoctorZero] = useState(0);
   const [chatSeries, setChatSeries] = useState([]);
   const [reportSeries, setReportSeries] = useState([]);
   const [symptomSeries, setSymptomSeries] = useState([]);
@@ -193,7 +192,6 @@ function AdminDashboard() {
       setSpecialtiesDemand(Array.isArray(specsRes.data?.demand) ? specsRes.data.demand : []);
 
       setDoctorTop(Array.isArray(docRes.data?.top_doctors) ? docRes.data.top_doctors : []);
-      setDoctorZero(Number(docRes.data?.doctors_with_zero_appointments || 0));
 
       setChatSeries(Array.isArray(chatRes.data?.series) ? chatRes.data.series : []);
       setReportSeries(Array.isArray(repRes.data?.series) ? repRes.data.series : []);
@@ -1029,19 +1027,28 @@ function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Analytics teaser (moved to Analytics tab) */}
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
-                <div className="flex items-center justify-between gap-4">
+              {/* Appointments Chart Preview */}
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg border border-slate-700/50 overflow-hidden">
+                <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Analytics</h3>
-                    <p className="text-sm text-slate-400">Open the Analytics tab to view charts.</p>
+                    <h3 className="text-lg font-semibold text-white">Appointments Overview</h3>
+                    <p className="text-xs text-slate-400">Last {analyticsRange === '7d' ? '7 days' : analyticsRange === '30d' ? '30 days' : analyticsRange === '90d' ? '90 days' : '1 year'}</p>
                   </div>
                   <button
                     onClick={() => setActiveTab('analytics')}
-                    className="px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 shadow-lg"
+                    className="px-3 py-1.5 rounded-lg font-medium text-xs text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 shadow-lg"
                   >
-                    View Analytics
+                    View All Analytics
                   </button>
+                </div>
+                <div className="p-4">
+                  <AppointmentsChartCard
+                    series={apptSeries}
+                    loading={analyticsLoading}
+                    errorText={''}
+                    range={analyticsRange}
+                    onRangeChange={setAnalyticsRange}
+                  />
                 </div>
               </div>
 
@@ -1110,9 +1117,9 @@ function AdminDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
-                <p className="text-slate-400 text-sm font-medium">Doctors with 0 appointments</p>
-                <p className="mt-2 text-3xl font-bold text-white">{doctorZero}</p>
-                <p className="mt-2 text-xs text-slate-500">Based on lifetime appointment history</p>
+                <p className="text-slate-400 text-sm font-medium">Total Appointments</p>
+                <p className="mt-2 text-3xl font-bold text-white">{(apptSeries || []).reduce((sum, d) => sum + Number(d.total || 0), 0)}</p>
+                <p className="mt-2 text-xs text-slate-500">In selected time period</p>
               </div>
               <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                 <p className="text-slate-400 text-sm font-medium">Active weight goals</p>

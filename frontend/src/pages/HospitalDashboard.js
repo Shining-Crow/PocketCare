@@ -28,9 +28,9 @@ const HospitalDashboard = () => {
   const navigate = useNavigate();
   const [hospital, setHospital] = useState(null);
   const [stats, setStats] = useState({
-    bedAvailability: { total: 100, occupied: 75, available: 25 },
-    appointments: { today: 45, upcoming: 120, completed: 320 },
-    finances: { revenue: 1250000, pending: 85000 },
+    bedAvailability: { total: 0, occupied: 0, available: 0 },
+    appointments: { today: 0, upcoming: 0, completed: 0 },
+    finances: { revenue: 0, pending: 0 },
     doctors: { total: 0, available: 0, specialties: 0 },
     privateRooms: { total: 0, available: 0, occupied: 0, reserved: 0 },
     patients: { today: 0 }
@@ -43,32 +43,11 @@ const HospitalDashboard = () => {
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [sosSummary, setSosSummary] = useState({ pending: 0, assigned: 0 });
 
-  // Mock data for charts - will be replaced with real data
-  const [occupancyData, setOccupancyData] = useState([
-    { name: 'Mon', general: 65, icu: 85, emergency: 45 },
-    { name: 'Tue', general: 70, icu: 90, emergency: 50 },
-    { name: 'Wed', general: 75, icu: 88, emergency: 55 },
-    { name: 'Thu', general: 68, icu: 82, emergency: 48 },
-    { name: 'Fri', general: 72, icu: 86, emergency: 52 },
-    { name: 'Sat', general: 65, icu: 80, emergency: 40 },
-    { name: 'Sun', general: 60, icu: 75, emergency: 35 }
-  ]);
+  const [occupancyData, setOccupancyData] = useState([]);
 
-  const [departmentData, setDepartmentData] = useState([
-    { name: 'Cardiology', patients: 45 },
-    { name: 'Neurology', patients: 32 },
-    { name: 'Orthopedics', patients: 28 },
-    { name: 'Pediatrics', patients: 38 },
-    { name: 'Oncology', patients: 25 }
-  ]);
+  const [departmentData, setDepartmentData] = useState([]);
 
-  const [bedAvailability, setBedAvailability] = useState([
-    { type: 'General Ward', total: 50, occupied: 35, color: 'blue' },
-    { type: 'ICU', total: 20, occupied: 18, color: 'red' },
-    { type: 'Emergency', total: 15, occupied: 10, color: 'green' },
-    { type: 'Pediatrics', total: 25, occupied: 15, color: 'yellow' },
-    { type: 'Maternity', total: 30, occupied: 20, color: 'purple' },
-  ]);
+  const [bedAvailability, setBedAvailability] = useState([]);
 
   const formatCompactNumber = (value) => {
     const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -507,6 +486,13 @@ const HospitalDashboard = () => {
                       .slice(0, 6)
                   : [];
 
+                const hasDeptData = deptTop.some((d) => Number(d?.patients || 0) > 0);
+                const hasOccupancyTrend = Array.isArray(occupancyData)
+                  && occupancyData.length > 0
+                  && occupancyData.some((row) =>
+                    Object.keys(row || {}).some((key) => key !== 'name' && Number(row?.[key] || 0) > 0)
+                  );
+
                 return (
                   <>
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
@@ -634,20 +620,26 @@ const HospitalDashboard = () => {
                         </div>
 
                         <div className="mt-4">
-                          <ResponsiveContainer width="100%" height={280} minHeight={280}>
-                            <LineChart data={occupancyData || []}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip />
-                              <Legend />
-                              <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />
-                              <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} dot={false} />
-                              <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} dot={false} />
-                              <Line type="monotone" dataKey="pediatrics" stroke="#F59E0B" strokeWidth={2} dot={false} />
-                              <Line type="monotone" dataKey="maternity" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
+                          {hasOccupancyTrend ? (
+                            <ResponsiveContainer width="100%" height={280} minHeight={280}>
+                              <LineChart data={occupancyData || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis domain={[0, 100]} />
+                                <Tooltip />
+                                <Legend />
+                                <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="pediatrics" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                                <Line type="monotone" dataKey="maternity" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
+                              No occupancy trend data yet.
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -656,15 +648,21 @@ const HospitalDashboard = () => {
                           <div className="text-sm font-bold text-gray-900">Top departments</div>
                           <div className="mt-1 text-xs text-gray-500">By activity (last 30 days)</div>
                           <div className="mt-4">
-                            <ResponsiveContainer width="100%" height={220} minHeight={220}>
-                              <BarChart data={deptTop} layout="vertical" margin={{ left: 24 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" />
-                                <YAxis type="category" dataKey="name" width={90} />
-                                <Tooltip />
-                                <Bar dataKey="patients" fill="#6366F1" radius={[8, 8, 8, 8]} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            {hasDeptData ? (
+                              <ResponsiveContainer width="100%" height={220} minHeight={220}>
+                                <BarChart data={deptTop} layout="vertical" margin={{ left: 24 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis type="number" />
+                                  <YAxis type="category" dataKey="name" width={90} />
+                                  <Tooltip />
+                                  <Bar dataKey="patients" fill="#6366F1" radius={[8, 8, 8, 8]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
+                                No department activity yet.
+                              </div>
+                            )}
                           </div>
                         </div>
 

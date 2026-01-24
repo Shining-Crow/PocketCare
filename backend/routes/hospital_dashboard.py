@@ -49,8 +49,7 @@ def get_hospital_dashboard_stats():
             SELECT 
                 SUM(total_beds) as total_beds,
                 SUM(available_beds) as available_beds,
-                SUM(occupied_beds) as occupied_beds,
-                SUM(reserved_beds) as reserved_beds
+                SUM(occupied_beds) as occupied_beds
             FROM bed_wards
             WHERE hospital_id = %s
         """, (hospital_id,))
@@ -63,8 +62,7 @@ def get_hospital_dashboard_stats():
                 ward_type,
                 SUM(total_beds) as total_beds,
                 SUM(available_beds) as available_beds,
-                SUM(occupied_beds) as occupied_beds,
-                SUM(reserved_beds) as reserved_beds
+                SUM(occupied_beds) as occupied_beds
             FROM bed_wards
             WHERE hospital_id = %s
             GROUP BY ward_type
@@ -136,8 +134,7 @@ def get_hospital_dashboard_stats():
             SELECT 
                 COUNT(*) as total_rooms,
                 SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available_rooms,
-                SUM(CASE WHEN status = 'occupied' THEN 1 ELSE 0 END) as occupied_rooms,
-                SUM(CASE WHEN status = 'reserved' THEN 1 ELSE 0 END) as reserved_rooms
+                SUM(CASE WHEN status IN ('occupied', 'reserved') THEN 1 ELSE 0 END) as occupied_rooms
             FROM private_rooms
             WHERE hospital_id = %s
         """, (hospital_id,))
@@ -180,7 +177,6 @@ def get_hospital_dashboard_stats():
                     'total': total_beds,
                     'occupied': occupied_beds,
                     'available': bed_stats['available_beds'] or 0,
-                    'reserved': bed_stats['reserved_beds'] or 0,
                     'occupancy_percentage': bed_occupancy_percentage
                 },
                 'appointments': {
@@ -204,7 +200,7 @@ def get_hospital_dashboard_stats():
                     'total': private_room_stats['total_rooms'] or 0,
                     'available': private_room_stats['available_rooms'] or 0,
                     'occupied': private_room_stats['occupied_rooms'] or 0,
-                    'reserved': private_room_stats['reserved_rooms'] or 0
+                    'reserved': 0
                 }
             },
             'bedsByWard': bed_by_ward,

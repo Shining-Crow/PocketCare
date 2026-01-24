@@ -4,6 +4,25 @@ import { BadgeDollarSign, GraduationCap, Stethoscope } from "lucide-react";
 export default function DoctorCard({ doctor, onClick }) {
   const qualification = (doctor?.qualification || "").trim();
 
+  const availabilityBadge = (
+    <span
+      className={
+        "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border shadow-sm backdrop-blur-sm bg-white/90 " +
+        (doctor?.is_available
+          ? "text-emerald-700 border-emerald-200"
+          : "text-rose-700 border-rose-200")
+      }
+    >
+      <span
+        className={
+          "w-2 h-2 rounded-full " +
+          (doctor?.is_available ? "bg-emerald-500" : "bg-rose-500")
+        }
+      />
+      {doctor?.is_available ? "Available" : "Unavailable"}
+    </span>
+  );
+
   const rawFee = doctor?.consultation_fee;
   const feeNumber = rawFee === 0 || rawFee ? Number(rawFee) : Number.NaN;
   const hasFee = Number.isFinite(feeNumber) && feeNumber >= 0;
@@ -25,6 +44,7 @@ export default function DoctorCard({ doctor, onClick }) {
     >
       {/* Doctor Image */}
       <div className="w-full h-44 bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center overflow-hidden relative">
+        <div className="absolute top-3 right-3 z-10">{availabilityBadge}</div>
         {doctor?.image ? (
           <img
             src={doctor.image}
@@ -54,23 +74,6 @@ export default function DoctorCard({ doctor, onClick }) {
               {doctor?.specialty || "Specialty not listed"}
             </p>
           </div>
-
-          <span
-            className={
-              "shrink-0 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border " +
-              (doctor?.is_available
-                ? "text-emerald-700 border-emerald-200 bg-emerald-50"
-                : "text-rose-700 border-rose-200 bg-rose-50")
-            }
-          >
-            <span
-              className={
-                "w-2 h-2 rounded-full " +
-                (doctor?.is_available ? "bg-emerald-500" : "bg-rose-500")
-              }
-            />
-            {doctor?.is_available ? "Available" : "Unavailable"}
-          </span>
         </div>
 
         {(qualification || hasFee) && (

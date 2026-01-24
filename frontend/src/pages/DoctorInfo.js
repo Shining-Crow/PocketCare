@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
-import { Calendar, FileText, CheckCircle } from "lucide-react";
+import {
+  Calendar,
+  FileText,
+  CheckCircle,
+  Stethoscope,
+  Mail,
+  Phone,
+  BadgeDollarSign,
+} from "lucide-react";
 import Footer from "../components/Footer";
 import SuccessModal from "../components/SuccessModal";
 import BackToDashboardButton from "../components/BackToDashboardButton";
@@ -112,7 +120,7 @@ export default function DoctorInfo() {
       } catch (e) {
         if (!cancelled) {
           setError(
-            e?.response?.data?.error || "Failed to load doctor profile."
+            e?.response?.data?.error || "Failed to load doctor profile.",
           );
         }
       } finally {
@@ -207,13 +215,16 @@ export default function DoctorInfo() {
 
     return `${convertTo12(startHour, startMin)} - ${convertTo12(
       endHour,
-      endMin
+      endMin,
     )}`;
   };
 
   const bookAppointment = async () => {
     if (!selectedDate || !selectedTime || !symptoms.trim()) {
-      alert("Please fill in all fields: Date, Time, and Symptoms");
+      setErrorModal({
+        show: true,
+        message: "Please select a date, time, and describe your symptoms.",
+      });
       return;
     }
 
@@ -277,18 +288,21 @@ export default function DoctorInfo() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
       <div className="flex-grow">
-        <div className="max-w-4xl mx-auto p-6">
+        <div className="max-w-5xl mx-auto p-6">
           {loading ? (
-            <div className="bg-white rounded-lg shadow p-6 text-center">
-              <p className="text-gray-600">Loading doctor profile...</p>
+            <div className="bg-white rounded-3xl shadow-xl p-10 text-center border border-gray-100">
+              <div className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+              <p className="text-gray-600 font-medium">
+                Loading doctor profile...
+              </p>
             </div>
           ) : error ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-red-600 font-semibold mb-3">{error}</p>
+            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+              <p className="text-red-600 font-semibold mb-4">{error}</p>
               <button
                 type="button"
                 onClick={() => navigate("/appointments")}
-                className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                className="px-4 py-2 rounded-xl border border-gray-200 text-gray-800 hover:bg-gray-50 transition font-semibold"
               >
                 Back to Appointments
               </button>
@@ -296,78 +310,117 @@ export default function DoctorInfo() {
           ) : (
             <>
               {/* Doctor Info Section */}
-              <div className="flex gap-6 bg-white rounded-lg shadow-lg p-6 mb-8 border border-gray-400">
-                {/* Doctor Image */}
-                <div className="w-64 h-64 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0 overflow-hidden">
-                  {doctor?.image ? (
-                    <img
-                      src={doctor.image}
-                      alt={doctor.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-7xl font-bold">
-                      {doctor?.name?.charAt(0)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Doctor Details */}
-                <div className="flex-grow">
-                  <div className="flex items-center gap-3 mb-2">
-                    <BackToDashboardButton className="shrink-0" />
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-3xl font-bold text-gray-900">
-                        {doctor?.name}
-                      </h2>
-                      <CheckCircle className="w-6 h-6 text-blue-600" />
+              <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+                <div className="p-6 sm:p-8 flex flex-col md:flex-row gap-6">
+                  {/* Doctor Avatar (icon-based) */}
+                  <div className="md:w-72 shrink-0">
+                    <div className="w-full aspect-square md:w-64 rounded-3xl bg-gradient-to-br from-blue-300 to-indigo-500 flex items-center justify-center text-white shadow-lg">
+                      <Stethoscope className="w-20 h-20" />
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border border-gray-200 bg-gray-50 text-gray-700">
+                        {doctor?.specialty || "Specialty not listed"}
+                      </div>
+                      <div
+                        className={
+                          "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border " +
+                          (doctor?.is_available
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-rose-200 bg-rose-50 text-rose-700")
+                        }
+                      >
+                        <span
+                          className={
+                            "w-2 h-2 rounded-full " +
+                            (doctor?.is_available
+                              ? "bg-emerald-500"
+                              : "bg-rose-500")
+                          }
+                        />
+                        {doctor?.is_available ? "Available" : "Unavailable"}
+                      </div>
                     </div>
                   </div>
 
-                  <p className="text-gray-600 mb-4">
-                    {doctor?.qualification} • {doctor?.experience} Years
-                  </p>
+                  {/* Doctor Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <BackToDashboardButton />
+                          <h2 className="text-3xl font-extrabold text-gray-900 truncate">
+                            {doctor?.name}
+                          </h2>
+                          <CheckCircle className="w-6 h-6 text-blue-600 shrink-0" />
+                        </div>
 
-                  <div className="space-y-2 mb-4">
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Email:</span>{" "}
-                      {doctor?.email || "N/A"}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Phone:</span>{" "}
-                      {doctor?.phone || "N/A"}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Rating:</span> ⭐{" "}
-                      {doctor?.rating || "N/A"}
-                    </p>
-                  </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {!!doctor?.qualification && (
+                            <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                              {doctor.qualification}
+                            </span>
+                          )}
+                          {(doctor?.experience || doctor?.experience === 0) && (
+                            <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+                              {doctor.experience} yrs experience
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                      About
-                    </h3>
-                    <p className="text-gray-600 text-sm leading-relaxed">
-                      {doctor?.bio ||
-                        "Dr. " +
-                          doctor?.name +
-                          " has a strong commitment to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies."}
-                    </p>
-                  </div>
+                      <div className="shrink-0">
+                        <div className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md">
+                          <BadgeDollarSign className="w-5 h-5" />
+                          <span className="font-bold">
+                            ৳{doctor?.consultation_fee || 500}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="text-lg font-semibold text-gray-900">
-                    Appointment fee:{" "}
-                    <span className="text-blue-600">
-                      ৳{doctor?.consultation_fee || 500}
-                    </span>
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-gray-500">
+                            Email
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {doctor?.email || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-gray-500">
+                            Phone
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {doctor?.phone || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6">
+                      <h3 className="text-sm font-bold text-gray-900 mb-2">
+                        About
+                      </h3>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        {doctor?.bio ||
+                          `Dr. ${doctor?.name} is committed to delivering comprehensive medical care, focusing on preventive medicine, early diagnosis, and effective treatment strategies.`}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Booking Section */}
-              <div className="bg-white p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                  Booking slots
+              <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 sm:p-8">
+                <h3 className="text-2xl font-extrabold text-gray-900 mb-6">
+                  Book an appointment
                 </h3>
 
                 <div className="space-y-6">
@@ -376,10 +429,10 @@ export default function DoctorInfo() {
                     <div className="flex gap-3 overflow-x-auto pb-2">
                       {upcomingDates.map((date, idx) => {
                         const dateStr = `${date.getFullYear()}-${String(
-                          date.getMonth() + 1
+                          date.getMonth() + 1,
                         ).padStart(2, "0")}-${String(date.getDate()).padStart(
                           2,
-                          "0"
+                          "0",
                         )}`;
                         const isSelected = selectedDate === dateStr;
                         const isAvailable = isDoctorAvailableOnDate(date);
@@ -393,8 +446,8 @@ export default function DoctorInfo() {
                               isSelected
                                 ? "bg-blue-500 text-white shadow-lg"
                                 : isAvailable
-                                ? "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400"
-                                : "bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
+                                  ? "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400"
+                                  : "bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed"
                             }`}
                             disabled={!isAvailable}
                           >

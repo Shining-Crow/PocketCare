@@ -5,7 +5,6 @@ import {
   Search,
   MapPin,
   Phone,
-  Star,
   Building2,
   Bed,
   Stethoscope,
@@ -38,15 +37,15 @@ function HospitalSearch() {
       setError(null);
 
       const params = {};
-      
+
       if (searchQuery) {
         params.search = searchQuery;
       }
-      
+
       if (cityFilter) {
         params.city = cityFilter;
       }
-      
+
       // Only apply location filter when explicitly enabled by user
       if (userLocation && useLocationFilter) {
         params.latitude = userLocation.latitude;
@@ -55,26 +54,37 @@ function HospitalSearch() {
       }
 
       const response = await api.get("/hospitals", { params });
-      
+
       // If we have user location but not filtering, still add distance info client-side
       let hospitalsData = response.data?.hospitals || [];
       if (userLocation && !useLocationFilter) {
-        hospitalsData = hospitalsData.map(hospital => {
-          if (hospital.latitude && hospital.longitude) {
-            const distance = calculateDistance(
-              userLocation.latitude, userLocation.longitude,
-              hospital.latitude, hospital.longitude
-            );
-            return { ...hospital, distance: Math.round(distance * 100) / 100 };
-          }
-          return hospital;
-        }).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+        hospitalsData = hospitalsData
+          .map((hospital) => {
+            if (hospital.latitude && hospital.longitude) {
+              const distance = calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                hospital.latitude,
+                hospital.longitude,
+              );
+              return {
+                ...hospital,
+                distance: Math.round(distance * 100) / 100,
+              };
+            }
+            return hospital;
+          })
+          .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
       }
-      
+
       setHospitals(hospitalsData);
     } catch (err) {
       console.error("Error fetching hospitals:", err);
-      setError(err.response?.data?.error || err.response?.data?.msg || "Failed to load hospitals");
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.msg ||
+          "Failed to load hospitals",
+      );
       setHospitals([]);
     } finally {
       setLoading(false);
@@ -84,13 +94,15 @@ function HospitalSearch() {
   // Haversine formula for distance calculation
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
@@ -113,10 +125,12 @@ function HospitalSearch() {
       },
       (err) => {
         console.error("Geolocation error:", err);
-        setLocationError("Unable to get your location. Please enable location services.");
+        setLocationError(
+          "Unable to get your location. Please enable location services.",
+        );
         setLocationLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }, []);
 
@@ -149,30 +163,14 @@ function HospitalSearch() {
     if (hospital.latitude && hospital.longitude) {
       window.open(
         `https://www.google.com/maps/search/?api=1&query=${hospital.latitude},${hospital.longitude}`,
-        "_blank"
+        "_blank",
       );
     } else if (hospital.address) {
       window.open(
         `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address)}`,
-        "_blank"
+        "_blank",
       );
     }
-  };
-
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    for (let i = 0; i < 5; i++) {
-      stars.push(
-        <Star
-          key={i}
-          className={`w-4 h-4 ${
-            i < fullStars ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-          }`}
-        />
-      );
-    }
-    return stars;
   };
 
   return (
@@ -184,8 +182,12 @@ function HospitalSearch() {
             <div className="flex items-center gap-3 mb-6">
               <BackToDashboardButton />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Hospital Search</h1>
-                <p className="text-sm text-gray-500">Find nearby hospitals and healthcare facilities</p>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Hospital Search
+                </h1>
+                <p className="text-sm text-gray-500">
+                  Find nearby hospitals and healthcare facilities
+                </p>
               </div>
             </div>
 
@@ -262,7 +264,9 @@ function HospitalSearch() {
                       </label>
                       <select
                         value={searchRadius}
-                        onChange={(e) => setSearchRadius(Number(e.target.value))}
+                        onChange={(e) =>
+                          setSearchRadius(Number(e.target.value))
+                        }
                         disabled={!useLocationFilter}
                         className={`w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           !useLocationFilter ? "opacity-50" : ""
@@ -300,7 +304,10 @@ function HospitalSearch() {
               ) : userLocation ? (
                 <div className="flex items-center gap-2 text-emerald-600 text-sm">
                   <MapPin className="w-4 h-4" />
-                  Location enabled - {useLocationFilter ? `showing hospitals within ${searchRadius}km` : "sorted by distance"}
+                  Location enabled -{" "}
+                  {useLocationFilter
+                    ? `showing hospitals within ${searchRadius}km`
+                    : "sorted by distance"}
                 </div>
               ) : locationError ? (
                 <div className="flex items-center gap-2 text-amber-600 text-sm">
@@ -328,7 +335,9 @@ function HospitalSearch() {
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-8 h-8 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Hospitals</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Error Loading Hospitals
+              </h3>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={fetchHospitals}
@@ -342,7 +351,9 @@ function HospitalSearch() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Building2 className="w-8 h-8 text-gray-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Hospitals Found</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No Hospitals Found
+              </h3>
               <p className="text-gray-600 mb-4">
                 {searchQuery || cityFilter
                   ? "Try adjusting your search filters"
@@ -361,7 +372,11 @@ function HospitalSearch() {
             <div className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <p className="text-gray-600">
-                  Found <span className="font-semibold text-gray-900">{hospitals.length}</span> hospitals
+                  Found{" "}
+                  <span className="font-semibold text-gray-900">
+                    {hospitals.length}
+                  </span>{" "}
+                  hospitals
                 </p>
                 <button
                   onClick={fetchHospitals}
@@ -387,20 +402,17 @@ function HospitalSearch() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <h3 className="text-xl font-bold text-gray-900">{hospital.name}</h3>
-                          <div className="flex items-center gap-1 mt-1">
-                            {renderStars(hospital.rating)}
-                            <span className="text-sm text-gray-600 ml-1">
-                              ({hospital.rating?.toFixed(1) || "0.0"})
-                            </span>
-                          </div>
+                          <h3 className="text-xl font-bold text-gray-900">
+                            {hospital.name}
+                          </h3>
                         </div>
-                        {hospital.distance !== null && hospital.distance !== undefined && (
-                          <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
-                            <Navigation className="w-4 h-4" />
-                            {hospital.distance} km
-                          </div>
-                        )}
+                        {hospital.distance !== null &&
+                          hospital.distance !== undefined && (
+                            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
+                              <Navigation className="w-4 h-4" />
+                              {hospital.distance} km
+                            </div>
+                          )}
                       </div>
 
                       {/* Address */}
@@ -423,14 +435,15 @@ function HospitalSearch() {
                           >
                             {hospital.phone}
                           </a>
-                          {hospital.emergency_contact && hospital.emergency_contact !== hospital.phone && (
-                            <>
-                              <span className="text-gray-300">|</span>
-                              <span className="text-red-600 text-sm font-medium">
-                                Emergency: {hospital.emergency_contact}
-                              </span>
-                            </>
-                          )}
+                          {hospital.emergency_contact &&
+                            hospital.emergency_contact !== hospital.phone && (
+                              <>
+                                <span className="text-gray-300">|</span>
+                                <span className="text-red-600 text-sm font-medium">
+                                  Emergency: {hospital.emergency_contact}
+                                </span>
+                              </>
+                            )}
                         </div>
                       )}
 
@@ -440,41 +453,50 @@ function HospitalSearch() {
                           <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg">
                             <Bed className="w-4 h-4 text-gray-500" />
                             <span className="text-sm text-gray-700">
-                              <span className="font-semibold">{hospital.available_beds || 0}</span>
-                              <span className="text-gray-500">/{hospital.total_beds} beds</span>
+                              <span className="font-semibold">
+                                {hospital.available_beds || 0}
+                              </span>
+                              <span className="text-gray-500">
+                                /{hospital.total_beds} beds
+                              </span>
                             </span>
                           </div>
                         )}
-                        {hospital.icu_beds !== null && hospital.icu_beds !== undefined && (
-                          <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-lg">
-                            <Stethoscope className="w-4 h-4 text-red-500" />
-                            <span className="text-sm text-red-700 font-medium">
-                              {hospital.icu_beds} ICU beds
-                            </span>
-                          </div>
-                        )}
+                        {hospital.icu_beds !== null &&
+                          hospital.icu_beds !== undefined && (
+                            <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-lg">
+                              <Stethoscope className="w-4 h-4 text-red-500" />
+                              <span className="text-sm text-red-700 font-medium">
+                                {hospital.icu_beds} ICU beds
+                              </span>
+                            </div>
+                          )}
                       </div>
 
                       {/* Services */}
-                      {hospital.services && Array.isArray(hospital.services) && hospital.services.length > 0 && (
-                        <div className="mt-4">
-                          <div className="flex flex-wrap gap-2">
-                            {hospital.services.slice(0, 5).map((service, idx) => (
-                              <span
-                                key={idx}
-                                className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium"
-                              >
-                                {service}
-                              </span>
-                            ))}
-                            {hospital.services.length > 5 && (
-                              <span className="text-gray-500 text-xs py-1">
-                                +{hospital.services.length - 5} more
-                              </span>
-                            )}
+                      {hospital.services &&
+                        Array.isArray(hospital.services) &&
+                        hospital.services.length > 0 && (
+                          <div className="mt-4">
+                            <div className="flex flex-wrap gap-2">
+                              {hospital.services
+                                .slice(0, 5)
+                                .map((service, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium"
+                                  >
+                                    {service}
+                                  </span>
+                                ))}
+                              {hospital.services.length > 5 && (
+                                <span className="text-gray-500 text-xs py-1">
+                                  +{hospital.services.length - 5} more
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                     </div>
 
                     {/* Actions */}
@@ -496,7 +518,9 @@ function HospitalSearch() {
                         </a>
                       )}
                       <button
-                        onClick={() => navigate(`/hospitals/${hospital.id}/book-bed`)}
+                        onClick={() =>
+                          navigate(`/hospitals/${hospital.id}/book-bed`)
+                        }
                         className="flex-1 md:flex-none px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
                       >
                         <Bed className="w-4 h-4" />

@@ -11,10 +11,11 @@ import {
   RefreshCw,
   Award,
   Clock,
-  DollarSign,
+  Banknote,
   Edit2,
   Save,
   X,
+  AlertCircle,
   CheckCircle,
   Users,
 } from "lucide-react";
@@ -93,6 +94,24 @@ function DoctorDashboard() {
     loading: false,
     action: "cancel", // 'cancel', 'delete', or 'accept'
   });
+
+  const [toast, setToast] = useState({
+    open: false,
+    type: "info", // 'success' | 'error' | 'info'
+    message: "",
+  });
+
+  const showToast = useCallback((message, type = "info") => {
+    setToast({ open: true, type, message: String(message || "") });
+  }, []);
+
+  useEffect(() => {
+    if (!toast.open) return;
+    const timeout = setTimeout(() => {
+      setToast((prev) => ({ ...prev, open: false }));
+    }, 2600);
+    return () => clearTimeout(timeout);
+  }, [toast.open, toast.type, toast.message]);
 
   const filteredSpecialties = useMemo(() => {
     const q = (specialtyQuery || "").trim().toLowerCase();
@@ -418,9 +437,10 @@ function DoctorDashboard() {
       closeModal();
     } catch (error) {
       console.error(`Error ${confirmModal.action}ing appointment:`, error);
-      alert(
+      showToast(
         error.response?.data?.error ||
           `Failed to ${confirmModal.action} appointment`,
+        "error",
       );
       setConfirmModal((prev) => ({ ...prev, loading: false }));
     }
@@ -437,7 +457,7 @@ function DoctorDashboard() {
     try {
       const names = selectedSpecialties.map((s) => s.name).filter(Boolean);
       if (!names.length) {
-        alert("Please select at least one specialty.");
+        showToast("Please select at least one specialty.", "error");
         return;
       }
       const ids = selectedSpecialties
@@ -476,7 +496,7 @@ function DoctorDashboard() {
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
       setIsEditing(false);
-      alert("Profile updated successfully!");
+      showToast("Profile updated.", "success");
 
       // Refresh profile from server to ensure sync
       const profileRes = await api.get("/doctor/profile");
@@ -486,14 +506,15 @@ function DoctorDashboard() {
       console.error("Error details:", error.response?.data);
 
       if (error.response?.status === 401) {
-        alert("Session expired. Please login again.");
+        showToast("Session expired. Please login again.", "error");
         logout();
         navigate("/login");
       } else {
-        alert(
+        showToast(
           `Failed to update profile: ${
             error.response?.data?.error || error.message
           }`,
+          "error",
         );
       }
     }
@@ -647,6 +668,50 @@ function DoctorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {toast.open && (
+        <div className="fixed top-5 right-5 z-50">
+          <div
+            className={`flex items-start gap-3 rounded-xl border bg-white px-4 py-3 shadow-lg backdrop-blur-sm min-w-[280px] max-w-[360px] ${
+              toast.type === "success"
+                ? "border-green-200"
+                : toast.type === "error"
+                  ? "border-red-200"
+                  : "border-gray-200"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className={`mt-0.5 ${
+                toast.type === "success"
+                  ? "text-green-600"
+                  : toast.type === "error"
+                    ? "text-red-600"
+                    : "text-gray-600"
+              }`}
+            >
+              {toast.type === "success" ? (
+                <CheckCircle className="w-5 h-5" />
+              ) : (
+                <AlertCircle className="w-5 h-5" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-gray-900 leading-snug">
+                {toast.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToast((prev) => ({ ...prev, open: false }))}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Banner */}
@@ -680,7 +745,7 @@ function DoctorDashboard() {
                     setDoctor({ ...doctor, is_available: newStatus });
                   } catch (error) {
                     console.error("Failed to toggle availability:", error);
-                    alert("Failed to update availability");
+                    showToast("Failed to update availability.", "error");
                   }
                 }}
                 className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
@@ -760,10 +825,10 @@ function DoctorDashboard() {
 
                 <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
-                    <DollarSign className="w-6 h-6 text-purple-600" />
+                    <Banknote className="w-6 h-6 text-purple-600" />
                   </div>
                   <p className="text-2xl font-bold text-gray-900">
-                    ${editForm.consultation_fee}
+                    ৳ {editForm.consultation_fee}
                   </p>
                   <p className="text-sm text-gray-600">Fee</p>
                 </div>
@@ -1349,12 +1414,12 @@ function DoctorDashboard() {
                       {stats.total_appointments}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  {/* <div className="flex justify-between items-center">
                     <span className="text-gray-600">Completed</span>
                     <span className="font-bold text-green-600">
                       {stats.completed_appointments}
                     </span>
-                  </div>
+                  </div> */}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Total Patients</span>
                     <span className="font-bold text-gray-900">

@@ -104,8 +104,12 @@ def fix_database():
         _ensure_column('doctors', 'available_days', "ALTER TABLE doctors ADD COLUMN available_days JSON NULL")
         _ensure_column('doctors', 'day_specific_availability', "ALTER TABLE doctors ADD COLUMN day_specific_availability JSON NULL")
         _ensure_column('doctors', 'is_available', "ALTER TABLE doctors ADD COLUMN is_available BOOLEAN DEFAULT TRUE")
+        _ensure_column('doctors', 'is_blocked', "ALTER TABLE doctors ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE")
         _ensure_column('doctors', 'bio', "ALTER TABLE doctors ADD COLUMN bio TEXT NULL")
         _ensure_column('doctors', 'created_at', "ALTER TABLE doctors ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+
+        # Ensure users table has is_blocked column
+        _ensure_column('users', 'is_blocked', "ALTER TABLE users ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE")
 
         # Backfill doctors.specialty_id from doctors.specialty (best effort)
         try:

@@ -561,10 +561,10 @@ def login():
         role = data.get('role', 'user')  # default to user
 
         if role == 'doctor':
-            query = "SELECT id, email, password_hash, name, phone, specialty, specialty_id, specialties FROM doctors WHERE email = %s"
+            query = "SELECT id, email, password_hash, name, phone, specialty, specialty_id, specialties, COALESCE(is_blocked, FALSE) as is_blocked FROM doctors WHERE email = %s"
             user = execute_query(query, (email,), fetch_one=True)
         else:
-            query = "SELECT id, email, password_hash, name, phone FROM users WHERE email = %s"
+            query = "SELECT id, email, password_hash, name, phone, COALESCE(is_blocked, FALSE) as is_blocked FROM users WHERE email = %s"
             user = execute_query(query, (email,), fetch_one=True)
 
         if not user:
@@ -572,6 +572,10 @@ def login():
 
         if not verify_password(password, user['password_hash']):
             return jsonify({'error': 'Invalid email or password'}), 401
+
+        # Check if account is blocked
+        if user.get('is_blocked'):
+            return jsonify({'error': 'Your account has been blocked. Please contact support.'}), 403
 
         access_token = create_access_token(identity=str(user['id']))
 
@@ -1649,4 +1653,207 @@ def update_doctor_profile():
         
     except Exception as e:
         return jsonify({'error': f'Failed to update profile: {str(e)}'}), 500
+
+
+# ============================================================================
+# ADMIN: User & Doctor Management Endpoints
+# ============================================================================
+
+@auth_bp.route('/admin/users', methods=['GET'])
+def admin_get_all_users():
+    """Get all users for admin management"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        search = request.args.get('search', '')
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        offset = (page - 1) * limit
+        
+        # Get total count
+        count_query = """
+            SELECT COUNT(*) as total FROM users
+            WHERE (%s = '' OR name LIKE %s OR email LIKE %s)
+        """
+        search_pattern = f'%{search}%'
+        count_result = execute_query(count_query, (search, search_pattern, search_pattern), fetch_one=True)
+        total = count_result['total'] if count_result else 0
+        
+        # Get users
+        query = """
+            SELECT id, email, name, phone, date_of_birth, gender, blood_group, 
+                   COALESCE(is_blocked, FALSE) as is_blocked, created_at
+            FROM users
+            WHERE (%s = '' OR name LIKE %s OR email LIKE %s)
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        users = execute_query(query, (search, search_pattern, search_pattern, limit, offset), fetch_all=True)
+        
+        return jsonify({
+            'users': users or [],
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total + limit - 1) // limit
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch users: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/doctors', methods=['GET'])
+def admin_get_all_doctors():
+    """Get all doctors for admin management"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        search = request.args.get('search', '')
+        page = request.args.get('page', 1, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        offset = (page - 1) * limit
+        
+        # Get total count
+        count_query = """
+            SELECT COUNT(*) as total FROM doctors
+            WHERE (%s = '' OR name LIKE %s OR email LIKE %s OR specialty LIKE %s)
+        """
+        search_pattern = f'%{search}%'
+        count_result = execute_query(count_query, (search, search_pattern, search_pattern, search_pattern), fetch_one=True)
+        total = count_result['total'] if count_result else 0
+        
+        # Get doctors
+        query = """
+            SELECT id, email, name, phone, specialty, qualification, experience, 
+                   rating, consultation_fee, is_available,
+                   COALESCE(is_blocked, FALSE) as is_blocked, created_at
+            FROM doctors
+            WHERE (%s = '' OR name LIKE %s OR email LIKE %s OR specialty LIKE %s)
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+        """
+        doctors = execute_query(query, (search, search_pattern, search_pattern, search_pattern, limit, offset), fetch_all=True)
+        
+        return jsonify({
+            'doctors': doctors or [],
+            'total': total,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total + limit - 1) // limit
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch doctors: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/users/<int:user_id>/block', methods=['PUT'])
+def admin_block_user(user_id):
+    """Block or unblock a user"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        data = request.get_json()
+        is_blocked = data.get('is_blocked', True)
+        
+        # Check if user exists
+        check_query = "SELECT id FROM users WHERE id = %s"
+        user = execute_query(check_query, (user_id,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Update block status
+        update_query = "UPDATE users SET is_blocked = %s WHERE id = %s"
+        execute_query(update_query, (is_blocked, user_id), commit=True)
+        
+        action = 'blocked' if is_blocked else 'unblocked'
+        return jsonify({'message': f'User {action} successfully'}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update user: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/doctors/<int:doctor_id>/block', methods=['PUT'])
+def admin_block_doctor(doctor_id):
+    """Block or unblock a doctor"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        data = request.get_json()
+        is_blocked = data.get('is_blocked', True)
+        
+        # Check if doctor exists
+        check_query = "SELECT id FROM doctors WHERE id = %s"
+        doctor = execute_query(check_query, (doctor_id,), fetch_one=True)
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+        
+        # Update block status
+        update_query = "UPDATE doctors SET is_blocked = %s WHERE id = %s"
+        execute_query(update_query, (is_blocked, doctor_id), commit=True)
+        
+        action = 'blocked' if is_blocked else 'unblocked'
+        return jsonify({'message': f'Doctor {action} successfully'}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to update doctor: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
+def admin_delete_user(user_id):
+    """Delete a user account"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        # Check if user exists
+        check_query = "SELECT id, name FROM users WHERE id = %s"
+        user = execute_query(check_query, (user_id,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Delete user (cascades to related tables)
+        delete_query = "DELETE FROM users WHERE id = %s"
+        execute_query(delete_query, (user_id,), commit=True)
+        
+        return jsonify({'message': f'User "{user["name"]}" deleted successfully'}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+
+
+@auth_bp.route('/admin/doctors/<int:doctor_id>', methods=['DELETE'])
+def admin_delete_doctor(doctor_id):
+    """Delete a doctor account"""
+    admin_token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not admin_token:
+        return jsonify({'error': 'Admin authentication required'}), 401
+    
+    try:
+        # Check if doctor exists
+        check_query = "SELECT id, name FROM doctors WHERE id = %s"
+        doctor = execute_query(check_query, (doctor_id,), fetch_one=True)
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+        
+        # Delete doctor (cascades to related tables)
+        delete_query = "DELETE FROM doctors WHERE id = %s"
+        execute_query(delete_query, (doctor_id,), commit=True)
+        
+        return jsonify({'message': f'Doctor "{doctor["name"]}" deleted successfully'}), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete doctor: {str(e)}'}), 500
 

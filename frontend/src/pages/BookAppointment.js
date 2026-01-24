@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../utils/api";
-import { Calendar, FileText, CheckCircle } from "lucide-react";
+import { Calendar, FileText, CheckCircle, X } from "lucide-react";
 import Footer from "../components/Footer";
 import BackToDashboardButton from "../components/BackToDashboardButton";
 
@@ -367,6 +367,23 @@ export default function BookAppointment() {
               Booking slots
             </h3>
 
+            {/* Doctor Unavailable Warning */}
+            {!doctor?.is_available && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="w-8 h-8 text-red-600" />
+                </div>
+                <h4 className="text-lg font-bold text-red-800 mb-2">
+                  Doctor Currently Unavailable
+                </h4>
+                <p className="text-red-600 text-sm">
+                  Dr. {doctor?.name} is currently not accepting new appointments.
+                  Please check back later or choose another doctor.
+                </p>
+              </div>
+            )}
+
+            {doctor?.is_available && (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Date Selection */}
               <div>
@@ -498,6 +515,7 @@ export default function BookAppointment() {
                 Book an appointment
               </button>
             </form>
+            )}
           </div>
         </div>
       </div>

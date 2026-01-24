@@ -3,6 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import LocationPickerMap from '../components/LocationPickerMap';
 import {
+  Users,
+  Stethoscope,
+  CalendarClock,
+  Siren,
+  FileText,
+  MessageSquare,
+  CheckCircle2,
+  LayoutDashboard,
+  Settings,
+  BarChart3,
+  UserPlus,
+  Clock,
+  Upload,
+  UserCheck,
+  Activity,
+  Target,
+  TrendingUp,
+  User,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Ban,
+  ShieldCheck,
+  X,
+  Building2,
+  ShieldPlus,
+  Star,
+  Server,
+  Database,
+  LogOut,
+} from 'lucide-react';
+import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
@@ -53,7 +86,6 @@ function AdminDashboard() {
   const [specialtiesDistribution, setSpecialtiesDistribution] = useState([]);
   const [specialtiesDemand, setSpecialtiesDemand] = useState([]);
   const [doctorTop, setDoctorTop] = useState([]);
-  const [doctorZero, setDoctorZero] = useState(0);
   const [chatSeries, setChatSeries] = useState([]);
   const [reportSeries, setReportSeries] = useState([]);
   const [symptomSeries, setSymptomSeries] = useState([]);
@@ -89,6 +121,20 @@ function AdminDashboard() {
   const [adminCreateLoading, setAdminCreateLoading] = useState(false);
   const [adminCreateError, setAdminCreateError] = useState('');
   const [adminCreateSuccess, setAdminCreateSuccess] = useState('');
+
+  // Users & Doctors Management State
+  const [usersListTab, setUsersListTab] = useState('users'); // 'users' | 'doctors'
+  const [usersList, setUsersList] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
+  const [doctorsSearch, setDoctorsSearch] = useState('');
+  const [doctorsPage, setDoctorsPage] = useState(1);
+  const [doctorsTotalPages, setDoctorsTotalPages] = useState(1);
+  const [confirmModal, setConfirmModal] = useState({ open: false, type: '', id: null, name: '', action: '' });
 
   const [toast, setToast] = useState({ isOpen: false, type: 'success', message: '' });
 
@@ -146,7 +192,6 @@ function AdminDashboard() {
       setSpecialtiesDemand(Array.isArray(specsRes.data?.demand) ? specsRes.data.demand : []);
 
       setDoctorTop(Array.isArray(docRes.data?.top_doctors) ? docRes.data.top_doctors : []);
-      setDoctorZero(Number(docRes.data?.doctors_with_zero_appointments || 0));
 
       setChatSeries(Array.isArray(chatRes.data?.series) ? chatRes.data.series : []);
       setReportSeries(Array.isArray(repRes.data?.series) ? repRes.data.series : []);
@@ -179,6 +224,101 @@ function AdminDashboard() {
       console.error(err);
     }
   };
+
+  const fetchUsersList = async (page = 1, search = '') => {
+    setUsersLoading(true);
+    try {
+      const response = await api.get('/auth/admin/users', {
+        params: { page, limit: 10, search }
+      });
+      setUsersList(response.data.users || []);
+      setUsersTotalPages(response.data.total_pages || 1);
+      setUsersPage(page);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to fetch users' });
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const fetchDoctorsList = async (page = 1, search = '') => {
+    setDoctorsLoading(true);
+    try {
+      const response = await api.get('/auth/admin/doctors', {
+        params: { page, limit: 10, search }
+      });
+      setDoctorsList(response.data.doctors || []);
+      setDoctorsTotalPages(response.data.total_pages || 1);
+      setDoctorsPage(page);
+    } catch (err) {
+      console.error('Failed to fetch doctors:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to fetch doctors' });
+    } finally {
+      setDoctorsLoading(false);
+    }
+  };
+
+  const handleBlockUser = async (userId, isBlocked) => {
+    try {
+      await api.put(`/auth/admin/users/${userId}/block`, { is_blocked: isBlocked });
+      setToast({ isOpen: true, type: 'success', message: `User ${isBlocked ? 'blocked' : 'unblocked'} successfully` });
+      fetchUsersList(usersPage, usersSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to update user' });
+    }
+  };
+
+  const handleBlockDoctor = async (doctorId, isBlocked) => {
+    try {
+      await api.put(`/auth/admin/doctors/${doctorId}/block`, { is_blocked: isBlocked });
+      setToast({ isOpen: true, type: 'success', message: `Doctor ${isBlocked ? 'blocked' : 'unblocked'} successfully` });
+      fetchDoctorsList(doctorsPage, doctorsSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to update doctor:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to update doctor' });
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    try {
+      await api.delete(`/auth/admin/users/${userId}`);
+      setToast({ isOpen: true, type: 'success', message: 'User deleted successfully' });
+      setConfirmModal({ open: false, type: '', id: null, name: '', action: '' });
+      fetchUsersList(usersPage, usersSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to delete user' });
+    }
+  };
+
+  const handleDeleteDoctor = async (doctorId) => {
+    try {
+      await api.delete(`/auth/admin/doctors/${doctorId}`);
+      setToast({ isOpen: true, type: 'success', message: 'Doctor deleted successfully' });
+      setConfirmModal({ open: false, type: '', id: null, name: '', action: '' });
+      fetchDoctorsList(doctorsPage, doctorsSearch);
+      fetchDashboardStats();
+    } catch (err) {
+      console.error('Failed to delete doctor:', err);
+      setToast({ isOpen: true, type: 'error', message: 'Failed to delete doctor' });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      if (usersListTab === 'users') {
+        fetchUsersList(1, usersSearch);
+      } else {
+        fetchDoctorsList(1, doctorsSearch);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, usersListTab]);
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -251,10 +391,10 @@ function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-400 font-medium">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -262,21 +402,23 @@ function AdminDashboard() {
 
   if (!admin) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 font-medium">Admin information not found</p>
+          <p className="text-slate-400 font-medium">Admin information not found</p>
         </div>
       </div>
     );
   }
 
-  const StatCard = ({ title, value, icon, color }) => (
-    <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+  const StatCard = ({ title, value, icon: Icon, color, bgColor }) => (
+    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50 hover:border-slate-600/50 hover:bg-slate-800/70 transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-gray-600 text-sm font-medium">{title}</p>
-        <span className={`text-3xl ${color}`}>{icon}</span>
+        <p className="text-slate-400 text-sm font-medium">{title}</p>
+        <div className={`p-2.5 rounded-xl ${bgColor}`}>
+          <Icon className={`w-6 h-6 ${color}`} />
+        </div>
       </div>
-      <p className="text-3xl font-bold text-gray-900">{value || 0}</p>
+      <p className="text-3xl font-bold text-white">{value || 0}</p>
     </div>
   );
 
@@ -391,13 +533,18 @@ function AdminDashboard() {
               labels: {
                 usePointStyle: true,
                 boxWidth: 8,
-                color: '#111827',
+                color: '#e2e8f0',
                 font: { family: 'ui-sans-serif, system-ui', weight: '600' },
               },
             },
             tooltip: {
               mode: 'index',
               intersect: false,
+              backgroundColor: 'rgba(30, 41, 59, 0.95)',
+              titleColor: '#f1f5f9',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(71, 85, 105, 0.5)',
+              borderWidth: 1,
             },
           },
           interaction: {
@@ -408,7 +555,7 @@ function AdminDashboard() {
             x: {
               grid: { display: false },
               ticks: {
-                color: '#6b7280',
+                color: '#94a3b8',
                 maxTicksLimit: 7,
                 callback: function (val) {
                   const raw = this.getLabelForValue(val);
@@ -424,8 +571,8 @@ function AdminDashboard() {
             },
             y: {
               beginAtZero: true,
-              ticks: { color: '#6b7280', precision: 0 },
-              grid: { color: 'rgba(17, 24, 39, 0.06)' },
+              ticks: { color: '#94a3b8', precision: 0 },
+              grid: { color: 'rgba(148, 163, 184, 0.1)' },
             },
           },
         },
@@ -445,7 +592,7 @@ function AdminDashboard() {
         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
           range === value
             ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent'
-            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            : 'bg-slate-700/50 text-slate-300 border-slate-600 hover:bg-slate-700 hover:border-slate-500'
         }`}
       >
         {label}
@@ -453,11 +600,11 @@ function AdminDashboard() {
     );
 
     return (
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Appointments Analytics</h3>
-            <p className="text-sm text-gray-600">Daily bookings + outcomes</p>
+            <h3 className="text-lg font-semibold text-white">Appointments Analytics</h3>
+            <p className="text-sm text-slate-400">Daily bookings + outcomes</p>
           </div>
           <div className="flex items-center gap-2">
             <RangeButton value="7d" label="7D" />
@@ -467,7 +614,7 @@ function AdminDashboard() {
         </div>
 
         {errorText && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="mb-4 bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm">
             {errorText}
           </div>
         )}
@@ -476,13 +623,13 @@ function AdminDashboard() {
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                <p className="text-gray-600 font-medium text-sm">Loading chart…</p>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                <p className="text-slate-400 font-medium text-sm">Loading chart…</p>
               </div>
             </div>
           ) : !series.length ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-gray-600 text-sm">No data available</p>
+              <p className="text-slate-500 text-sm">No data available</p>
             </div>
           ) : (
             <canvas ref={canvasRef} />
@@ -530,11 +677,18 @@ function AdminDashboard() {
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { intersect: false },
+            tooltip: { 
+              intersect: false,
+              backgroundColor: 'rgba(30, 41, 59, 0.95)',
+              titleColor: '#f1f5f9',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(71, 85, 105, 0.5)',
+              borderWidth: 1,
+            },
           },
           scales: {
-            x: { ticks: { color: '#6b7280' }, grid: { display: false } },
-            y: { beginAtZero: true, ticks: { color: '#6b7280', precision: 0 }, grid: { color: 'rgba(17, 24, 39, 0.06)' } },
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
           },
         },
       });
@@ -548,27 +702,27 @@ function AdminDashboard() {
     }, [labels, values, title]);
 
     return (
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          {subtitle ? <p className="text-sm text-gray-600">{subtitle}</p> : null}
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          {subtitle ? <p className="text-sm text-slate-400">{subtitle}</p> : null}
         </div>
 
         {errorText ? (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{errorText}</div>
+          <div className="mb-4 bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm">{errorText}</div>
         ) : null}
 
         <div className="h-[300px] relative">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                <p className="text-gray-600 font-medium text-sm">Loading chart…</p>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                <p className="text-slate-400 font-medium text-sm">Loading chart…</p>
               </div>
             </div>
           ) : !labels?.length ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-gray-600 text-sm">No data available</p>
+              <p className="text-slate-500 text-sm">No data available</p>
             </div>
           ) : (
             <canvas ref={canvasRef} />
@@ -622,15 +776,22 @@ function AdminDashboard() {
               labels: {
                 usePointStyle: true,
                 boxWidth: 8,
-                color: '#111827',
+                color: '#e2e8f0',
                 font: { family: 'ui-sans-serif, system-ui', weight: '600' },
               },
+            },
+            tooltip: {
+              backgroundColor: 'rgba(30, 41, 59, 0.95)',
+              titleColor: '#f1f5f9',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(71, 85, 105, 0.5)',
+              borderWidth: 1,
             },
           },
           interaction: { mode: 'index', intersect: false },
           scales: {
-            x: { grid: { display: false }, ticks: { color: '#6b7280', maxTicksLimit: 7 } },
-            y: { beginAtZero: true, ticks: { color: '#6b7280', precision: 0 }, grid: { color: 'rgba(17, 24, 39, 0.06)' } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 7 } },
+            y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
           },
         },
       });
@@ -644,27 +805,27 @@ function AdminDashboard() {
     }, [labels, datasets]);
 
     return (
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          {subtitle ? <p className="text-sm text-gray-600">{subtitle}</p> : null}
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          {subtitle ? <p className="text-sm text-slate-400">{subtitle}</p> : null}
         </div>
 
         {errorText ? (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{errorText}</div>
+          <div className="mb-4 bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm">{errorText}</div>
         ) : null}
 
         <div className="h-[300px] relative">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                <p className="text-gray-600 font-medium text-sm">Loading chart…</p>
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3"></div>
+                <p className="text-slate-400 font-medium text-sm">Loading chart…</p>
               </div>
             </div>
           ) : !labels?.length ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-gray-600 text-sm">No data available</p>
+              <p className="text-slate-500 text-sm">No data available</p>
             </div>
           ) : (
             <canvas ref={canvasRef} />
@@ -675,28 +836,28 @@ function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {toast.isOpen ? (
           <div className="fixed top-5 right-5 z-[60]">
             <div
-              className={`shadow-lg border rounded-xl px-4 py-3 flex items-start gap-3 bg-white ${
-                toast.type === 'success' ? 'border-green-200' : 'border-gray-200'
+              className={`shadow-xl border rounded-xl px-4 py-3 flex items-start gap-3 bg-slate-800 ${
+                toast.type === 'success' ? 'border-green-500/50' : 'border-slate-600'
               }`}
             >
               <div
                 className={`mt-0.5 h-2.5 w-2.5 rounded-full ${
-                  toast.type === 'success' ? 'bg-green-500' : 'bg-gray-500'
+                  toast.type === 'success' ? 'bg-green-500' : 'bg-slate-500'
                 }`}
               />
               <div className="min-w-[220px]">
-                <div className="text-sm font-semibold text-gray-900">Success</div>
-                <div className="text-sm text-gray-700 mt-0.5">{toast.message}</div>
+                <div className="text-sm font-semibold text-white">Success</div>
+                <div className="text-sm text-slate-300 mt-0.5">{toast.message}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setToast((s) => ({ ...s, isOpen: false }))}
-                className="ml-2 text-gray-400 hover:text-gray-600"
+                className="ml-2 text-slate-400 hover:text-slate-200"
                 aria-label="Close"
               >
                 ×
@@ -706,9 +867,10 @@ function AdminDashboard() {
         ) : null}
 
         {/* Welcome Banner */}
-        <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg p-8">
+        <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white shadow-2xl shadow-purple-900/30 p-8">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/10 rounded-full -ml-20 -mb-20"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
           
           <div className="relative z-10 flex items-center justify-between">
             <div>
@@ -717,61 +879,61 @@ function AdminDashboard() {
             </div>
             <button
               onClick={handleLogout}
-              className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition text-sm"
+              className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition text-sm flex items-center gap-2"
             >
-              Sign Out
+              <LogOut className="w-4 h-4" /> Sign Out
             </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="mb-8 flex space-x-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+        <div className="mb-8 flex space-x-2 bg-slate-800/50 backdrop-blur-sm rounded-xl p-1.5 shadow-lg border border-slate-700/50">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex-1 py-3 px-6 rounded-md font-medium transition ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'overview'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            📊 Overview
+            <LayoutDashboard className="w-4 h-4" /> Overview
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex-1 py-3 px-6 rounded-md font-medium transition ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'users'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            👥 Users & Doctors
+            <Users className="w-4 h-4" /> Users & Doctors
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`flex-1 py-3 px-6 rounded-md font-medium transition ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'system'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            ⚙️ System
+            <Settings className="w-4 h-4" /> System
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`flex-1 py-3 px-6 rounded-md font-medium transition ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'analytics'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            📈 Analytics
+            <BarChart3 className="w-4 h-4" /> Analytics
           </button>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg flex items-center gap-3">
-            <span className="text-xl">⚠️</span>
+          <div className="mb-6 bg-red-900/30 border border-red-700/50 text-red-400 px-6 py-4 rounded-xl flex items-center gap-3">
+            <Siren className="w-5 h-5" />
             <div>{error}</div>
           </div>
         )}
@@ -781,73 +943,83 @@ function AdminDashboard() {
           <div className="space-y-8">
             {/* Key Stats Grid */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Key Metrics</h2>
+              <h2 className="text-2xl font-bold text-white mb-6">Key Metrics</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                   title="Total Users"
                   value={stats.total_users}
-                  icon="👥"
-                  color="text-blue-600"
+                  icon={Users}
+                  color="text-blue-400"
+                  bgColor="bg-blue-500/20"
                 />
                 <StatCard
                   title="Active Doctors"
                   value={stats.total_doctors}
-                  icon="👨‍⚕️"
-                  color="text-green-600"
+                  icon={Stethoscope}
+                  color="text-emerald-400"
+                  bgColor="bg-emerald-500/20"
                 />
                 <StatCard
                   title="Pending Appointments"
                   value={stats.pending_appointments}
-                  icon="📅"
-                  color="text-yellow-600"
+                  icon={CalendarClock}
+                  color="text-amber-400"
+                  bgColor="bg-amber-500/20"
                 />
                 <StatCard
                   title="SOS Alerts"
                   value={stats.active_sos_alerts}
-                  icon="🚨"
-                  color="text-red-600"
+                  icon={Siren}
+                  color="text-red-400"
+                  bgColor="bg-red-500/20"
                 />
               </div>
             </div>
 
             {/* Secondary Metrics */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">System Activity</h2>
+              <h2 className="text-2xl font-bold text-white mb-6">System Activity</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Medical Reports</h3>
-                    <span className="text-2xl">📄</span>
+                    <h3 className="text-lg font-semibold text-white">Medical Reports</h3>
+                    <div className="p-2.5 rounded-xl bg-indigo-500/20">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">{stats.total_reports}</p>
-                  <p className="text-sm text-gray-600 mb-4">Total reviewed</p>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-600 rounded-full" style={{ width: '65%' }}></div>
+                  <p className="text-3xl font-bold text-white mb-2">{stats.total_reports}</p>
+                  <p className="text-sm text-slate-400 mb-4">Total reviewed</p>
+                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style={{ width: '65%' }}></div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">AI Chat Activity</h3>
-                    <span className="text-2xl">💬</span>
+                    <h3 className="text-lg font-semibold text-white">AI Chat Activity</h3>
+                    <div className="p-2.5 rounded-xl bg-purple-500/20">
+                      <MessageSquare className="w-6 h-6 text-purple-400" />
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">{stats.chats_today}</p>
-                  <p className="text-sm text-gray-600 mb-4">Chats today</p>
-                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    ● Live
+                  <p className="text-3xl font-bold text-white mb-2">{stats.chats_today}</p>
+                  <p className="text-sm text-slate-400 mb-4">Chats today</p>
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <Activity className="w-3 h-3 mr-1.5" /> Live
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">System Status</h3>
-                    <span className="text-2xl">✅</span>
+                    <h3 className="text-lg font-semibold text-white">System Status</h3>
+                    <div className="p-2.5 rounded-xl bg-emerald-500/20">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-green-600 mb-2">98%</p>
-                  <p className="text-sm text-gray-600 mb-4">Uptime (30 days)</p>
+                  <p className="text-3xl font-bold text-emerald-400 mb-2">98%</p>
+                  <p className="text-sm text-slate-400 mb-4">Uptime (30 days)</p>
                   <div className="flex gap-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                      Healthy
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <ShieldCheck className="w-3 h-3 mr-1" /> Healthy
                     </span>
                   </div>
                 </div>
@@ -855,40 +1027,54 @@ function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Analytics teaser (moved to Analytics tab) */}
-              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <div className="flex items-center justify-between gap-4">
+              {/* Appointments Chart Preview */}
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg border border-slate-700/50 overflow-hidden">
+                <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Analytics</h3>
-                    <p className="text-sm text-gray-600">Open the Analytics tab to view charts.</p>
+                    <h3 className="text-lg font-semibold text-white">Appointments Overview</h3>
+                    <p className="text-xs text-slate-400">Last {analyticsRange === '7d' ? '7 days' : analyticsRange === '30d' ? '30 days' : analyticsRange === '90d' ? '90 days' : '1 year'}</p>
                   </div>
                   <button
                     onClick={() => setActiveTab('analytics')}
-                    className="px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95"
+                    className="px-3 py-1.5 rounded-lg font-medium text-xs text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 shadow-lg"
                   >
-                    View Analytics
+                    View All Analytics
                   </button>
+                </div>
+                <div className="p-4">
+                  <AppointmentsChartCard
+                    series={apptSeries}
+                    loading={analyticsLoading}
+                    errorText={''}
+                    range={analyticsRange}
+                    onRangeChange={setAnalyticsRange}
+                  />
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Activities</h3>
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
+                <h3 className="text-lg font-semibold text-white mb-6">Recent Activities</h3>
                 <div className="space-y-4">
                   {[
-                    { action: 'New user registered', time: '2 minutes ago', icon: '👤' },
-                    { action: 'Appointment scheduled', time: '15 minutes ago', icon: '📅' },
-                    { action: 'SOS alert received', time: '1 hour ago', icon: '🚨' },
-                    { action: 'Medical report uploaded', time: '2 hours ago', icon: '📄' },
-                    { action: 'Doctor login', time: '3 hours ago', icon: '👨‍⚕️' },
-                  ].map((activity, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                      <span className="text-xl">{activity.icon}</span>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900 text-sm">{activity.action}</p>
-                        <p className="text-xs text-gray-500">{activity.time}</p>
+                    { action: 'New user registered', time: '2 minutes ago', icon: UserPlus, color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+                    { action: 'Appointment scheduled', time: '15 minutes ago', icon: CalendarClock, color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
+                    { action: 'SOS alert received', time: '1 hour ago', icon: Siren, color: 'text-red-400', bgColor: 'bg-red-500/20' },
+                    { action: 'Medical report uploaded', time: '2 hours ago', icon: Upload, color: 'text-indigo-400', bgColor: 'bg-indigo-500/20' },
+                    { action: 'Doctor login', time: '3 hours ago', icon: Stethoscope, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20' },
+                  ].map((activity, i) => {
+                    const IconComponent = activity.icon;
+                    return (
+                      <div key={i} className="flex items-center gap-4 p-3 bg-slate-700/30 rounded-lg border border-slate-600/30 hover:bg-slate-700/50 transition-colors">
+                        <div className={`p-2 rounded-lg ${activity.bgColor}`}>
+                          <IconComponent className={`w-4 h-4 ${activity.color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-white text-sm">{activity.action}</p>
+                          <p className="text-xs text-slate-500">{activity.time}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -900,11 +1086,11 @@ function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Analytics</h2>
-                <p className="text-sm text-gray-600">Charts across doctors, chats, reports, symptoms, and weight.</p>
+                <h2 className="text-2xl font-bold text-white">Analytics</h2>
+                <p className="text-sm text-slate-400">Charts across doctors, chats, reports, symptoms, and weight.</p>
               </div>
 
-              <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+              <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 shadow-lg border border-slate-700/50">
                 {[
                   { v: '7d', t: '7 Days' },
                   { v: '30d', t: '30 Days' },
@@ -915,8 +1101,8 @@ function AdminDashboard() {
                     onClick={() => setAnalyticsRange(x.v)}
                     className={`px-4 py-2 rounded-md font-semibold text-sm transition ${
                       analyticsRange === x.v
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                     }`}
                   >
                     {x.t}
@@ -926,24 +1112,24 @@ function AdminDashboard() {
             </div>
 
             {analyticsError ? (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg">{analyticsError}</div>
+              <div className="bg-red-900/30 border border-red-700/50 text-red-400 px-6 py-4 rounded-xl">{analyticsError}</div>
             ) : null}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <p className="text-gray-600 text-sm font-medium">Doctors with 0 appointments</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900">{doctorZero}</p>
-                <p className="mt-2 text-xs text-gray-500">Based on lifetime appointment history</p>
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
+                <p className="text-slate-400 text-sm font-medium">Total Appointments</p>
+                <p className="mt-2 text-3xl font-bold text-white">{(apptSeries || []).reduce((sum, d) => sum + Number(d.total || 0), 0)}</p>
+                <p className="mt-2 text-xs text-slate-500">In selected time period</p>
               </div>
-              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <p className="text-gray-600 text-sm font-medium">Active weight goals</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900">{weightActiveGoals}</p>
-                <p className="mt-2 text-xs text-gray-500">Users currently tracking a goal</p>
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
+                <p className="text-slate-400 text-sm font-medium">Active weight goals</p>
+                <p className="mt-2 text-3xl font-bold text-white">{weightActiveGoals}</p>
+                <p className="mt-2 text-xs text-slate-500">Users currently tracking a goal</p>
               </div>
-              <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                <p className="text-gray-600 text-sm font-medium">Avg check-ins / user / week</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900">{Number(weightAvgCheckins || 0).toFixed(2)}</p>
-                <p className="mt-2 text-xs text-gray-500">Weight entries in selected range</p>
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
+                <p className="text-slate-400 text-sm font-medium">Avg check-ins / user / week</p>
+                <p className="mt-2 text-3xl font-bold text-white">{Number(weightAvgCheckins || 0).toFixed(2)}</p>
+                <p className="mt-2 text-xs text-slate-500">Weight entries in selected range</p>
               </div>
             </div>
 
@@ -1083,7 +1269,7 @@ function AdminDashboard() {
               />
             </div>
 
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-500">
               Notes: Doctor approval funnel, OCR confidence, processing time, and chat escalation rate require extra fields/logging (not currently stored).
             </div>
           </div>
@@ -1092,27 +1278,27 @@ function AdminDashboard() {
         {/* Users & Doctors Tab */}
         {activeTab === 'users' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Users & Doctors Management</h2>
-              <p className="text-gray-600">Platform totals and account creation.</p>
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-slate-700/50">
+              <h2 className="text-2xl font-bold text-white mb-2">Users & Doctors Management</h2>
+              <p className="text-slate-400">Platform totals and account creation.</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-4xl font-bold text-blue-600 mb-2">{stats?.total_users || 0}</p>
-                  <p className="text-gray-700 font-medium">Total Users</p>
+                <div className="p-6 bg-blue-500/10 rounded-xl border border-blue-500/30">
+                  <p className="text-4xl font-bold text-blue-400 mb-2">{stats?.total_users || 0}</p>
+                  <p className="text-slate-300 font-medium">Total Users</p>
                 </div>
-                <div className="p-6 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-4xl font-bold text-green-600 mb-2">{stats?.total_doctors || 0}</p>
-                  <p className="text-gray-700 font-medium">Total Doctors</p>
+                <div className="p-6 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
+                  <p className="text-4xl font-bold text-emerald-400 mb-2">{stats?.total_doctors || 0}</p>
+                  <p className="text-slate-300 font-medium">Total Doctors</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-slate-700/50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Account Creation</h3>
-                  <p className="text-sm text-gray-600 mt-1">Create Hospital or Admin accounts from a modal.</p>
+                  <h3 className="text-xl font-bold text-white">Account Creation</h3>
+                  <p className="text-sm text-slate-400 mt-1">Create Hospital or Admin accounts from a modal.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1125,13 +1311,13 @@ function AdminDashboard() {
                       setAdminCreateSuccess('');
                       setAccountModalOpen(true);
                     }}
-                    className="px-5 py-2 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95"
+                    className="px-5 py-2 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 shadow-lg"
                   >
                     + Create Account
                   </button>
                   <a
                     href="/hospital/login"
-                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-900 hover:bg-gray-200"
+                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600"
                   >
                     Hospital Login
                   </a>
@@ -1139,38 +1325,320 @@ function AdminDashboard() {
               </div>
             </div>
 
+            {/* Users & Doctors List */}
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-slate-700/50">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div className="flex items-center gap-2 bg-slate-700/50 rounded-lg p-1 border border-slate-600/50">
+                  <button
+                    type="button"
+                    onClick={() => setUsersListTab('users')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-1.5 ${
+                      usersListTab === 'users'
+                        ? 'bg-slate-600 shadow text-blue-400'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <User className="w-4 h-4" /> Users ({stats?.total_users || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUsersListTab('doctors')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-1.5 ${
+                      usersListTab === 'doctors'
+                        ? 'bg-slate-600 shadow text-emerald-400'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Stethoscope className="w-4 h-4" /> Doctors ({stats?.total_doctors || 0})
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder={`Search ${usersListTab}...`}
+                    className="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-sm w-64 text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={usersListTab === 'users' ? usersSearch : doctorsSearch}
+                    onChange={(e) => {
+                      if (usersListTab === 'users') {
+                        setUsersSearch(e.target.value);
+                      } else {
+                        setDoctorsSearch(e.target.value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (usersListTab === 'users') {
+                          fetchUsersList(1, usersSearch);
+                        } else {
+                          fetchDoctorsList(1, doctorsSearch);
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (usersListTab === 'users') {
+                        fetchUsersList(1, usersSearch);
+                      } else {
+                        fetchDoctorsList(1, doctorsSearch);
+                      }
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-semibold hover:opacity-90 shadow-lg"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+
+              {/* Users List */}
+              {usersListTab === 'users' && (
+                <div>
+                  {usersLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                  ) : usersList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">No users found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-700/50 border-b border-slate-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">ID</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Name</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Email</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Phone</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Status</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Joined</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {usersList.map((user) => (
+                            <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                              <td className="px-4 py-3 text-slate-400">#{user.id}</td>
+                              <td className="px-4 py-3 font-medium text-white">{user.name}</td>
+                              <td className="px-4 py-3 text-slate-400">{user.email}</td>
+                              <td className="px-4 py-3 text-slate-400">{user.phone || '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  user.is_blocked 
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                }`}>
+                                  {user.is_blocked ? 'Blocked' : 'Active'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-500 text-xs">
+                                {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleBlockUser(user.id, !user.is_blocked)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                                      user.is_blocked
+                                        ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                                        : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30'
+                                    }`}
+                                  >
+                                    {user.is_blocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmModal({ open: true, type: 'user', id: user.id, name: user.name, action: 'delete' })}
+                                    className="px-3 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* Pagination */}
+                  {usersTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => fetchUsersList(usersPage - 1, usersSearch)}
+                        disabled={usersPage <= 1}
+                        className="px-3 py-1 rounded bg-slate-700 text-slate-300 text-sm disabled:opacity-50 hover:bg-slate-600 border border-slate-600"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-slate-400">Page {usersPage} of {usersTotalPages}</span>
+                      <button
+                        onClick={() => fetchUsersList(usersPage + 1, usersSearch)}
+                        disabled={usersPage >= usersTotalPages}
+                        className="px-3 py-1 rounded bg-slate-700 text-slate-300 text-sm disabled:opacity-50 hover:bg-slate-600 border border-slate-600"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Doctors List */}
+              {usersListTab === 'doctors' && (
+                <div>
+                  {doctorsLoading ? (
+                    <div className="flex justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                    </div>
+                  ) : doctorsList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">No doctors found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-700/50 border-b border-slate-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">ID</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Name</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Email</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Specialty</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Rating</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Status</th>
+                            <th className="px-4 py-3 text-left font-semibold text-slate-300">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {doctorsList.map((doctor) => (
+                            <tr key={doctor.id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                              <td className="px-4 py-3 text-slate-400">#{doctor.id}</td>
+                              <td className="px-4 py-3 font-medium text-white">{doctor.name}</td>
+                              <td className="px-4 py-3 text-slate-400">{doctor.email}</td>
+                              <td className="px-4 py-3 text-slate-400">{doctor.specialty || '-'}</td>
+                              <td className="px-4 py-3 text-amber-400 flex items-center gap-1"><Star className="w-4 h-4 fill-amber-400" /> {doctor.rating || 0}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  doctor.is_blocked 
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                }`}>
+                                  {doctor.is_blocked ? 'Blocked' : 'Active'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleBlockDoctor(doctor.id, !doctor.is_blocked)}
+                                    className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                                      doctor.is_blocked
+                                        ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                                        : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30'
+                                    }`}
+                                  >
+                                    {doctor.is_blocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmModal({ open: true, type: 'doctor', id: doctor.id, name: doctor.name, action: 'delete' })}
+                                    className="px-3 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {/* Pagination */}
+                  {doctorsTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => fetchDoctorsList(doctorsPage - 1, doctorsSearch)}
+                        disabled={doctorsPage <= 1}
+                        className="px-3 py-1 rounded bg-slate-700 text-slate-300 text-sm disabled:opacity-50 hover:bg-slate-600 border border-slate-600"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-slate-400">Page {doctorsPage} of {doctorsTotalPages}</span>
+                      <button
+                        onClick={() => fetchDoctorsList(doctorsPage + 1, doctorsSearch)}
+                        disabled={doctorsPage >= doctorsTotalPages}
+                        className="px-3 py-1 rounded bg-slate-700 text-slate-300 text-sm disabled:opacity-50 hover:bg-slate-600 border border-slate-600"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Confirmation Modal */}
+            {confirmModal.open && (
+              <div className="fixed inset-0 z-50 overflow-y-auto">
+                <div className="flex min-h-screen items-center justify-center px-4">
+                  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setConfirmModal({ open: false, type: '', id: null, name: '', action: '' })} />
+                  <div className="relative bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full border border-slate-700">
+                    <h3 className="text-lg font-bold text-white mb-2">Confirm Delete</h3>
+                    <p className="text-slate-400 mb-6">
+                      Are you sure you want to delete <span className="font-semibold text-white">{confirmModal.name}</span>? This action cannot be undone.
+                    </p>
+                    <div className="flex items-center gap-3 justify-end">
+                      <button
+                        onClick={() => setConfirmModal({ open: false, type: '', id: null, name: '', action: '' })}
+                        className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 font-semibold hover:bg-slate-600 border border-slate-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirmModal.type === 'user') {
+                            handleDeleteUser(confirmModal.id);
+                          } else {
+                            handleDeleteDoctor(confirmModal.id);
+                          }
+                        }}
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {accountModalOpen ? (
               <div className="fixed inset-0 z-50 overflow-y-auto">
                 <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                   <div
-                    className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
                     onClick={() => setAccountModalOpen(false)}
                   />
 
-                  <div className="inline-block transform overflow-hidden rounded-2xl bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
-                    <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+                  <div className="inline-block transform overflow-hidden rounded-2xl bg-slate-800 text-left align-bottom shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle border border-slate-700">
+                    <div className="px-6 py-5 border-b border-slate-700 flex items-center justify-between">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Create Account</h3>
-                        <p className="text-xs text-gray-500 mt-1">Choose Hospital or Admin.</p>
+                        <h3 className="text-lg font-bold text-white">Create Account</h3>
+                        <p className="text-xs text-slate-400 mt-1">Choose Hospital or Admin.</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setAccountModalOpen(false)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-900 text-sm font-semibold"
+                        className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold border border-slate-600"
                       >
                         Close
                       </button>
                     </div>
 
                     <div className="px-6 pt-5">
-                      <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                      <div className="flex items-center gap-2 bg-slate-700/50 rounded-lg p-1 border border-slate-600/50">
                         <button
                           type="button"
                           onClick={() => setAccountModalTab('hospital')}
                           className={`flex-1 py-2 rounded-md text-sm font-semibold transition ${
                             accountModalTab === 'hospital'
-                              ? 'bg-white shadow text-gray-900'
-                              : 'text-gray-600 hover:text-gray-900'
+                              ? 'bg-slate-600 shadow text-white'
+                              : 'text-slate-400 hover:text-white'
                           }`}
                         >
                           Hospital Account
@@ -1180,8 +1648,8 @@ function AdminDashboard() {
                           onClick={() => setAccountModalTab('admin')}
                           className={`flex-1 py-2 rounded-md text-sm font-semibold transition ${
                             accountModalTab === 'admin'
-                              ? 'bg-white shadow text-gray-900'
-                              : 'text-gray-600 hover:text-gray-900'
+                              ? 'bg-slate-600 shadow text-white'
+                              : 'text-slate-400 hover:text-white'
                           }`}
                         >
                           Admin Account
@@ -1193,12 +1661,12 @@ function AdminDashboard() {
                       {accountModalTab === 'hospital' ? (
                         <div>
                           {hospitalCreateError ? (
-                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                            <div className="mb-4 bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm">
                               {hospitalCreateError}
                             </div>
                           ) : null}
                           {hospitalCreateSuccess ? (
-                            <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+                            <div className="mb-4 bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 px-4 py-3 rounded-lg text-sm">
                               {hospitalCreateSuccess}
                             </div>
                           ) : null}
@@ -1206,72 +1674,72 @@ function AdminDashboard() {
                           <form onSubmit={submitCreateHospital} className="space-y-5">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Hospital Name *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Hospital Name *</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.name}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, name: e.target.value }))}
                                   required
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Email (Login) *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Email (Login) *</label>
                                 <input
                                   type="email"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.email}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, email: e.target.value }))}
                                   required
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Password *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Password *</label>
                                 <input
                                   type="password"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.password}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, password: e.target.value }))}
                                   required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
+                                <p className="text-xs text-slate-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Phone</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.phone}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, phone: e.target.value }))}
                                 />
                               </div>
                               <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Address *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Address *</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.address}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, address: e.target.value }))}
                                   required
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">City</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">City</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.city}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, city: e.target.value }))}
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">State</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">State</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.state}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, state: e.target.value }))}
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Emergency Contact</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Emergency Contact</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={hospitalForm.emergency_contact}
                                   onChange={(e) => setHospitalForm((s) => ({ ...s, emergency_contact: e.target.value }))}
                                 />
@@ -1279,7 +1747,7 @@ function AdminDashboard() {
                             </div>
 
                             <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">Location (Mini Map) *</label>
+                              <label className="block text-sm font-semibold text-slate-300 mb-2">Location (Mini Map) *</label>
                               <LocationPickerMap
                                 value={{ lat: hospitalForm.latitude, lng: hospitalForm.longitude }}
                                 onChange={(v) =>
@@ -1297,23 +1765,23 @@ function AdminDashboard() {
                               <button
                                 type="submit"
                                 disabled={hospitalCreateLoading}
-                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60"
+                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60 shadow-lg"
                               >
                                 {hospitalCreateLoading ? 'Creating...' : 'Create Hospital Account'}
                               </button>
-                              <div className="text-xs text-gray-500">Saves credentials + latitude/longitude.</div>
+                              <div className="text-xs text-slate-500">Saves credentials + latitude/longitude.</div>
                             </div>
                           </form>
                         </div>
                       ) : (
                         <div>
                           {adminCreateError ? (
-                            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                            <div className="mb-4 bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm">
                               {adminCreateError}
                             </div>
                           ) : null}
                           {adminCreateSuccess ? (
-                            <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+                            <div className="mb-4 bg-emerald-900/30 border border-emerald-700/50 text-emerald-400 px-4 py-3 rounded-lg text-sm">
                               {adminCreateSuccess}
                             </div>
                           ) : null}
@@ -1321,39 +1789,39 @@ function AdminDashboard() {
                           <form onSubmit={submitCreateAdmin} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Name *</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={adminCreateForm.name}
                                   onChange={(e) => setAdminCreateForm((s) => ({ ...s, name: e.target.value }))}
                                   required
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Email *</label>
                                 <input
                                   type="email"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={adminCreateForm.email}
                                   onChange={(e) => setAdminCreateForm((s) => ({ ...s, email: e.target.value }))}
                                   required
                                 />
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Password *</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Password *</label>
                                 <input
                                   type="password"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={adminCreateForm.password}
                                   onChange={(e) => setAdminCreateForm((s) => ({ ...s, password: e.target.value }))}
                                   required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
+                                <p className="text-xs text-slate-500 mt-1">Use 8+ chars with uppercase, lowercase, number, symbol.</p>
                               </div>
                               <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
+                                <label className="block text-sm font-semibold text-slate-300 mb-1">Role</label>
                                 <input
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                   value={adminCreateForm.role}
                                   onChange={(e) => setAdminCreateForm((s) => ({ ...s, role: e.target.value }))}
                                   placeholder="admin"
@@ -1365,11 +1833,11 @@ function AdminDashboard() {
                               <button
                                 type="submit"
                                 disabled={adminCreateLoading}
-                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60"
+                                className="px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-95 disabled:opacity-60 shadow-lg"
                               >
                                 {adminCreateLoading ? 'Creating...' : 'Create Admin Account'}
                               </button>
-                              <div className="text-xs text-gray-500">Creates another admin user.</div>
+                              <div className="text-xs text-slate-500">Creates another admin user.</div>
                             </div>
                           </form>
                         </div>
@@ -1385,32 +1853,48 @@ function AdminDashboard() {
         {/* System Tab */}
         {activeTab === 'system' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">System Configuration</h2>
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-slate-700/50">
+              <h2 className="text-2xl font-bold text-white mb-6">System Configuration</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-600 mb-2">API Status</p>
-                  <p className="text-2xl font-bold text-green-600 mb-2">✓ Running</p>
-                  <p className="text-xs text-gray-500">Version: 1.0.0</p>
+                <div className="p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-slate-400">API Status</p>
+                    <div className="p-2 rounded-lg bg-emerald-500/20">
+                      <Server className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <p className="text-2xl font-bold text-emerald-400">Running</p>
+                  </div>
+                  <p className="text-xs text-slate-500">Version: 1.0.0</p>
                 </div>
-                <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-600 mb-2">Database Status</p>
-                  <p className="text-2xl font-bold text-green-600 mb-2">✓ Connected</p>
-                  <p className="text-xs text-gray-500">MySQL 8.0</p>
+                <div className="p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-slate-400">Database Status</p>
+                    <div className="p-2 rounded-lg bg-blue-500/20">
+                      <Database className="w-5 h-5 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <p className="text-2xl font-bold text-emerald-400">Connected</p>
+                  </div>
+                  <p className="text-xs text-slate-500">MySQL 8.0</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Admin Profile</h2>
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-slate-700/50">
+              <h2 className="text-2xl font-bold text-white mb-6">Admin Profile</h2>
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-purple-500/30">
                   {admin.name?.charAt(0) || 'A'}
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-gray-900">{admin.name}</p>
-                  <p className="text-gray-600">{admin.email}</p>
-                  <p className="text-sm text-gray-500 mt-2">Role: {admin.role || 'Administrator'}</p>
+                  <p className="text-xl font-bold text-white">{admin.name}</p>
+                  <p className="text-slate-400">{admin.email}</p>
+                  <p className="text-sm text-slate-500 mt-2">Role: {admin.role || 'Administrator'}</p>
                 </div>
               </div>
             </div>

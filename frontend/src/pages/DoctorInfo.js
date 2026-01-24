@@ -9,6 +9,7 @@ import {
   Mail,
   Phone,
   BadgeDollarSign,
+  X,
 } from "lucide-react";
 import Footer from "../components/Footer";
 import SuccessModal from "../components/SuccessModal";
@@ -423,6 +424,23 @@ export default function DoctorInfo() {
                   Book an appointment
                 </h3>
 
+                {/* Doctor Unavailable Warning */}
+                {!doctor?.is_available && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <X className="w-8 h-8 text-red-600" />
+                    </div>
+                    <h4 className="text-lg font-bold text-red-800 mb-2">
+                      Doctor Currently Unavailable
+                    </h4>
+                    <p className="text-red-600 text-sm">
+                      Dr. {doctor?.name} is currently not accepting new appointments.
+                      Please check back later or choose another doctor.
+                    </p>
+                  </div>
+                )}
+
+                {doctor?.is_available && (
                 <div className="space-y-6">
                   {/* Date Selection */}
                   <div>
@@ -545,6 +563,7 @@ export default function DoctorInfo() {
                     {booking ? "Booking..." : "Book an appointment"}
                   </button>
                 </div>
+                )}
               </div>
             </>
           )}

@@ -8,6 +8,27 @@ from math import radians, cos, sin, asin, sqrt
 hospitals_bp = Blueprint('hospitals', __name__)
 
 
+def get_hospital_bed_stats(cursor, hospital_id):
+    """
+    Get aggregated bed statistics from bed_wards table for a hospital.
+    Returns total_beds, available_beds, and icu_beds.
+    """
+    cursor.execute("""
+        SELECT 
+            COALESCE(SUM(total_beds), 0) as total_beds,
+            COALESCE(SUM(available_beds), 0) as available_beds,
+            COALESCE(SUM(CASE WHEN ward_type = 'icu' THEN total_beds ELSE 0 END), 0) as icu_beds
+        FROM bed_wards
+        WHERE hospital_id = %s
+    """, (hospital_id,))
+    result = cursor.fetchone()
+    return {
+        'total_beds': result['total_beds'] if result else 0,
+        'available_beds': result['available_beds'] if result else 0,
+        'icu_beds': result['icu_beds'] if result else 0
+    }
+
+
 def haversine(lon1, lat1, lon2, lat2):
     """
     Calculate the great circle distance in kilometers between two points 
@@ -50,7 +71,7 @@ def get_hospitals():
         # Get query parameters
         user_lat = request.args.get('latitude', type=float)
         user_lon = request.args.get('longitude', type=float)
-        radius = request.args.get('radius', default=50, type=float)
+        radius = request.args.get('radius', default=5, type=float)
         city = request.args.get('city', type=str)
         service = request.args.get('service', type=str)
         search = request.args.get('search', type=str)
@@ -96,6 +117,17 @@ def get_hospitals():
             else:
                 services_list = []
             
+            # Get bed data - use aggregated bed_wards data if hospital columns are NULL or 0
+            total_beds = hospital['total_beds']
+            available_beds = hospital['available_beds']
+            icu_beds = hospital['icu_beds']
+            
+            if not total_beds or total_beds == 0:
+                bed_stats = get_hospital_bed_stats(cursor, hospital['id'])
+                total_beds = bed_stats['total_beds']
+                available_beds = bed_stats['available_beds']
+                icu_beds = bed_stats['icu_beds']
+            
             hospital_data = {
                 'id': hospital['id'],
                 'name': hospital['name'],
@@ -107,9 +139,9 @@ def get_hospitals():
                 'phone': hospital['phone'],
                 'email': hospital['email'],
                 'emergency_contact': hospital['emergency_contact'],
-                'total_beds': hospital['total_beds'],
-                'available_beds': hospital['available_beds'],
-                'icu_beds': hospital['icu_beds'],
+                'total_beds': total_beds,
+                'available_beds': available_beds,
+                'icu_beds': icu_beds,
                 'services': services_list,
                 'rating': float(hospital['rating']) if hospital['rating'] else 0.0,
                 'distance': None
@@ -202,6 +234,17 @@ def get_hospital_details(hospital_id):
         else:
             services_list = []
         
+        # Get bed data - use aggregated bed_wards data if hospital columns are NULL or 0
+        total_beds = hospital['total_beds']
+        available_beds = hospital['available_beds']
+        icu_beds = hospital['icu_beds']
+        
+        if not total_beds or total_beds == 0:
+            bed_stats = get_hospital_bed_stats(cursor, hospital['id'])
+            total_beds = bed_stats['total_beds']
+            available_beds = bed_stats['available_beds']
+            icu_beds = bed_stats['icu_beds']
+        
         hospital_data = {
             'id': hospital['id'],
             'name': hospital['name'],
@@ -213,9 +256,9 @@ def get_hospital_details(hospital_id):
             'phone': hospital['phone'],
             'email': hospital['email'],
             'emergency_contact': hospital['emergency_contact'],
-            'total_beds': hospital['total_beds'],
-            'available_beds': hospital['available_beds'],
-            'icu_beds': hospital['icu_beds'],
+            'total_beds': total_beds,
+            'available_beds': available_beds,
+            'icu_beds': icu_beds,
             'services': services_list,
             'rating': float(hospital['rating']) if hospital['rating'] else 0.0,
             'doctors': doctors
@@ -246,7 +289,7 @@ def get_nearby_hospitals():
     try:
         user_lat = request.args.get('latitude', type=float)
         user_lon = request.args.get('longitude', type=float)
-        radius = request.args.get('radius', default=25, type=float)  # Default 25km
+        radius = request.args.get('radius', default=5, type=float)  # Default 5km
         limit = request.args.get('limit', default=10, type=int)
         
         if user_lat is None or user_lon is None:
@@ -277,6 +320,17 @@ def get_nearby_hospitals():
                 )
                 
                 if distance <= radius:
+                    # Get bed data - use aggregated bed_wards data if hospital columns are NULL or 0
+                    total_beds = hospital['total_beds']
+                    available_beds = hospital['available_beds']
+                    icu_beds = hospital['icu_beds']
+                    
+                    if not total_beds or total_beds == 0:
+                        bed_stats = get_hospital_bed_stats(cursor, hospital['id'])
+                        total_beds = bed_stats['total_beds']
+                        available_beds = bed_stats['available_beds']
+                        icu_beds = bed_stats['icu_beds']
+                    
                     nearby.append({
                         'id': hospital['id'],
                         'name': hospital['name'],
@@ -288,9 +342,9 @@ def get_nearby_hospitals():
                         'phone': hospital['phone'],
                         'email': hospital['email'],
                         'emergency_contact': hospital['emergency_contact'],
-                        'total_beds': hospital['total_beds'],
-                        'available_beds': hospital['available_beds'],
-                        'icu_beds': hospital['icu_beds'],
+                        'total_beds': total_beds,
+                        'available_beds': available_beds,
+                        'icu_beds': icu_beds,
                         'services': hospital['services'],
                         'rating': float(hospital['rating']) if hospital['rating'] else 0.0,
                         'distance': round(distance, 2)

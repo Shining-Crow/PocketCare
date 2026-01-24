@@ -502,7 +502,6 @@ def fix_database():
                 room_config VARCHAR(50) NULL,
                 total_beds INT NOT NULL DEFAULT 0,
                 available_beds INT NOT NULL DEFAULT 0,
-                reserved_beds INT NOT NULL DEFAULT 0,
                 occupied_beds INT NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -513,6 +512,37 @@ def fix_database():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """,
         )
+
+        # Migration: reserved_beds was removed (reserved now counts as occupied).
+        # Best-effort migrate existing data and drop the legacy column.
+        if _table_exists('bed_wards') and _column_exists('bed_wards', 'reserved_beds'):
+            print("Migrating bed_wards.reserved_beds -> occupied_beds...")
+            try:
+                cursor.execute(
+                    """
+                    UPDATE bed_wards
+                    SET occupied_beds = COALESCE(occupied_beds, 0) + COALESCE(reserved_beds, 0)
+                    WHERE COALESCE(reserved_beds, 0) > 0
+                    """
+                )
+                conn.commit()
+            except Exception as e:
+                print(f"! Could not migrate reserved_beds values: {e}")
+
+            # Some installations may have a CHECK constraint referencing reserved_beds.
+            # Drop it if present (MySQL 8+) before dropping the column.
+            try:
+                cursor.execute("ALTER TABLE bed_wards DROP CHECK chk_bed_counts")
+                conn.commit()
+            except Exception:
+                pass
+
+            try:
+                cursor.execute("ALTER TABLE bed_wards DROP COLUMN reserved_beds")
+                conn.commit()
+                print("✓ bed_wards.reserved_beds dropped")
+            except Exception as e:
+                print(f"! Could not drop bed_wards.reserved_beds (may be safe to ignore): {e}")
 
         _ensure_table(
             'private_rooms',

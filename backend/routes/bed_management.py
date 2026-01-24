@@ -56,8 +56,15 @@ def create_bed_ward():
         room_config = data.get('room_config')  # For private rooms
         total_beds = data.get('total_beds', 0)
         available_beds = data.get('available_beds', 0)
+        # reserved_beds was removed; accept it as a backwards-compatible alias for occupied.
         reserved_beds = data.get('reserved_beds', 0)
         occupied_beds = data.get('occupied_beds', 0)
+
+        effective_occupied_beds = (occupied_beds or 0) + (reserved_beds or 0)
+
+        # If available isn't provided (or is None), derive it from total - occupied.
+        if available_beds is None:
+            available_beds = max(0, (total_beds or 0) - effective_occupied_beds)
         
         if not hospital_id or not ward_type:
             return jsonify({'error': 'Hospital ID and ward type are required'}), 400
@@ -84,20 +91,18 @@ def create_bed_ward():
             cursor.execute("""
                 UPDATE bed_wards 
                 SET total_beds = %s, available_beds = %s, 
-                    reserved_beds = %s, occupied_beds = %s,
+                    occupied_beds = %s,
                     updated_at = NOW()
                 WHERE id = %s
-            """, (total_beds, available_beds, reserved_beds, occupied_beds, existing['id']))
+            """, (total_beds, available_beds, effective_occupied_beds, existing['id']))
             ward_id = existing['id']
         else:
             # Create new ward
             cursor.execute("""
                 INSERT INTO bed_wards 
-                (hospital_id, ward_type, ac_type, room_config, total_beds, available_beds, 
-                 reserved_beds, occupied_beds)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (hospital_id, ward_type, ac_type, room_config, total_beds, available_beds, 
-                  reserved_beds, occupied_beds))
+                (hospital_id, ward_type, ac_type, room_config, total_beds, available_beds, occupied_beds)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (hospital_id, ward_type, ac_type, room_config, total_beds, available_beds, effective_occupied_beds))
             ward_id = cursor.lastrowid
         
         conn.commit()
@@ -121,6 +126,12 @@ def update_bed_ward(ward_id):
     """Update bed ward counts"""
     try:
         data = request.get_json()
+
+        # Backwards compatibility: reserved_beds -> occupied_beds
+        if 'reserved_beds' in data and 'occupied_beds' not in data:
+            data['occupied_beds'] = data.get('reserved_beds')
+        if 'reserved_beds' in data:
+            data.pop('reserved_beds', None)
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -135,9 +146,6 @@ def update_bed_ward(ward_id):
         if 'available_beds' in data:
             update_fields.append('available_beds = %s')
             values.append(data['available_beds'])
-        if 'reserved_beds' in data:
-            update_fields.append('reserved_beds = %s')
-            values.append(data['reserved_beds'])
         if 'occupied_beds' in data:
             update_fields.append('occupied_beds = %s')
             values.append(data['occupied_beds'])
@@ -468,7 +476,6 @@ def get_bed_summary():
                 ac_type,
                 SUM(total_beds) as total,
                 SUM(available_beds) as available,
-                SUM(reserved_beds) as reserved,
                 SUM(occupied_beds) as occupied
             FROM bed_wards
             WHERE hospital_id = %s

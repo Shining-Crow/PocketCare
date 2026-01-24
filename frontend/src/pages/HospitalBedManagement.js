@@ -63,7 +63,7 @@ const HospitalBedManagement = () => {
     const reserved = reservedParsed.value;
 
     if (reserved > total) {
-      setWarningMessage(`Reserved beds (${reserved}) cannot exceed total beds (${total})`);
+      setWarningMessage(`Occupied beds (${reserved}) cannot exceed total beds (${total})`);
       setShowWarningModal(true);
       return;
     }
@@ -219,18 +219,22 @@ const HospitalBedManagement = () => {
           private_2bed_with_bath: { total: 0, available: 0, reserved: 0 }
         };
         response.data.wards.forEach(ward => {
+          const total = Number(ward.total_beds ?? 0);
+          const occupied = Number(ward.occupied_beds ?? 0) + Number(ward.reserved_beds ?? 0);
+          const available = ward.available_beds != null
+            ? Number(ward.available_beds)
+            : Math.max(0, total - occupied);
+
           // Handle regular wards
           if (ward.ward_type !== 'private_room') {
             const key = ward.ac_type === 'not_applicable' 
               ? ward.ward_type 
               : `${ward.ward_type}_${ward.ac_type}`;
             if (newBedStatus[key]) {
-              // Recalculate available as total - reserved
-              const calculatedAvailable = ward.total_beds - ward.reserved_beds;
               newBedStatus[key] = {
-                total: ward.total_beds,
-                available: calculatedAvailable,
-                reserved: ward.reserved_beds,
+                total,
+                available,
+                reserved: occupied,
                 id: ward.id
               };
             }
@@ -247,12 +251,10 @@ const HospitalBedManagement = () => {
             }
             
             if (newBedStatus[key]) {
-              // Recalculate available as total - reserved
-              const calculatedAvailable = ward.total_beds - ward.reserved_beds;
               newBedStatus[key] = {
-                total: ward.total_beds,
-                available: calculatedAvailable,
-                reserved: ward.reserved_beds,
+                total,
+                available,
+                reserved: occupied,
                 id: ward.id
               };
             } else {
@@ -276,17 +278,16 @@ const HospitalBedManagement = () => {
       
       // Convert empty strings to 0 before saving
       const total = parseInt(data.total) || 0;
-      const available = parseInt(data.available) || 0;
-      const reserved = parseInt(data.reserved) || 0;
+      const occupied = parseInt(data.reserved) || 0;
       
-      // Validate reserved doesn't exceed total
-      if (reserved > total) {
-        setWarningMessage(`Reserved beds (${reserved}) cannot exceed total beds (${total})`);
+      // Validate occupied doesn't exceed total
+      if (occupied > total) {
+        setWarningMessage(`Occupied beds (${occupied}) cannot exceed total beds (${total})`);
         setShowWarningModal(true);
         return;
       }
-      
-      const occupied = total - available - reserved;
+
+      const available = Math.max(0, total - occupied);
       
       const wardData = {
         hospital_id: hospitalId,
@@ -294,7 +295,6 @@ const HospitalBedManagement = () => {
         ac_type: config.acType,
         total_beds: total,
         available_beds: available,
-        reserved_beds: reserved,
         occupied_beds: occupied
       };
       
@@ -404,7 +404,7 @@ const HospitalBedManagement = () => {
               <div className="text-xl font-bold text-blue-800">{totalAvailableBeds}</div>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="text-xs text-amber-700">Reserved</div>
+              <div className="text-xs text-amber-700">Occupied</div>
               <div className="text-xl font-bold text-amber-800">{totalReservedBeds}</div>
             </div>
           </div>

@@ -1,9 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar
 } from 'recharts';
+import {
+  Activity,
+  Bed,
+  Building2,
+  Calendar,
+  CalendarCheck2,
+  CircleDollarSign,
+  ClipboardList,
+  LogOut,
+  RefreshCw,
+  ShieldAlert,
+  Stethoscope,
+  Users,
+} from 'lucide-react';
 import HospitalBedManagement from './HospitalBedManagement';
 import HospitalDoctorsManagement from './HospitalDoctorsManagement';
 import HospitalAppointments from './HospitalAppointments';
@@ -14,45 +28,142 @@ const HospitalDashboard = () => {
   const navigate = useNavigate();
   const [hospital, setHospital] = useState(null);
   const [stats, setStats] = useState({
-    bedAvailability: { total: 100, occupied: 75, available: 25 },
-    appointments: { today: 45, upcoming: 120, completed: 320 },
-    emergency: { active: 3, responded: 12, pending: 2 },
-    finances: { revenue: 1250000, pending: 85000 }
+    bedAvailability: { total: 0, occupied: 0, available: 0 },
+    appointments: { today: 0, upcoming: 0, completed: 0 },
+    finances: { revenue: 0, pending: 0 },
+    doctors: { total: 0, available: 0, specialties: 0 },
+    privateRooms: { total: 0, available: 0, occupied: 0, reserved: 0 },
+    patients: { today: 0 }
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [patientsToday, setPatientsToday] = useState(0);
-  const [bedOccupancyPercentage, setBedOccupancyPercentage] = useState(0);
   const [revenueToday, setRevenueToday] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [recentAppointments, setRecentAppointments] = useState([]);
+  const [sosSummary, setSosSummary] = useState({ pending: 0, assigned: 0 });
 
-  // Mock data for charts - will be replaced with real data
-  const [occupancyData, setOccupancyData] = useState([
-    { name: 'Mon', general: 65, icu: 85, emergency: 45 },
-    { name: 'Tue', general: 70, icu: 90, emergency: 50 },
-    { name: 'Wed', general: 75, icu: 88, emergency: 55 },
-    { name: 'Thu', general: 68, icu: 82, emergency: 48 },
-    { name: 'Fri', general: 72, icu: 86, emergency: 52 },
-    { name: 'Sat', general: 65, icu: 80, emergency: 40 },
-    { name: 'Sun', general: 60, icu: 75, emergency: 35 }
-  ]);
+  const [occupancyData, setOccupancyData] = useState([]);
 
-  const [departmentData, setDepartmentData] = useState([
-    { name: 'Cardiology', patients: 45 },
-    { name: 'Neurology', patients: 32 },
-    { name: 'Orthopedics', patients: 28 },
-    { name: 'Pediatrics', patients: 38 },
-    { name: 'Oncology', patients: 25 }
-  ]);
+  const [departmentData, setDepartmentData] = useState([]);
 
-  const [bedAvailability, setBedAvailability] = useState([
-    { type: 'General Ward', total: 50, occupied: 35, color: 'blue' },
-    { type: 'ICU', total: 20, occupied: 18, color: 'red' },
-    { type: 'Emergency', total: 15, occupied: 10, color: 'green' },
-    { type: 'Pediatrics', total: 25, occupied: 15, color: 'yellow' },
-    { type: 'Maternity', total: 30, occupied: 20, color: 'purple' },
-  ]);
+  const [bedAvailability, setBedAvailability] = useState([]);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+  const formatCompactNumber = (value) => {
+    const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
+    return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(safe);
+  };
+
+  const formatBDT = (value) => {
+    const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
+    return `৳${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(safe)}`;
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString([], { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const fetchHospitalData = useCallback(async (hospitalId) => {
+    try {
+      setLoading(true);
+      const hospitalToken = localStorage.getItem('hospitalToken');
+      const authHeaders = hospitalToken ? { Authorization: `Bearer ${hospitalToken}` } : undefined;
+
+      const allReq = fetch(`http://localhost:5000/api/hospital-dashboard/all?hospital_id=${hospitalId}`);
+      const statsReq = fetch(`http://localhost:5000/api/hospital-dashboard/stats?hospital_id=${hospitalId}`);
+      const recentReq = fetch(`http://localhost:5000/api/hospital-dashboard/recent-appointments?hospital_id=${hospitalId}&limit=6`);
+      const sosReq = hospitalToken
+        ? fetch(`http://localhost:5000/api/hospital/emergency/requests?include_assigned=1`, { headers: authHeaders })
+        : null;
+
+      const [allRes, statsRes, recentRes, sosRes] = await Promise.allSettled([
+        allReq,
+        statsReq,
+        recentReq,
+        sosReq,
+      ]);
+
+      const safeJson = async (res) => {
+        if (!res || !res.ok) return null;
+        try {
+          return await res.json();
+        } catch {
+          return null;
+        }
+      };
+
+      const allData = allRes.status === 'fulfilled' ? await safeJson(allRes.value) : null;
+      const statsData = statsRes.status === 'fulfilled' ? await safeJson(statsRes.value) : null;
+      const recentData = recentRes.status === 'fulfilled' ? await safeJson(recentRes.value) : null;
+      const sosData = sosRes && sosRes.status === 'fulfilled' ? await safeJson(sosRes.value) : null;
+
+      const mergedHospital = {
+        ...(allData?.hospital || {}),
+        ...(statsData?.hospital || {}),
+      };
+      if (Object.keys(mergedHospital).length) {
+        setHospital((prev) => ({
+          ...(prev || {}),
+          ...mergedHospital,
+        }));
+      }
+
+      if (allData?.stats || statsData?.stats) {
+        setStats((prev) => ({
+          ...prev,
+          ...(allData?.stats || {}),
+          ...(statsData?.stats || {}),
+        }));
+      }
+
+      if (allData?.occupancyData?.length) setOccupancyData(allData.occupancyData);
+
+      if (allData?.departmentData?.length) {
+        setDepartmentData(allData.departmentData);
+      } else if (statsData?.departmentDistribution?.length) {
+        setDepartmentData(
+          statsData.departmentDistribution.map((row) => ({
+            name: row?.department || row?.name || 'Department',
+            patients: row?.count ?? row?.patients ?? 0,
+          }))
+        );
+      }
+
+      if (allData?.bedAvailability?.length) setBedAvailability(allData.bedAvailability);
+
+      const patientsTodayValue =
+        statsData?.stats?.patients?.today ??
+        allData?.patientsToday ??
+        0;
+      setPatientsToday(patientsTodayValue);
+
+      setRevenueToday(allData?.revenueToday ?? 0);
+
+      if (recentData?.success && Array.isArray(recentData?.appointments)) {
+        setRecentAppointments(recentData.appointments);
+      } else {
+        setRecentAppointments([]);
+      }
+
+      if (sosData && (Array.isArray(sosData.pending) || Array.isArray(sosData.assigned))) {
+        setSosSummary({
+          pending: Array.isArray(sosData.pending) ? sosData.pending.length : 0,
+          assigned: Array.isArray(sosData.assigned) ? sosData.assigned.length : 0,
+        });
+      } else {
+        setSosSummary({ pending: 0, assigned: 0 });
+      }
+
+      setLastUpdatedAt(new Date());
+      setLoading(false);
+    } catch (error) {
+      console.warn('Error fetching hospital data, using default mock data:', error);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const hospitalToken = localStorage.getItem('hospitalToken');
@@ -61,74 +172,19 @@ const HospitalDashboard = () => {
     if (!hospitalToken || !hospitalInfo) {
       navigate('/hospital/login');
       return;
-    } else {
-      const parsedHospital = JSON.parse(hospitalInfo);
-      setHospital(parsedHospital);
-      fetchHospitalData(parsedHospital.id);
     }
-  }, [navigate]);
+
+    const parsedHospital = JSON.parse(hospitalInfo);
+    setHospital(parsedHospital);
+    fetchHospitalData(parsedHospital.id);
+  }, [navigate, fetchHospitalData]);
 
   // Refetch data when switching back to overview tab
   useEffect(() => {
     if (activeTab === 'overview' && hospital?.id) {
       fetchHospitalData(hospital.id);
     }
-  }, [activeTab, hospital?.id]);
-
-  const fetchHospitalData = async (hospitalId) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/hospital-dashboard/all?hospital_id=${hospitalId}`);
-
-      if (!response.ok) {
-        console.warn('Failed to fetch hospital data, using default mock data');
-        setLoading(false);
-        return; // Use the default mock data already set in state
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Update hospital info
-        if (data.hospital) {
-          setHospital(prevHospital => ({
-            ...prevHospital,
-            name: data.hospital.name
-          }));
-        }
-
-        // Update stats
-        if (data.stats) {
-          setStats(data.stats);
-        }
-
-        // Update occupancy data
-        if (data.occupancyData && data.occupancyData.length > 0) {
-          setOccupancyData(data.occupancyData);
-        }
-
-        // Update department data
-        if (data.departmentData && data.departmentData.length > 0) {
-          setDepartmentData(data.departmentData);
-        }
-
-        // Update bed availability
-        if (data.bedAvailability && data.bedAvailability.length > 0) {
-          setBedAvailability(data.bedAvailability);
-        }
-
-        // Update dashboard metrics
-        setPatientsToday(data.patientsToday || 0);
-        setBedOccupancyPercentage(data.bedOccupancyPercentage || 0);
-        setRevenueToday(data.revenueToday || 0);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.warn('Error fetching hospital data, using default mock data:', error);
-      setLoading(false);
-    }
-  };
+  }, [activeTab, hospital?.id, fetchHospitalData]);
 
   const handleLogout = () => {
     localStorage.removeItem('hospitalToken');
@@ -136,34 +192,52 @@ const HospitalDashboard = () => {
     navigate('/');
   };
 
-  const StatCard = ({ title, value, change, icon, color = 'blue' }) => {
-    const colorClasses = {
-      blue: { bg: 'bg-blue-50', text: 'text-blue-600' },
-      green: { bg: 'bg-green-50', text: 'text-green-600' },
-      red: { bg: 'bg-red-50', text: 'text-red-600' },
-      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600' },
-      purple: { bg: 'bg-purple-50', text: 'text-purple-600' }
+  const KpiCard = ({ title, value, subtitle, icon: Icon, tone = 'blue' }) => {
+    const tones = {
+      blue: 'from-blue-500 to-indigo-600',
+      emerald: 'from-emerald-500 to-teal-600',
+      amber: 'from-amber-500 to-orange-600',
+      rose: 'from-rose-500 to-red-600',
+      violet: 'from-violet-500 to-purple-600',
+      slate: 'from-slate-600 to-slate-800',
     };
 
-    const currentColor = colorClasses[color] || colorClasses.blue;
+    const gradient = tones[tone] || tones.blue;
 
     return (
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-gray-500 text-sm font-medium">{title}</p>
-            <p className="text-3xl font-bold text-gray-800 mt-2">{value}</p>
-            {change && (
-              <p className={`text-sm mt-1 ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {change > 0 ? '↑' : '↓'} {Math.abs(change)}%
-              </p>
-            )}
+      <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition">
+        <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-gradient-to-br opacity-10 blur-2xl" />
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</div>
+            <div className="mt-2 text-3xl font-extrabold text-gray-900 truncate">{value}</div>
+            {subtitle ? <div className="mt-1 text-sm text-gray-600">{subtitle}</div> : null}
           </div>
-          <div className={`p-3 rounded-lg ${currentColor.bg} ${currentColor.text}`}>
-            <span className="text-2xl">{icon}</span>
+          <div className={`shrink-0 rounded-2xl bg-gradient-to-br ${gradient} p-3 shadow-sm`}>
+            <Icon className="h-5 w-5 text-white" />
           </div>
         </div>
       </div>
+    );
+  };
+
+  const StatusBadge = ({ value }) => {
+    const key = String(value || '').toLowerCase();
+    const styles =
+      key === 'completed'
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : key === 'confirmed'
+        ? 'bg-blue-50 text-blue-700 border-blue-200'
+        : key === 'pending'
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : key === 'cancelled'
+        ? 'bg-rose-50 text-rose-700 border-rose-200'
+        : 'bg-gray-50 text-gray-700 border-gray-200';
+
+    return (
+      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${styles}`}>
+        {String(value || 'unknown').toUpperCase()}
+      </span>
     );
   };
 
@@ -182,81 +256,136 @@ const HospitalDashboard = () => {
     <div>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50">
         {/* Top Navigation */}
-        <div className="bg-white shadow-sm border-b">
+        <div className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70">
           <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              {/* Left: Logo and Brand */}
-              <div className="flex items-center flex-shrink-0">
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                  PocketCare Hospital
-                </span>
+            <div className="flex h-16 items-center justify-between gap-3">
+              {/* Left: Brand */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-sm">
+                  <Building2 className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-extrabold text-gray-900 truncate">PocketCare Hospital</div>
+                  <div className="text-xs text-gray-500 truncate">{hospital?.name || 'Hospital workspace'}</div>
+                </div>
               </div>
 
-              {/* Center: Navigation Tabs */}
-              <div className="flex items-baseline space-x-2 flex-1 justify-center">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'overview' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => setActiveTab('appointments')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'appointments' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Appointments
-                </button>
-                <button
-                  onClick={() => setActiveTab('beds')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'beds' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Bed Management
-                </button>
-                <button
-                  onClick={() => setActiveTab('emergency')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'emergency' ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Emergency SOS
-                </button>
-                <button
-                  onClick={() => setActiveTab('doctors')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'doctors' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Doctors
-                </button>
-                <button
-                  onClick={() => setActiveTab('reports')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'reports' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Reports
-                </button>
-              </div>
-
-              {/* Right: User Info and Actions */}
-              <div className="flex items-center space-x-4 flex-shrink-0">
-                <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                  <span className="text-xl">🔔</span>
-                  <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    3
-                  </span>
-                </button>
-                <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-800">
-                      {hospital?.name || 'City General Hospital'}
-                    </p>
-                    <p className="text-xs text-gray-500">Hospital Administrator</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-blue-600 font-semibold">H</span>
-                  </div>
+              {/* Center: Tabs */}
+              <div className="hidden md:flex flex-1 justify-center">
+                <div className="inline-flex items-center rounded-2xl border border-gray-200 bg-gray-50 p-1">
                   <button
-                    onClick={handleLogout}
-                    className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    type="button"
+                    onClick={() => setActiveTab('overview')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'overview'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    Logout
+                    <ClipboardList className="h-4 w-4" />
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('appointments')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'appointments'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <CalendarCheck2 className="h-4 w-4" />
+                    Appointments
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('beds')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'beds'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Bed className="h-4 w-4" />
+                    Beds
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('doctors')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'doctors'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Stethoscope className="h-4 w-4" />
+                    Doctors
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('emergency')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'emergency'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <ShieldAlert className="h-4 w-4" />
+                    SOS
                   </button>
                 </div>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                  <div className="h-9 w-9 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                    <span className="text-blue-700 font-bold">H</span>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-gray-900 leading-tight truncate max-w-[180px]">
+                      {hospital?.name || 'Hospital'}
+                    </div>
+                    <div className="text-xs text-gray-500 leading-tight">Administrator</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile tabs */}
+            <div className="md:hidden pb-3">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'appointments', label: 'Appointments' },
+                  { id: 'beds', label: 'Beds' },
+                  { id: 'doctors', label: 'Doctors' },
+                  { id: 'emergency', label: 'SOS' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                      activeTab === t.id
+                        ? t.id === 'emergency'
+                          ? 'border-rose-200 bg-rose-50 text-rose-700'
+                          : 'border-gray-200 bg-white text-gray-900'
+                        : 'border-gray-200 bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -267,115 +396,438 @@ const HospitalDashboard = () => {
           {/* Tab Content */}
           {activeTab === 'overview' && (
             <>
-              {/* Statistics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <StatCard
-                  title="Total Patients Today"
-                  value={patientsToday}
-                  change={12}
-                  icon="👥"
-                  color="blue"
-                />
-                <StatCard
-                  title="Bed Occupancy"
-                  value={`${bedOccupancyPercentage}%`}
-                  change={5}
-                  icon="🛏️"
-                  color="green"
-                />
-                <StatCard
-                  title="Appointments Today"
-                  value={stats.appointments.today}
-                  change={-3}
-                  icon="📅"
-                  color="purple"
-                />
-                <StatCard
-                  title="Revenue Today"
-                  value={`৳${(revenueToday / 1000).toFixed(0)}K`}
-                  change={8}
-                  icon="💰"
-                  color="yellow"
-                />
-              </div>
-
-              {/* Charts Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                {/* Bed Occupancy Chart */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Bed Occupancy Trend</h3>
-                  <ResponsiveContainer width="100%" height={256} minHeight={256}>
-                    <LineChart data={occupancyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} />
-                      <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} />
-                      <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Department Distribution */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Department Distribution</h3>
-                  <ResponsiveContainer width="100%" height={256} minHeight={256}>
-                    <PieChart>
-                      <Pie
-                        data={departmentData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="patients"
+              {/* Overview header */}
+              <div className="mb-8">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Hospital dashboard</div>
+                      <div className="mt-1 text-2xl font-extrabold text-gray-900 truncate">
+                        {hospital?.name || 'Hospital Overview'}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                        <span className="inline-flex items-center gap-2">
+                          <ClipboardList className="h-4 w-4" />
+                          Overview & operations
+                        </span>
+                        {lastUpdatedAt ? (
+                          <span className="text-gray-500">Last updated {formatDateTime(lastUpdatedAt)}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => hospital?.id && fetchHospitalData(hospital.id)}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                       >
-                        {departmentData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                        <RefreshCw className="h-4 w-4" />
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('emergency')}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                      >
+                        <ShieldAlert className="h-4 w-4" />
+                        Emergency
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Bed Availability */}
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Bed Availability Status</h3>
-                <div className="space-y-4">
-                  {bedAvailability.map(bed => {
-                    const available = bed.available || (bed.total - bed.occupied);
-                    const availabilityPercent = (available / bed.total) * 100;
-                    return (
-                      <div key={bed.type} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium text-gray-700">{bed.type}</span>
-                          <span className="text-gray-600">{available}/{bed.total} beds available</span>
+              {/* KPI grid + snapshot */}
+              {(() => {
+                const totalBeds = stats?.bedAvailability?.total ?? 0;
+                const occupiedBedsRaw = Number(stats?.bedAvailability?.occupied ?? 0);
+                const reservedBedsRaw = Number(stats?.bedAvailability?.reserved ?? 0);
+
+                // Business rule: reserved counts as occupied (blocked inventory).
+                const occupiedBeds = Math.max(0, occupiedBedsRaw + reservedBedsRaw);
+                const availableBeds = Math.max(0, Number(totalBeds) - occupiedBeds);
+                const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / Number(totalBeds)) * 100) : 0;
+
+                const appt = stats?.appointments || {};
+                const doctors = stats?.doctors || {};
+                const rooms = stats?.privateRooms || {};
+
+                const totalRooms = Number(rooms.total ?? 0);
+                const occupiedRooms = Math.max(0, Number(rooms.occupied ?? 0) + Number(rooms.reserved ?? 0));
+                const availableRooms = Math.max(0, totalRooms - occupiedRooms);
+
+                const occupancyDonut = [
+                  { name: 'Occupied', value: Math.max(0, occupiedBeds) },
+                  { name: 'Available', value: Math.max(0, availableBeds) },
+                ].filter((d) => d.value > 0);
+
+                const occupancyColors = ['#ef4444', '#10b981'];
+
+                const deptTop = Array.isArray(departmentData)
+                  ? [...departmentData]
+                      .map((d) => ({
+                        name: d?.name || 'Department',
+                        patients: d?.patients ?? 0,
+                      }))
+                      .sort((a, b) => (b.patients || 0) - (a.patients || 0))
+                      .slice(0, 6)
+                  : [];
+
+                const hasDeptData = deptTop.some((d) => Number(d?.patients || 0) > 0);
+                const hasOccupancyTrend = Array.isArray(occupancyData)
+                  && occupancyData.length > 0
+                  && occupancyData.some((row) =>
+                    Object.keys(row || {}).some((key) => key !== 'name' && Number(row?.[key] || 0) > 0)
+                  );
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start mb-6">
+                      <div className="lg:col-span-2 space-y-6">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                          <KpiCard
+                            title="Patients today"
+                            value={formatCompactNumber(stats?.patients?.today ?? patientsToday)}
+                            subtitle="Based on today’s appointments"
+                            icon={Users}
+                            tone="blue"
+                          />
+                          <KpiCard
+                            title="Appointments today"
+                            value={formatCompactNumber(appt.today ?? 0)}
+                            subtitle={`${formatCompactNumber(appt.upcoming ?? 0)} upcoming`}
+                            icon={CalendarCheck2}
+                            tone="violet"
+                          />
+                          <KpiCard
+                            title="Bed occupancy"
+                            value={`${occupancyPct}%`}
+                            subtitle={`${formatCompactNumber(availableBeds)} beds available`}
+                            icon={Bed}
+                            tone="emerald"
+                          />
+                          <KpiCard
+                            title="Doctors"
+                            value={formatCompactNumber(doctors.total ?? 0)}
+                            subtitle={`${formatCompactNumber(doctors.available ?? 0)} available • ${formatCompactNumber(doctors.specialties ?? 0)} specialties`}
+                            icon={Stethoscope}
+                            tone="slate"
+                          />
+                          <KpiCard
+                            title="SOS queue"
+                            value={formatCompactNumber((sosSummary?.pending ?? 0) + (sosSummary?.assigned ?? 0))}
+                            subtitle={`${formatCompactNumber(sosSummary?.pending ?? 0)} pending • ${formatCompactNumber(sosSummary?.assigned ?? 0)} assigned`}
+                            icon={ShieldAlert}
+                            tone="rose"
+                          />
+                          <KpiCard
+                            title="Revenue today"
+                            value={formatBDT(revenueToday)}
+                            subtitle={`Pending billing: ${formatBDT(stats?.finances?.pending ?? 0)}`}
+                            icon={CircleDollarSign}
+                            tone="amber"
+                          />
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full"
-                            style={{
-                              width: `${availabilityPercent}%`,
-                              backgroundColor:
-                                bed.color === 'blue' ? '#3B82F6' :
-                                  bed.color === 'red' ? '#EF4444' :
-                                    bed.color === 'green' ? '#10B981' :
-                                      bed.color === 'yellow' ? '#F59E0B' :
-                                        bed.color === 'indigo' ? '#6366F1' :
-                                          '#8B5CF6'
-                            }}
-                          ></div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold text-gray-900">Occupancy trend</div>
+                              <div className="mt-1 text-xs text-gray-500">Last 7 days • Ward utilization (%)</div>
+                            </div>
+                            <div className="inline-flex items-center gap-2 text-xs text-gray-600">
+                              <Activity className="h-4 w-4" />
+                              Utilization
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            {hasOccupancyTrend ? (
+                              <ResponsiveContainer width="100%" height={240} minHeight={240}>
+                                <LineChart data={occupancyData || []}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" />
+                                  <YAxis domain={[0, 100]} />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Line type="monotone" dataKey="general" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="icu" stroke="#10B981" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="emergency" stroke="#EF4444" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="pediatrics" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                                  <Line type="monotone" dataKey="maternity" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                                No occupancy trend data yet.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+
+                      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-bold text-gray-900">Operational snapshot</div>
+                          <div className="text-xs text-gray-500">Live</div>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-2 gap-4">
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-xs font-semibold text-gray-600">Beds</div>
+                            <div className="mt-1 text-xl font-extrabold text-gray-900">{formatCompactNumber(totalBeds)}</div>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex justify-between text-xs text-gray-600"><span>Available</span><span className="font-semibold text-gray-800">{formatCompactNumber(availableBeds)}</span></div>
+                              <div className="flex justify-between text-xs text-gray-600"><span>Occupied</span><span className="font-semibold text-gray-800">{formatCompactNumber(occupiedBeds)}</span></div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-xs font-semibold text-gray-600">Private rooms</div>
+                            <div className="mt-1 text-xl font-extrabold text-gray-900">{formatCompactNumber(totalRooms)}</div>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex justify-between text-xs text-gray-600"><span>Available</span><span className="font-semibold text-gray-800">{formatCompactNumber(availableRooms)}</span></div>
+                              <div className="flex justify-between text-xs text-gray-600"><span>Occupied</span><span className="font-semibold text-gray-800">{formatCompactNumber(occupiedRooms)}</span></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-semibold text-gray-700">Bed allocation</div>
+                            <div className="text-xs text-gray-500">{occupancyPct}% occupied</div>
+                          </div>
+                          <div className="mt-3 h-2 w-full rounded-full bg-gray-100">
+                            <div
+                              className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"
+                              style={{ width: `${Math.max(0, Math.min(100, occupancyPct))}%` }}
+                            />
+                          </div>
+                          <div className="mt-4">
+                            <ResponsiveContainer width="100%" height={150} minHeight={150}>
+                              <PieChart>
+                                <Pie
+                                  data={occupancyDonut.length ? occupancyDonut : [{ name: 'No data', value: 1 }]}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={42}
+                                  outerRadius={64}
+                                  paddingAngle={2}
+                                >
+                                  {(occupancyDonut.length ? occupancyDonut : [{ name: 'No data', value: 1 }]).map((_, i) => (
+                                    <Cell key={i} fill={occupancyDonut.length ? occupancyColors[i % occupancyColors.length] : '#e5e7eb'} />
+                                  ))}
+                                </Pie>
+                                <Tooltip />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+                      <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm self-start">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-gray-900">Recent appointments</div>
+                            <div className="mt-1 text-xs text-gray-500">Latest patient bookings and statuses</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('appointments')}
+                            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            View all
+                          </button>
+                        </div>
+
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
+                          <div className="grid grid-cols-12 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
+                            <div className="col-span-5">Patient</div>
+                            <div className="col-span-3">Department</div>
+                            <div className="col-span-2">Date</div>
+                            <div className="col-span-2 text-right">Status</div>
+                          </div>
+                          <div className="divide-y divide-gray-200">
+                            {(recentAppointments || []).slice(0, 6).map((apptRow) => (
+                              <div key={apptRow.id} className="grid grid-cols-12 items-center px-4 py-3">
+                                <div className="col-span-5 min-w-0">
+                                  <div className="font-semibold text-gray-900 truncate">{apptRow.patient_name || 'Patient'}</div>
+                                  <div className="mt-0.5 text-xs text-gray-500 truncate">{apptRow.doctor_name ? `Dr. ${apptRow.doctor_name}` : 'Doctor not assigned'}</div>
+                                </div>
+                                <div className="col-span-3 text-sm text-gray-700 truncate">{apptRow.department || '—'}</div>
+                                <div className="col-span-2 text-sm text-gray-700 truncate">
+                                  {apptRow.appointment_date ? new Date(apptRow.appointment_date).toLocaleDateString() : '—'}
+                                </div>
+                                <div className="col-span-2 flex justify-end">
+                                  <StatusBadge value={apptRow.status} />
+                                </div>
+                              </div>
+                            ))}
+                            {(!recentAppointments || recentAppointments.length === 0) && (
+                              <div className="px-4 py-5 text-center text-sm text-gray-600">
+                                No recent appointments found.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="text-sm font-bold text-gray-900">Top departments</div>
+                          <div className="mt-1 text-xs text-gray-500">By activity (last 30 days)</div>
+                          <div className="mt-4">
+                            {hasDeptData ? (
+                              <ResponsiveContainer width="100%" height={220} minHeight={220}>
+                                <BarChart data={deptTop} layout="vertical" margin={{ left: 24 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis type="number" />
+                                  <YAxis type="category" dataKey="name" width={90} />
+                                  <Tooltip />
+                                  <Bar dataKey="patients" fill="#6366F1" radius={[8, 8, 8, 8]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                                No department activity yet.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="text-sm font-bold text-gray-900">Ward availability</div>
+                          <div className="mt-1 text-xs text-gray-500">Availability by ward / room type</div>
+                          <div className="mt-4 space-y-3">
+                            {(bedAvailability || []).slice(0, 6).map((bed) => {
+                              const total = Number(bed?.total ?? 0);
+                              const available = Number(
+                                bed?.available ?? Math.max(0, total - Number(bed?.occupied ?? 0))
+                              );
+                              const pct = total > 0 ? Math.round((available / total) * 100) : 0;
+                              const barColor =
+                                bed?.color === 'red'
+                                  ? 'bg-rose-500'
+                                  : bed?.color === 'green'
+                                  ? 'bg-emerald-500'
+                                  : bed?.color === 'yellow'
+                                  ? 'bg-amber-500'
+                                  : bed?.color === 'purple'
+                                  ? 'bg-violet-500'
+                                  : bed?.color === 'indigo'
+                                  ? 'bg-indigo-500'
+                                  : 'bg-blue-500';
+
+                              return (
+                                <div
+                                  key={bed?.type || `${total}:${available}`}
+                                  className="rounded-2xl border border-gray-200 bg-gray-50 p-3"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 truncate">
+                                        {bed?.type || 'Ward'}
+                                      </div>
+                                      <div className="mt-0.5 text-xs text-gray-600">
+                                        {formatCompactNumber(available)} / {formatCompactNumber(total)} available
+                                      </div>
+                                    </div>
+                                    <div className="text-xs font-semibold text-gray-700">{pct}%</div>
+                                  </div>
+                                  <div className="mt-2 h-2 w-full rounded-full bg-white">
+                                    <div
+                                      className={`h-2 rounded-full ${barColor}`}
+                                      style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {(!bedAvailability || bedAvailability.length === 0) && (
+                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
+                                No bed availability data yet.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="text-sm font-bold text-gray-900">Quick actions</div>
+                          <div className="mt-1 text-xs text-gray-500">Jump to common workflows</div>
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('appointments')}
+                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Calendar className="h-4 w-4" />Appointments</div>
+                              <div className="mt-1 text-xs text-gray-600">Manage bookings</div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('beds')}
+                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Bed className="h-4 w-4" />Beds</div>
+                              <div className="mt-1 text-xs text-gray-600">Wards & inventory</div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('doctors')}
+                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
+                            >
+                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Stethoscope className="h-4 w-4" />Doctors</div>
+                              <div className="mt-1 text-xs text-gray-600">Roster & availability</div>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <div className="text-sm font-bold text-gray-900">Queue & tasks</div>
+                          <div className="mt-1 text-xs text-gray-500">Operational items that need attention</div>
+                          <div className="mt-4 space-y-3">
+                            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-rose-800"><ShieldAlert className="h-4 w-4" />Emergency SOS</div>
+                                <div className="text-xs font-semibold text-rose-800">{formatCompactNumber(sosSummary?.pending ?? 0)} pending</div>
+                              </div>
+                              <div className="mt-1 text-xs text-rose-700/90">Review and accept nearby SOS requests.</div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab('emergency')}
+                                className="mt-3 inline-flex items-center rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700"
+                              >
+                                Open SOS
+                              </button>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><CalendarCheck2 className="h-4 w-4" />Appointments</div>
+                                <div className="text-xs font-semibold text-gray-700">{formatCompactNumber((stats?.appointments?.pending ?? 0) + (stats?.appointments?.confirmed ?? 0))} in queue</div>
+                              </div>
+                              <div className="mt-1 text-xs text-gray-600">Confirm pending requests and assign doctors.</div>
+                            </div>
+
+                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><CircleDollarSign className="h-4 w-4" />Billing</div>
+                                <div className="text-xs font-semibold text-gray-700">{formatBDT(stats?.finances?.pending ?? 0)} pending</div>
+                              </div>
+                              <div className="mt-1 text-xs text-gray-600">Track receivables and daily collections.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
 
@@ -397,39 +849,6 @@ const HospitalDashboard = () => {
           {/* Emergency SOS Tab */}
           {activeTab === 'emergency' && (
             <HospitalEmergencySOS />
-          )}
-
-          {/* Reports Tab */}
-          {activeTab === 'reports' && (
-            <div className="bg-white rounded-xl shadow-sm p-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">📊</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Financial Report</h3>
-                  <p className="text-sm text-gray-600">Monthly revenue, expenses, and profits</p>
-                  <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">👥</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Patient Statistics</h3>
-                  <p className="text-sm text-gray-600">Admissions, discharges, and demographics</p>
-                  <button className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">🏥</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Hospital Performance</h3>
-                  <p className="text-sm text-gray-600">Efficiency, quality, and patient satisfaction</p>
-                  <button className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
         </div>
       </div>

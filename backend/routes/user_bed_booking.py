@@ -166,23 +166,23 @@ def create_bed_booking():
             special_requirements, notes
         ))
         
-        # Update bed_wards table: decrease available_beds and increase reserved_beds
+        # Update bed_wards table: decrease available_beds and increase occupied_beds
         if ward_type == 'private_room' and room_config:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds - 1, reserved_beds = reserved_beds + 1
+                SET available_beds = available_beds - 1, occupied_beds = occupied_beds + 1
                 WHERE hospital_id = %s AND ward_type = %s AND room_config = %s AND available_beds > 0
             """, (hospital_id, ward_type, room_config))
         elif ward_type in ['icu', 'emergency']:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds - 1, reserved_beds = reserved_beds + 1
+                SET available_beds = available_beds - 1, occupied_beds = occupied_beds + 1
                 WHERE hospital_id = %s AND ward_type = %s AND available_beds > 0
             """, (hospital_id, ward_type))
         else:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds - 1, reserved_beds = reserved_beds + 1
+                SET available_beds = available_beds - 1, occupied_beds = occupied_beds + 1
                 WHERE hospital_id = %s AND ward_type = %s AND ac_type = %s AND available_beds > 0
             """, (hospital_id, ward_type, ac_type))
         
@@ -298,7 +298,7 @@ def cancel_booking(booking_id):
             WHERE id = %s
         """, (booking_id,))
         
-        # Restore bed availability: increase available_beds and decrease reserved_beds
+        # Restore bed availability: increase available_beds and decrease occupied_beds
         ward_type = booking['ward_type']
         hospital_id = booking['hospital_id']
         ac_type = booking['ac_type']
@@ -307,19 +307,19 @@ def cancel_booking(booking_id):
         if ward_type == 'private_room' and room_config:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                 WHERE hospital_id = %s AND ward_type = %s AND room_config = %s
             """, (hospital_id, ward_type, room_config))
         elif ward_type in ['icu', 'emergency']:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                 WHERE hospital_id = %s AND ward_type = %s
             """, (hospital_id, ward_type))
         else:
             cursor.execute("""
                 UPDATE bed_wards 
-                SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                 WHERE hospital_id = %s AND ward_type = %s AND ac_type = %s
             """, (hospital_id, ward_type, ac_type))
         
@@ -561,19 +561,19 @@ def update_booking_status(booking_id):
             if ward_type == 'private_room' and room_config:
                 cursor.execute("""
                     UPDATE bed_wards 
-                    SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                    SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                     WHERE hospital_id = %s AND ward_type = %s AND room_config = %s
                 """, (hospital_id, ward_type, room_config))
             elif ward_type in ['icu', 'emergency']:
                 cursor.execute("""
                     UPDATE bed_wards 
-                    SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                    SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                     WHERE hospital_id = %s AND ward_type = %s
                 """, (hospital_id, ward_type))
             else:
                 cursor.execute("""
                     UPDATE bed_wards 
-                    SET available_beds = available_beds + 1, reserved_beds = GREATEST(reserved_beds - 1, 0)
+                    SET available_beds = available_beds + 1, occupied_beds = GREATEST(occupied_beds - 1, 0)
                     WHERE hospital_id = %s AND ward_type = %s AND ac_type = %s
                 """, (hospital_id, ward_type, ac_type))
         

@@ -357,7 +357,6 @@ CREATE TABLE IF NOT EXISTS bed_wards (
     room_config VARCHAR(50) NULL COMMENT 'For private rooms: 1_bed_no_bath, 1_bed_with_bath, 2_bed_with_bath (2 beds always have attached bathroom)',
     total_beds INT NOT NULL DEFAULT 0,
     available_beds INT NOT NULL DEFAULT 0,
-    reserved_beds INT NOT NULL DEFAULT 0,
     occupied_beds INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -368,9 +367,8 @@ CREATE TABLE IF NOT EXISTS bed_wards (
     CONSTRAINT chk_bed_counts CHECK (
         total_beds >= 0 AND
         available_beds >= 0 AND
-        reserved_beds >= 0 AND
         occupied_beds >= 0 AND
-        (available_beds + reserved_beds + occupied_beds) <= total_beds
+        (available_beds + occupied_beds) <= total_beds
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

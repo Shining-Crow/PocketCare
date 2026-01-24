@@ -142,7 +142,7 @@ function BedBooking() {
           availability[key] = {
             total: ward.total_beds,
             available: ward.available_beds,
-            reserved: ward.reserved_beds
+            occupied: (ward.occupied_beds ?? 0) + (ward.reserved_beds ?? 0)
           };
         });
         setWardAvailability(availability);

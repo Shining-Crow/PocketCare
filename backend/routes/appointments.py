@@ -213,10 +213,18 @@ def create_appointment():
         if not cursor.fetchone():
             return jsonify({'error': 'Only users can book appointments with this endpoint'}), 403
 
-        # Ensure doctor exists
-        cursor.execute('SELECT id FROM doctors WHERE id = %s', (int(doctor_id),))
-        if not cursor.fetchone():
+        # Ensure doctor exists and is available
+        cursor.execute('SELECT id, is_available FROM doctors WHERE id = %s', (int(doctor_id),))
+        doctor = cursor.fetchone()
+        if not doctor:
             return jsonify({'error': 'Doctor not found'}), 404
+        
+        # Check if doctor is available for booking
+        if not doctor.get('is_available', True):
+            return jsonify({
+                'error': 'Doctor is currently unavailable',
+                'message': 'This doctor is currently not accepting new appointments. Please try another doctor or check back later.'
+            }), 400
 
         # Calculate max appointments based on time slot duration (5 users per hour)
         max_appointments = 5  # Default for 1 hour or unknown duration

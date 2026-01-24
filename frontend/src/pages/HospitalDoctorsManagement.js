@@ -172,9 +172,6 @@ const HospitalDoctorsManagement = () => {
   // Calculate statistics from local data
   const activeDoctors = doctors.filter(d => d.status === 'available' || d.status === 'in-session').length;
   const totalAppointments = doctors.reduce((sum, doctor) => sum + (doctor.appointments || 0), 0);
-  const averageRating = doctors.length > 0 
-    ? (doctors.reduce((sum, doctor) => sum + (doctor.rating || 0), 0) / doctors.length).toFixed(1)
-    : '0.0';
 
   console.log('Render state - doctors:', doctors.length, 'loading:', loading, 'filteredDoctors:', filteredDoctors.length);
 
@@ -211,7 +208,7 @@ const HospitalDoctorsManagement = () => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-800">👨‍⚕️ Active Doctors</h3>
@@ -231,24 +228,7 @@ const HospitalDoctorsManagement = () => {
           </div>
           <p className="text-sm text-gray-600">Total scheduled appointments today</p>
           <div className="mt-4 text-xs text-gray-500">
-            Avg. per doctor: {(totalAppointments / doctors.length).toFixed(1)}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">⭐ Avg. Rating</h3>
-            <span className="text-2xl font-bold text-yellow-600">{averageRating}/5</span>
-          </div>
-          <p className="text-sm text-gray-600">Overall doctor satisfaction</p>
-          <div className="mt-4">
-            <div className="flex items-center">
-              {[...Array(5)].map((_, i) => (
-                <span key={i} className={`text-xl ${i < Math.floor(averageRating) ? 'text-yellow-400' : 'text-gray-300'}`}>
-                  ★
-                </span>
-              ))}
-            </div>
+            Avg. per doctor: {doctors.length > 0 ? (totalAppointments / doctors.length).toFixed(1) : '0.0'}
           </div>
         </div>
       </div>
@@ -426,9 +406,6 @@ const HospitalDoctorsManagement = () => {
                   Appointments
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rating
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -436,7 +413,7 @@ const HospitalDoctorsManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading && doctors.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
+                  <td colSpan="5" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
                       <p className="text-gray-500">Loading doctors...</p>
@@ -445,7 +422,7 @@ const HospitalDoctorsManagement = () => {
                 </tr>
               ) : filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
                     No doctors found matching your criteria
                   </td>
                 </tr>
@@ -509,18 +486,6 @@ const HospitalDoctorsManagement = () => {
                       <div className="text-center">
                         <div className="text-xl font-bold text-blue-600">{doctor.appointments}</div>
                         <div className="text-xs text-gray-500">today</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="mr-2">
-                          {[...Array(5)].map((_, i) => (
-                            <span key={i} className={`text-lg ${i < Math.floor(doctor.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
-                              ★
-                            </span>
-                          ))}
-                        </div>
-                        <span className="font-medium">{doctor.rating}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">

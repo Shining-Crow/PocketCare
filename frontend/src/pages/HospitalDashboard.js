@@ -333,18 +333,6 @@ const HospitalDashboard = () => {
                     <ShieldAlert className="h-4 w-4" />
                     SOS
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('reports')}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                      activeTab === 'reports'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    <Activity className="h-4 w-4" />
-                    Reports
-                  </button>
                 </div>
               </div>
 
@@ -382,7 +370,6 @@ const HospitalDashboard = () => {
                   { id: 'beds', label: 'Beds' },
                   { id: 'doctors', label: 'Doctors' },
                   { id: 'emergency', label: 'SOS' },
-                  { id: 'reports', label: 'Reports' },
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -797,14 +784,6 @@ const HospitalDashboard = () => {
                               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Stethoscope className="h-4 w-4" />Doctors</div>
                               <div className="mt-1 text-xs text-gray-600">Roster & availability</div>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('reports')}
-                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
-                            >
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><ClipboardList className="h-4 w-4" />Reports</div>
-                              <div className="mt-1 text-xs text-gray-600">Analytics & exports</div>
-                            </button>
                           </div>
                         </div>
 
@@ -870,39 +849,6 @@ const HospitalDashboard = () => {
           {/* Emergency SOS Tab */}
           {activeTab === 'emergency' && (
             <HospitalEmergencySOS />
-          )}
-
-          {/* Reports Tab */}
-          {activeTab === 'reports' && (
-            <div className="bg-white rounded-xl shadow-sm p-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Reports & Analytics</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">📊</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Financial Report</h3>
-                  <p className="text-sm text-gray-600">Monthly revenue, expenses, and profits</p>
-                  <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">👥</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Patient Statistics</h3>
-                  <p className="text-sm text-gray-600">Admissions, discharges, and demographics</p>
-                  <button className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-                <div className="p-6 border border-gray-200 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="text-3xl mb-4">🏥</div>
-                  <h3 className="font-semibold text-gray-800 mb-2">Hospital Performance</h3>
-                  <p className="text-sm text-gray-600">Efficiency, quality, and patient satisfaction</p>
-                  <button className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
-                    Generate
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
         </div>
       </div>

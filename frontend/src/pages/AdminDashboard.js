@@ -3,6 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import LocationPickerMap from '../components/LocationPickerMap';
 import {
+  Users,
+  Stethoscope,
+  CalendarClock,
+  Siren,
+  FileText,
+  MessageSquare,
+  CheckCircle2,
+  LayoutDashboard,
+  Settings,
+  BarChart3,
+  UserPlus,
+  Clock,
+  Upload,
+  UserCheck,
+  Activity,
+  Target,
+  TrendingUp,
+  User,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  Ban,
+  ShieldCheck,
+  X,
+  Building2,
+  ShieldPlus,
+  Star,
+  Server,
+  Database,
+  LogOut,
+} from 'lucide-react';
+import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
@@ -379,11 +412,13 @@ function AdminDashboard() {
     );
   }
 
-  const StatCard = ({ title, value, icon, color }) => (
+  const StatCard = ({ title, value, icon: Icon, color, bgColor }) => (
     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50 hover:border-slate-600/50 hover:bg-slate-800/70 transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
         <p className="text-slate-400 text-sm font-medium">{title}</p>
-        <span className={`text-3xl ${color}`}>{icon}</span>
+        <div className={`p-2.5 rounded-xl ${bgColor}`}>
+          <Icon className={`w-6 h-6 ${color}`} />
+        </div>
       </div>
       <p className="text-3xl font-bold text-white">{value || 0}</p>
     </div>
@@ -846,9 +881,9 @@ function AdminDashboard() {
             </div>
             <button
               onClick={handleLogout}
-              className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition text-sm"
+              className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition text-sm flex items-center gap-2"
             >
-              Sign Out
+              <LogOut className="w-4 h-4" /> Sign Out
             </button>
           </div>
         </div>
@@ -857,50 +892,50 @@ function AdminDashboard() {
         <div className="mb-8 flex space-x-2 bg-slate-800/50 backdrop-blur-sm rounded-xl p-1.5 shadow-lg border border-slate-700/50">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'overview'
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            📊 Overview
+            <LayoutDashboard className="w-4 h-4" /> Overview
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'users'
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            👥 Users & Doctors
+            <Users className="w-4 h-4" /> Users & Doctors
           </button>
           <button
             onClick={() => setActiveTab('system')}
-            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'system'
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            ⚙️ System
+            <Settings className="w-4 h-4" /> System
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 ${
+            className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === 'analytics'
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
-            📈 Analytics
+            <BarChart3 className="w-4 h-4" /> Analytics
           </button>
         </div>
 
         {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-900/30 border border-red-700/50 text-red-400 px-6 py-4 rounded-xl flex items-center gap-3">
-            <span className="text-xl">⚠️</span>
+            <Siren className="w-5 h-5" />
             <div>{error}</div>
           </div>
         )}
@@ -915,26 +950,30 @@ function AdminDashboard() {
                 <StatCard
                   title="Total Users"
                   value={stats.total_users}
-                  icon="👥"
+                  icon={Users}
                   color="text-blue-400"
+                  bgColor="bg-blue-500/20"
                 />
                 <StatCard
                   title="Active Doctors"
                   value={stats.total_doctors}
-                  icon="👨‍⚕️"
+                  icon={Stethoscope}
                   color="text-emerald-400"
+                  bgColor="bg-emerald-500/20"
                 />
                 <StatCard
                   title="Pending Appointments"
                   value={stats.pending_appointments}
-                  icon="📅"
+                  icon={CalendarClock}
                   color="text-amber-400"
+                  bgColor="bg-amber-500/20"
                 />
                 <StatCard
                   title="SOS Alerts"
                   value={stats.active_sos_alerts}
-                  icon="🚨"
+                  icon={Siren}
                   color="text-red-400"
+                  bgColor="bg-red-500/20"
                 />
               </div>
             </div>
@@ -946,7 +985,9 @@ function AdminDashboard() {
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">Medical Reports</h3>
-                    <span className="text-2xl">📄</span>
+                    <div className="p-2.5 rounded-xl bg-indigo-500/20">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
                   </div>
                   <p className="text-3xl font-bold text-white mb-2">{stats.total_reports}</p>
                   <p className="text-sm text-slate-400 mb-4">Total reviewed</p>
@@ -958,25 +999,29 @@ function AdminDashboard() {
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">AI Chat Activity</h3>
-                    <span className="text-2xl">💬</span>
+                    <div className="p-2.5 rounded-xl bg-purple-500/20">
+                      <MessageSquare className="w-6 h-6 text-purple-400" />
+                    </div>
                   </div>
                   <p className="text-3xl font-bold text-white mb-2">{stats.chats_today}</p>
                   <p className="text-sm text-slate-400 mb-4">Chats today</p>
                   <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    ● Live
+                    <Activity className="w-3 h-3 mr-1.5" /> Live
                   </div>
                 </div>
 
                 <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-slate-700/50">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">System Status</h3>
-                    <span className="text-2xl">✅</span>
+                    <div className="p-2.5 rounded-xl bg-emerald-500/20">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    </div>
                   </div>
                   <p className="text-3xl font-bold text-emerald-400 mb-2">98%</p>
                   <p className="text-sm text-slate-400 mb-4">Uptime (30 days)</p>
                   <div className="flex gap-2">
                     <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      Healthy
+                      <ShieldCheck className="w-3 h-3 mr-1" /> Healthy
                     </span>
                   </div>
                 </div>
@@ -1004,20 +1049,25 @@ function AdminDashboard() {
                 <h3 className="text-lg font-semibold text-white mb-6">Recent Activities</h3>
                 <div className="space-y-4">
                   {[
-                    { action: 'New user registered', time: '2 minutes ago', icon: '👤' },
-                    { action: 'Appointment scheduled', time: '15 minutes ago', icon: '📅' },
-                    { action: 'SOS alert received', time: '1 hour ago', icon: '🚨' },
-                    { action: 'Medical report uploaded', time: '2 hours ago', icon: '📄' },
-                    { action: 'Doctor login', time: '3 hours ago', icon: '👨‍⚕️' },
-                  ].map((activity, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 bg-slate-700/30 rounded-lg border border-slate-600/30 hover:bg-slate-700/50 transition-colors">
-                      <span className="text-xl">{activity.icon}</span>
-                      <div className="flex-1">
-                        <p className="font-medium text-white text-sm">{activity.action}</p>
-                        <p className="text-xs text-slate-500">{activity.time}</p>
+                    { action: 'New user registered', time: '2 minutes ago', icon: UserPlus, color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+                    { action: 'Appointment scheduled', time: '15 minutes ago', icon: CalendarClock, color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
+                    { action: 'SOS alert received', time: '1 hour ago', icon: Siren, color: 'text-red-400', bgColor: 'bg-red-500/20' },
+                    { action: 'Medical report uploaded', time: '2 hours ago', icon: Upload, color: 'text-indigo-400', bgColor: 'bg-indigo-500/20' },
+                    { action: 'Doctor login', time: '3 hours ago', icon: Stethoscope, color: 'text-emerald-400', bgColor: 'bg-emerald-500/20' },
+                  ].map((activity, i) => {
+                    const IconComponent = activity.icon;
+                    return (
+                      <div key={i} className="flex items-center gap-4 p-3 bg-slate-700/30 rounded-lg border border-slate-600/30 hover:bg-slate-700/50 transition-colors">
+                        <div className={`p-2 rounded-lg ${activity.bgColor}`}>
+                          <IconComponent className={`w-4 h-4 ${activity.color}`} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-white text-sm">{activity.action}</p>
+                          <p className="text-xs text-slate-500">{activity.time}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1275,24 +1325,24 @@ function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setUsersListTab('users')}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-1.5 ${
                       usersListTab === 'users'
                         ? 'bg-slate-600 shadow text-blue-400'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    👤 Users ({stats?.total_users || 0})
+                    <User className="w-4 h-4" /> Users ({stats?.total_users || 0})
                   </button>
                   <button
                     type="button"
                     onClick={() => setUsersListTab('doctors')}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition flex items-center gap-1.5 ${
                       usersListTab === 'doctors'
                         ? 'bg-slate-600 shadow text-emerald-400'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    🩺 Doctors ({stats?.total_doctors || 0})
+                    <Stethoscope className="w-4 h-4" /> Doctors ({stats?.total_doctors || 0})
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1455,7 +1505,7 @@ function AdminDashboard() {
                               <td className="px-4 py-3 font-medium text-white">{doctor.name}</td>
                               <td className="px-4 py-3 text-slate-400">{doctor.email}</td>
                               <td className="px-4 py-3 text-slate-400">{doctor.specialty || '-'}</td>
-                              <td className="px-4 py-3 text-amber-400">⭐ {doctor.rating || 0}</td>
+                              <td className="px-4 py-3 text-amber-400 flex items-center gap-1"><Star className="w-4 h-4 fill-amber-400" /> {doctor.rating || 0}</td>
                               <td className="px-4 py-3">
                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                   doctor.is_blocked 
@@ -1800,13 +1850,29 @@ function AdminDashboard() {
               <h2 className="text-2xl font-bold text-white mb-6">System Configuration</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                  <p className="text-sm text-slate-400 mb-2">API Status</p>
-                  <p className="text-2xl font-bold text-emerald-400 mb-2">✓ Running</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-slate-400">API Status</p>
+                    <div className="p-2 rounded-lg bg-emerald-500/20">
+                      <Server className="w-5 h-5 text-emerald-400" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <p className="text-2xl font-bold text-emerald-400">Running</p>
+                  </div>
                   <p className="text-xs text-slate-500">Version: 1.0.0</p>
                 </div>
                 <div className="p-6 bg-slate-700/30 rounded-xl border border-slate-600/50">
-                  <p className="text-sm text-slate-400 mb-2">Database Status</p>
-                  <p className="text-2xl font-bold text-emerald-400 mb-2">✓ Connected</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-slate-400">Database Status</p>
+                    <div className="p-2 rounded-lg bg-blue-500/20">
+                      <Database className="w-5 h-5 text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <p className="text-2xl font-bold text-emerald-400">Connected</p>
+                  </div>
                   <p className="text-xs text-slate-500">MySQL 8.0</p>
                 </div>
               </div>

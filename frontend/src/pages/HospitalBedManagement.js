@@ -862,29 +862,45 @@ const HospitalBedManagement = () => {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform animate-slideUp overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Update saved</h3>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-gray-700">Bed status has been updated successfully.</p>
+                  <p className="text-sm text-gray-500 mt-1">Emergency routing will use the latest availability.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                >
+                  Done
+                </button>
               </div>
             </div>
-            
-            {/* Success Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
-              <p className="text-gray-600">Bed status has been updated successfully</p>
-            </div>
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition duration-200 transform hover:scale-105"
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
@@ -892,29 +908,45 @@ const HospitalBedManagement = () => {
       {/* Warning Modal */}
       {showWarningModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">
-            {/* Warning Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-red-100 rounded-full p-3">
-                <svg className="w-16 h-16 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform animate-slideUp overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Validation error</h3>
+              <button
+                onClick={() => setShowWarningModal(false)}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-2 transition"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-gray-700">{warningMessage}</p>
+                  <p className="text-sm text-gray-500 mt-1">Please correct the values and try again.</p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowWarningModal(false)}
+                  className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Close
+                </button>
               </div>
             </div>
-            
-            {/* Warning Message */}
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Validation Error</h3>
-              <p className="text-gray-600">{warningMessage}</p>
-            </div>
-            
-            {/* Close Button */}
-            <button
-              onClick={() => setShowWarningModal(false)}
-              className="w-full py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition duration-200 transform hover:scale-105"
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}

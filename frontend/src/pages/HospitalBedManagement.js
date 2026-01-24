@@ -327,6 +327,7 @@ const HospitalBedManagement = () => {
   // Calculate total available beds
   const totalAvailableBeds = Object.values(bedStatus).reduce((sum, ward) => sum + ward.available, 0);
   const totalCapacity = Object.values(bedStatus).reduce((sum, ward) => sum + ward.total, 0);
+  const totalReservedBeds = Object.values(bedStatus).reduce((sum, ward) => sum + ward.reserved, 0);
   const sosAvailability = totalAvailableBeds > 10 ? 'high' : totalAvailableBeds > 0 ? 'medium' : 'low';
 
   if (loading) {
@@ -338,37 +339,82 @@ const HospitalBedManagement = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Bed Management</h1>
-        <p className="text-gray-600">Update real-time bed availability for accurate emergency routing</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Bed Management</h1>
+          <p className="text-gray-600">Keep bed availability accurate for emergency routing and bookings.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              loadBedData();
+              fetchBookings();
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v6h6M20 20v-6h-6M5 15a7 7 0 0011.95 3.95M19 9A7 7 0 006.05 5.05" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status Banner */}
-      <div className="mb-8 p-6 rounded-xl border shadow-sm" style={{
-        background: sosAvailability === 'high' ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
-          sosAvailability === 'medium' ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' :
-            'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-        borderColor: sosAvailability === 'high' ? '#10b981' :
-          sosAvailability === 'medium' ? '#f59e0b' :
-            '#ef4444'
-      }}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between">
+      <div
+        className={
+          `mb-8 rounded-xl border border-gray-200 bg-white shadow-sm p-6 border-l-4 ` +
+          (sosAvailability === 'high'
+            ? 'border-l-emerald-500'
+            : sosAvailability === 'medium'
+              ? 'border-l-amber-500'
+              : 'border-l-red-500')
+        }
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
           <div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-1">
-              {sosAvailability === 'high' ? '🚨 Ready for Emergencies' :
-                sosAvailability === 'medium' ? '⚠️ Limited Capacity' :
-                  '🔴 Full Capacity'}
-            </h3>
-            <p className="text-gray-700">
-              {sosAvailability === 'high' ? 'Hospital is optimally prepared for emergency cases' :
-                sosAvailability === 'medium' ? 'Emergency cases will be routed only for critical needs' :
-                  'No beds available for emergency routing'}
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className={
+                  `inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ` +
+                  (sosAvailability === 'high'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : sosAvailability === 'medium'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-red-50 text-red-700 border-red-200')
+                }
+              >
+                {sosAvailability === 'high'
+                  ? 'Ready'
+                  : sosAvailability === 'medium'
+                    ? 'Limited'
+                    : 'Full'}
+              </span>
+              <h3 className="text-lg font-semibold text-gray-900">Emergency routing status</h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              {sosAvailability === 'high'
+                ? 'You have healthy capacity for incoming emergency cases.'
+                : sosAvailability === 'medium'
+                  ? 'Capacity is limited. Keep counts updated to avoid overbooking.'
+                  : 'No availability reported. Patients may be routed elsewhere.'}
             </p>
           </div>
-          <div className="mt-4 md:mt-0">
-            <div className="text-3xl font-bold text-gray-800">{totalAvailableBeds} / {totalCapacity}</div>
-            <p className="text-sm text-gray-600">Available beds / Total capacity</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="text-xs text-gray-500">Capacity</div>
+              <div className="text-xl font-bold text-gray-900">{totalCapacity}</div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-xs text-blue-700">Available</div>
+              <div className="text-xl font-bold text-blue-800">{totalAvailableBeds}</div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="text-xs text-amber-700">Reserved</div>
+              <div className="text-xl font-bold text-amber-800">{totalReservedBeds}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -397,7 +443,7 @@ const HospitalBedManagement = () => {
           return (
             <div 
               key={cardId} 
-              className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/40 rounded-2xl shadow-md p-5 border-2 border-gray-100 hover:shadow-2xl hover:border-blue-400 hover:-translate-y-1 transition-all duration-300 flex flex-col min-h-[320px] backdrop-blur-sm"
+              className="bg-white rounded-xl shadow-sm p-5 border border-gray-200 hover:shadow-md transition-shadow flex flex-col min-h-[320px]"
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
@@ -409,7 +455,7 @@ const HospitalBedManagement = () => {
                           e.stopPropagation();
                           toggleEditMode(cardId, currentType);
                         }}
-                        className="ml-2 px-3 py-1.5 text-sm font-semibold text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-1"
+                        className="ml-2 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition flex items-center gap-1"
                       >
                         {editMode[cardId] ? (
                           <>
@@ -431,7 +477,7 @@ const HospitalBedManagement = () => {
                       {/* Dropdown Edit Menu */}
                       {editMode[cardId] && (
                         <div 
-                          className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border-2 border-blue-200 p-4 z-50 animate-slideDown"
+                          className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50 animate-slideDown"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="space-y-4">
@@ -445,7 +491,7 @@ const HospitalBedManagement = () => {
                                 min="0"
                                 value={data.total}
                                 onChange={(e) => updateBedCount(currentType, 'total', e.target.value)}
-                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -461,7 +507,7 @@ const HospitalBedManagement = () => {
                                 max={data.total}
                                 value={data.reserved}
                                 onChange={(e) => updateBedCount(currentType, 'reserved', e.target.value)}
-                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -470,50 +516,57 @@ const HospitalBedManagement = () => {
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 font-medium">Total Capacity: {data.total} beds</p>
+                  <p className="text-sm text-gray-600">Total capacity: {data.total} beds</p>
                 </div>
                 <div className="text-right ml-4">
-                  <div className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap inline-block shadow-md ${
-                    data.available > 5 
-                      ? 'bg-gradient-to-r from-green-400 to-green-500 text-white border-2 border-green-300' 
-                      : data.available > 0 
-                        ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white border-2 border-yellow-300' 
-                        : 'bg-gradient-to-r from-red-400 to-red-500 text-white border-2 border-red-300'
-                  }`}>
-                    {data.available} Available
+                  <div
+                    className={
+                      `px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap inline-flex items-center border ` +
+                      (data.available > 5
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : data.available > 0
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-red-50 text-red-700 border-red-200')
+                    }
+                  >
+                    {data.available} available
                   </div>
                 </div>
               </div>
 
               {/* AC/Non-AC Toggle Buttons for General, Pediatrics, and Maternity */}
               {ward.toggleType === 'ac' && (
-                <div className="mb-3 flex gap-2 justify-start">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAcToggle({ ...acToggle, [ward.type]: 'ac' });
-                    }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                      acToggle[ward.type] === 'ac'
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                    }`}
-                  >
-                    AC
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAcToggle({ ...acToggle, [ward.type]: 'non_ac' });
-                    }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${
-                      acToggle[ward.type] === 'non_ac'
-                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                    }`}
-                  >
-                    Non-AC
-                  </button>
+                <div className="mb-3">
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAcToggle({ ...acToggle, [ward.type]: 'ac' });
+                      }}
+                      className={
+                        `px-3 py-1.5 rounded-md text-sm font-semibold transition ` +
+                        (acToggle[ward.type] === 'ac'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      AC
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAcToggle({ ...acToggle, [ward.type]: 'non_ac' });
+                      }}
+                      className={
+                        `px-3 py-1.5 rounded-md text-sm font-semibold transition ` +
+                        (acToggle[ward.type] === 'non_ac'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      Non-AC
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -527,11 +580,12 @@ const HospitalBedManagement = () => {
                         e.stopPropagation();
                         setPrivateRoomToggle(option.value);
                       }}
-                      className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all whitespace-nowrap shadow-sm ${
-                        privateRoomToggle === option.value
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                          : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md'
-                      }`}
+                      className={
+                        `px-3 py-1.5 rounded-lg font-semibold text-xs transition whitespace-nowrap border ` +
+                        (privateRoomToggle === option.value
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300')
+                      }
                     >
                       {option.label}
                     </button>
@@ -541,9 +595,9 @@ const HospitalBedManagement = () => {
 
               {/* Info Section for cards without toggles */}
               {!ward.hasToggle && (
-                <div className="mb-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <span className="font-medium">
@@ -557,20 +611,20 @@ const HospitalBedManagement = () => {
 
               {/* Quick Stats */}
               <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t-2 border-gray-200 mt-auto">
-                <div className="p-2.5 bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl shadow-sm border border-gray-200">
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="font-bold text-2xl text-gray-900">{data.total}</div>
-                  <div className="text-xs text-gray-600 mt-0.5 font-semibold">Total Beds</div>
+                  <div className="text-xs text-gray-600 mt-0.5 font-semibold">Total</div>
                 </div>
-                <div className="p-2.5 bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl shadow-sm border border-blue-200">
-                  <div className="font-bold text-2xl text-blue-700">{data.available}</div>
-                  <div className="text-xs text-blue-600 mt-0.5 font-semibold">Available</div>
+                <div className="p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="font-bold text-2xl text-blue-800">{data.available}</div>
+                  <div className="text-xs text-blue-700 mt-0.5 font-semibold">Available</div>
                 </div>
-                <div className="p-2.5 bg-gradient-to-br from-yellow-100 to-yellow-50 rounded-xl shadow-sm border border-yellow-200">
+                <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200">
                   {/* Show actual booking count if available, otherwise show reserved_beds */}
-                  <div className="font-bold text-2xl text-yellow-700">
+                  <div className="font-bold text-2xl text-amber-800">
                     {(bookingsByWard[currentType] || []).length || data.reserved}
                   </div>
-                  <div className="text-xs text-yellow-600 mt-0.5 font-semibold">Reserved</div>
+                  <div className="text-xs text-amber-700 mt-0.5 font-semibold">Reserved</div>
                 </div>
               </div>
 
@@ -607,7 +661,7 @@ const HospitalBedManagement = () => {
                           e.stopPropagation();
                           handleCardClick(bookingKeyForModal, ward.label);
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold text-sm hover:from-indigo-600 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -904,8 +958,6 @@ const HospitalBedManagement = () => {
         
         .animate-slideDown {
           animation: slideDown 0.2s ease-out;
-        }
-          animation: slideUp 0.3s ease-out;
         }
       `}</style>
     </div>

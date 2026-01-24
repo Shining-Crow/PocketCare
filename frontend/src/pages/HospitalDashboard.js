@@ -38,7 +38,6 @@ const HospitalDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [patientsToday, setPatientsToday] = useState(0);
-  const [bedOccupancyPercentage, setBedOccupancyPercentage] = useState(0);
   const [revenueToday, setRevenueToday] = useState(0);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [recentAppointments, setRecentAppointments] = useState([]);
@@ -161,13 +160,6 @@ const HospitalDashboard = () => {
         allData?.patientsToday ??
         0;
       setPatientsToday(patientsTodayValue);
-
-      const occupancyFromStats = statsData?.stats?.bedAvailability?.occupancy_percentage;
-      setBedOccupancyPercentage(
-        Number.isFinite(Number(occupancyFromStats))
-          ? Number(occupancyFromStats)
-          : (allData?.bedOccupancyPercentage ?? 0)
-      );
 
       setRevenueToday(allData?.revenueToday ?? 0);
 
@@ -482,25 +474,28 @@ const HospitalDashboard = () => {
               {/* KPI grid + snapshot */}
               {(() => {
                 const totalBeds = stats?.bedAvailability?.total ?? 0;
-                const occupiedBeds = stats?.bedAvailability?.occupied ?? 0;
-                const availableBeds = stats?.bedAvailability?.available ?? 0;
-                const reservedBeds = stats?.bedAvailability?.reserved ?? 0;
-                const occupancyPct =
-                  Number.isFinite(Number(stats?.bedAvailability?.occupancy_percentage))
-                    ? Number(stats.bedAvailability.occupancy_percentage)
-                    : (Number.isFinite(Number(bedOccupancyPercentage)) ? Number(bedOccupancyPercentage) : (totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0));
+                const occupiedBedsRaw = Number(stats?.bedAvailability?.occupied ?? 0);
+                const reservedBedsRaw = Number(stats?.bedAvailability?.reserved ?? 0);
+
+                // Business rule: reserved counts as occupied (blocked inventory).
+                const occupiedBeds = Math.max(0, occupiedBedsRaw + reservedBedsRaw);
+                const availableBeds = Math.max(0, Number(totalBeds) - occupiedBeds);
+                const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / Number(totalBeds)) * 100) : 0;
 
                 const appt = stats?.appointments || {};
                 const doctors = stats?.doctors || {};
                 const rooms = stats?.privateRooms || {};
 
+                const totalRooms = Number(rooms.total ?? 0);
+                const occupiedRooms = Math.max(0, Number(rooms.occupied ?? 0) + Number(rooms.reserved ?? 0));
+                const availableRooms = Math.max(0, totalRooms - occupiedRooms);
+
                 const occupancyDonut = [
                   { name: 'Occupied', value: Math.max(0, occupiedBeds) },
                   { name: 'Available', value: Math.max(0, availableBeds) },
-                  { name: 'Reserved', value: Math.max(0, reservedBeds) },
                 ].filter((d) => d.value > 0);
 
-                const occupancyColors = ['#ef4444', '#10b981', '#f59e0b'];
+                const occupancyColors = ['#ef4444', '#10b981'];
 
                 const deptTop = Array.isArray(departmentData)
                   ? [...departmentData]
@@ -575,17 +570,15 @@ const HospitalDashboard = () => {
                             <div className="mt-3 space-y-2">
                               <div className="flex justify-between text-xs text-gray-600"><span>Available</span><span className="font-semibold text-gray-800">{formatCompactNumber(availableBeds)}</span></div>
                               <div className="flex justify-between text-xs text-gray-600"><span>Occupied</span><span className="font-semibold text-gray-800">{formatCompactNumber(occupiedBeds)}</span></div>
-                              <div className="flex justify-between text-xs text-gray-600"><span>Reserved</span><span className="font-semibold text-gray-800">{formatCompactNumber(reservedBeds)}</span></div>
                             </div>
                           </div>
 
                           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                             <div className="text-xs font-semibold text-gray-600">Private rooms</div>
-                            <div className="mt-1 text-xl font-extrabold text-gray-900">{formatCompactNumber(rooms.total ?? 0)}</div>
+                            <div className="mt-1 text-xl font-extrabold text-gray-900">{formatCompactNumber(totalRooms)}</div>
                             <div className="mt-3 space-y-2">
-                              <div className="flex justify-between text-xs text-gray-600"><span>Available</span><span className="font-semibold text-gray-800">{formatCompactNumber(rooms.available ?? 0)}</span></div>
-                              <div className="flex justify-between text-xs text-gray-600"><span>Occupied</span><span className="font-semibold text-gray-800">{formatCompactNumber(rooms.occupied ?? 0)}</span></div>
-                              <div className="flex justify-between text-xs text-gray-600"><span>Reserved</span><span className="font-semibold text-gray-800">{formatCompactNumber(rooms.reserved ?? 0)}</span></div>
+                              <div className="flex justify-between text-xs text-gray-600"><span>Available</span><span className="font-semibold text-gray-800">{formatCompactNumber(availableRooms)}</span></div>
+                              <div className="flex justify-between text-xs text-gray-600"><span>Occupied</span><span className="font-semibold text-gray-800">{formatCompactNumber(occupiedRooms)}</span></div>
                             </div>
                           </div>
                         </div>

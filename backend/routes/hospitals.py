@@ -71,7 +71,7 @@ def get_hospitals():
         # Get query parameters
         user_lat = request.args.get('latitude', type=float)
         user_lon = request.args.get('longitude', type=float)
-        radius = request.args.get('radius', default=50, type=float)
+        radius = request.args.get('radius', default=5, type=float)
         city = request.args.get('city', type=str)
         service = request.args.get('service', type=str)
         search = request.args.get('search', type=str)
@@ -289,7 +289,7 @@ def get_nearby_hospitals():
     try:
         user_lat = request.args.get('latitude', type=float)
         user_lon = request.args.get('longitude', type=float)
-        radius = request.args.get('radius', default=25, type=float)  # Default 25km
+        radius = request.args.get('radius', default=5, type=float)  # Default 5km
         limit = request.args.get('limit', default=10, type=int)
         
         if user_lat is None or user_lon is None:

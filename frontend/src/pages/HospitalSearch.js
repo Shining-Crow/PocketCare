@@ -27,7 +27,7 @@ function HospitalSearch() {
   const [userLocation, setUserLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
-  const [searchRadius, setSearchRadius] = useState(50); // km
+  const [searchRadius, setSearchRadius] = useState(5); // km
   const [useLocationFilter, setUseLocationFilter] = useState(false); // Only filter by location when explicitly enabled
   const [showFilters, setShowFilters] = useState(false);
 
@@ -151,7 +151,7 @@ function HospitalSearch() {
   const clearFilters = () => {
     setSearchQuery("");
     setCityFilter("");
-    setSearchRadius(50);
+    setSearchRadius(5);
     setUseLocationFilter(false);
     // Trigger refetch after state updates
     setTimeout(() => {
@@ -272,6 +272,7 @@ function HospitalSearch() {
                           !useLocationFilter ? "opacity-50" : ""
                         }`}
                       >
+                        <option value={5}>5 km</option>
                         <option value={10}>10 km</option>
                         <option value={25}>25 km</option>
                         <option value={50}>50 km</option>

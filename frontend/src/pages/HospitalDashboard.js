@@ -7,10 +7,12 @@ import {
 import {
   Activity,
   Bed,
+  Building2,
   Calendar,
   CalendarCheck2,
   CircleDollarSign,
   ClipboardList,
+  LogOut,
   RefreshCw,
   ShieldAlert,
   Stethoscope,
@@ -283,81 +285,149 @@ const HospitalDashboard = () => {
     <div>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50">
         {/* Top Navigation */}
-        <div className="bg-white shadow-sm border-b">
+        <div className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/70">
           <div className="w-full px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              {/* Left: Logo and Brand */}
-              <div className="flex items-center flex-shrink-0">
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                  PocketCare Hospital
-                </span>
+            <div className="flex h-16 items-center justify-between gap-3">
+              {/* Left: Brand */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-sm">
+                  <Building2 className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-extrabold text-gray-900 truncate">PocketCare Hospital</div>
+                  <div className="text-xs text-gray-500 truncate">{hospital?.name || 'Hospital workspace'}</div>
+                </div>
               </div>
 
-              {/* Center: Navigation Tabs */}
-              <div className="flex items-baseline space-x-2 flex-1 justify-center">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'overview' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => setActiveTab('appointments')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'appointments' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Appointments
-                </button>
-                <button
-                  onClick={() => setActiveTab('beds')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'beds' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Bed Management
-                </button>
-                <button
-                  onClick={() => setActiveTab('emergency')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'emergency' ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Emergency SOS
-                </button>
-                <button
-                  onClick={() => setActiveTab('doctors')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'doctors' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Doctors
-                </button>
-                <button
-                  onClick={() => setActiveTab('reports')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${activeTab === 'reports' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  Reports
-                </button>
-              </div>
-
-              {/* Right: User Info and Actions */}
-              <div className="flex items-center space-x-4 flex-shrink-0">
-                <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                  <span className="text-xl">🔔</span>
-                  <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    3
-                  </span>
-                </button>
-                <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-800">
-                      {hospital?.name || 'City General Hospital'}
-                    </p>
-                    <p className="text-xs text-gray-500">Hospital Administrator</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <span className="text-blue-600 font-semibold">H</span>
-                  </div>
+              {/* Center: Tabs */}
+              <div className="hidden md:flex flex-1 justify-center">
+                <div className="inline-flex items-center rounded-2xl border border-gray-200 bg-gray-50 p-1">
                   <button
-                    onClick={handleLogout}
-                    className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    type="button"
+                    onClick={() => setActiveTab('overview')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'overview'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    Logout
+                    <ClipboardList className="h-4 w-4" />
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('appointments')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'appointments'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <CalendarCheck2 className="h-4 w-4" />
+                    Appointments
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('beds')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'beds'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Bed className="h-4 w-4" />
+                    Beds
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('doctors')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'doctors'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Stethoscope className="h-4 w-4" />
+                    Doctors
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('emergency')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'emergency'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <ShieldAlert className="h-4 w-4" />
+                    SOS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('reports')}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      activeTab === 'reports'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Activity className="h-4 w-4" />
+                    Reports
                   </button>
                 </div>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                  <div className="h-9 w-9 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                    <span className="text-blue-700 font-bold">H</span>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-gray-900 leading-tight truncate max-w-[180px]">
+                      {hospital?.name || 'Hospital'}
+                    </div>
+                    <div className="text-xs text-gray-500 leading-tight">Administrator</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile tabs */}
+            <div className="md:hidden pb-3">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'appointments', label: 'Appointments' },
+                  { id: 'beds', label: 'Beds' },
+                  { id: 'doctors', label: 'Doctors' },
+                  { id: 'emergency', label: 'SOS' },
+                  { id: 'reports', label: 'Reports' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                      activeTab === t.id
+                        ? t.id === 'emergency'
+                          ? 'border-rose-200 bg-rose-50 text-rose-700'
+                          : 'border-gray-200 bg-white text-gray-900'
+                        : 'border-gray-200 bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

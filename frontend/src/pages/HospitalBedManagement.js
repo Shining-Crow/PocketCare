@@ -81,10 +81,11 @@ const HospitalBedManagement = () => {
   
   // Handle card click to show patient info - using real booking data from API
   // Handle card click to show patient info - using real booking data from API
-  const handleCardClick = (currentType, wardLabel) => {
+  const handleCardClick = (currentType, wardLabel, limit) => {
     // currentType is already the correct key (e.g., 'general_ac', 'icu', 'private_1bed_no_bath')
     // Just use it directly to get bookings
     const bookings = bookingsByWard[currentType] || [];
+    const limitedBookings = Number.isFinite(limit) ? bookings.slice(0, Math.max(0, limit)) : bookings;
     
     console.log('handleCardClick:', { currentType, wardLabel, bookings, allBookings: bookingsByWard });
     
@@ -92,7 +93,7 @@ const HospitalBedManagement = () => {
       wardType: currentType,
       wardLabel,
       bookingKey: currentType,
-      patients: bookings
+      patients: limitedBookings
     });
     setShowPatientModal(true);
   };
@@ -429,6 +430,9 @@ const HospitalBedManagement = () => {
           const isEditing = activeEditorKey === currentType;
           const isSaving = savingWardKey === currentType;
 
+          const currentBookings = bookingsByWard[currentType] || [];
+          const bookingCountForCard = currentBookings.length;
+
           const totalDraft = isEditing ? parseNonNegativeInt(editorDraft.total) : { ok: true, value: data.total };
           const reservedDraft = isEditing ? parseNonNegativeInt(editorDraft.reserved) : { ok: true, value: data.reserved };
           const previewTotal = totalDraft.value;
@@ -646,9 +650,8 @@ const HospitalBedManagement = () => {
                   <div className="text-xs text-blue-700 mt-0.5 font-semibold">Available</div>
                 </div>
                 <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200">
-                  {/* Show actual booking count if available, otherwise show reserved_beds */}
                   <div className="font-bold text-2xl text-amber-800">
-                    {(bookingsByWard[currentType] || []).length || data.reserved}
+                    {data.reserved}
                   </div>
                   <div className="text-xs text-amber-700 mt-0.5 font-semibold">Reserved</div>
                 </div>
@@ -656,28 +659,13 @@ const HospitalBedManagement = () => {
 
               {/* View Patients Button - only show if there are actual bookings */}
               {(() => {
-                const currentBookings = bookingsByWard[currentType] || [];
+                const hasBookings = bookingCountForCard > 0;
 
-                let bookingKeyForModal = currentType;
-                let totalBookingsCount = currentBookings.length;
-
-                // Private rooms have multiple sub-types; show the button if any option has bookings.
-                if (ward.toggleType === 'private' && ward.options) {
-                  const privateKeys = ward.options.map((o) => o.value);
-                  const total = privateKeys.reduce(
-                    (sum, key) => sum + ((bookingsByWard[key] || []).length || 0),
-                    0
-                  );
-                  totalBookingsCount = total;
-
-                  // If current selection has no bookings, default the modal to the first option that does.
-                  if (currentBookings.length === 0) {
-                    const firstWithBookings = privateKeys.find((k) => (bookingsByWard[k] || []).length > 0);
-                    if (firstWithBookings) bookingKeyForModal = firstWithBookings;
-                  }
-                }
-
-                const hasBookings = totalBookingsCount > 0;
+                // Show count based on reserved (if set) but never exceed the actual booking list length.
+                const reservedForWard = Number.parseInt(data.reserved, 10) || 0;
+                const displayCount = reservedForWard > 0
+                  ? Math.min(reservedForWard, bookingCountForCard)
+                  : bookingCountForCard;
 
                 if (hasBookings) {
                   return (
@@ -685,14 +673,14 @@ const HospitalBedManagement = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCardClick(bookingKeyForModal, ward.label);
+                          handleCardClick(currentType, ward.label, displayCount);
                         }}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                         </svg>
-                        View {totalBookingsCount} Patient{totalBookingsCount !== 1 ? 's' : ''}
+                        View {displayCount} Patient{displayCount !== 1 ? 's' : ''}
                       </button>
                     </div>
                   );

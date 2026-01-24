@@ -117,14 +117,15 @@ def get_hospital_dashboard_stats():
         # Get weekly bed occupancy trend
         cursor.execute("""
             SELECT 
-                DATE_FORMAT(created_at, '%a') as day_name,
+                DATE_FORMAT(created_at, '%%a') as day_name,
+                DATE(created_at) as date_val,
                 COUNT(*) as allocations
             FROM bed_allocation_logs
             WHERE hospital_id = %s 
             AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             AND action = 'allocated'
-            GROUP BY day_name, DATE(created_at)
-            ORDER BY created_at
+            GROUP BY day_name, date_val
+            ORDER BY date_val
         """, (hospital_id,))
         
         weekly_occupancy = cursor.fetchall()
@@ -293,7 +294,7 @@ def get_bed_occupancy_trend():
         cursor.execute("""
             SELECT 
                 DATE(bal.created_at) as date,
-                DATE_FORMAT(bal.created_at, '%a') as day_name,
+                DATE_FORMAT(bal.created_at, '%%a') as day_name,
                 bw.ward_type,
                 COUNT(*) as allocations
             FROM bed_allocation_logs bal

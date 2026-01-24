@@ -8,9 +8,7 @@ import {
   Activity,
   Bed,
   Building2,
-  Calendar,
   CalendarCheck2,
-  CircleDollarSign,
   ClipboardList,
   LogOut,
   RefreshCw,
@@ -38,7 +36,6 @@ const HospitalDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [patientsToday, setPatientsToday] = useState(0);
-  const [revenueToday, setRevenueToday] = useState(0);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [recentAppointments, setRecentAppointments] = useState([]);
   const [sosSummary, setSosSummary] = useState({ pending: 0, assigned: 0 });
@@ -52,11 +49,6 @@ const HospitalDashboard = () => {
   const formatCompactNumber = (value) => {
     const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
     return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(safe);
-  };
-
-  const formatBDT = (value) => {
-    const safe = Number.isFinite(Number(value)) ? Number(value) : 0;
-    return `৳${new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(safe)}`;
   };
 
   const formatDateTime = (value) => {
@@ -139,8 +131,6 @@ const HospitalDashboard = () => {
         allData?.patientsToday ??
         0;
       setPatientsToday(patientsTodayValue);
-
-      setRevenueToday(allData?.revenueToday ?? 0);
 
       if (recentData?.success && Array.isArray(recentData?.appointments)) {
         setRecentAppointments(recentData.appointments);
@@ -449,7 +439,6 @@ const HospitalDashboard = () => {
                 const occupancyPct = totalBeds > 0 ? Math.round((occupiedBeds / Number(totalBeds)) * 100) : 0;
 
                 const appt = stats?.appointments || {};
-                const doctors = stats?.doctors || {};
                 const rooms = stats?.privateRooms || {};
 
                 const totalRooms = Number(rooms.total ?? 0);
@@ -484,7 +473,7 @@ const HospitalDashboard = () => {
                   <>
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start mb-6">
                       <div className="lg:col-span-2 space-y-6">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                           <KpiCard
                             title="Patients today"
                             value={formatCompactNumber(stats?.patients?.today ?? patientsToday)}
@@ -507,25 +496,11 @@ const HospitalDashboard = () => {
                             tone="emerald"
                           />
                           <KpiCard
-                            title="Doctors"
-                            value={formatCompactNumber(doctors.total ?? 0)}
-                            subtitle={`${formatCompactNumber(doctors.available ?? 0)} available • ${formatCompactNumber(doctors.specialties ?? 0)} specialties`}
-                            icon={Stethoscope}
-                            tone="slate"
-                          />
-                          <KpiCard
                             title="SOS queue"
                             value={formatCompactNumber((sosSummary?.pending ?? 0) + (sosSummary?.assigned ?? 0))}
                             subtitle={`${formatCompactNumber(sosSummary?.pending ?? 0)} pending • ${formatCompactNumber(sosSummary?.assigned ?? 0)} assigned`}
                             icon={ShieldAlert}
                             tone="rose"
-                          />
-                          <KpiCard
-                            title="Revenue today"
-                            value={formatBDT(revenueToday)}
-                            subtitle={`Pending billing: ${formatBDT(stats?.finances?.pending ?? 0)}`}
-                            icon={CircleDollarSign}
-                            tone="amber"
                           />
                         </div>
 
@@ -628,119 +603,124 @@ const HospitalDashboard = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
-                      <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm self-start">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-gray-900">Recent appointments</div>
-                            <div className="mt-1 text-xs text-gray-500">Latest patient bookings and statuses</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab('appointments')}
-                            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                          >
-                            View all
-                          </button>
+                    {/* Recent Appointments - Full Width */}
+                    <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-gray-900">Recent appointments</div>
+                          <div className="mt-1 text-xs text-gray-500">Latest patient bookings and statuses</div>
                         </div>
-
-                        <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
-                          <div className="grid grid-cols-12 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
-                            <div className="col-span-5">Patient</div>
-                            <div className="col-span-3">Department</div>
-                            <div className="col-span-2">Date</div>
-                            <div className="col-span-2 text-right">Status</div>
-                          </div>
-                          <div className="divide-y divide-gray-200">
-                            {(recentAppointments || []).slice(0, 6).map((apptRow) => (
-                              <div key={apptRow.id} className="grid grid-cols-12 items-center px-4 py-3">
-                                <div className="col-span-5 min-w-0">
-                                  <div className="font-semibold text-gray-900 truncate">{apptRow.patient_name || 'Patient'}</div>
-                                  <div className="mt-0.5 text-xs text-gray-500 truncate">{apptRow.doctor_name ? `Dr. ${apptRow.doctor_name}` : 'Doctor not assigned'}</div>
-                                </div>
-                                <div className="col-span-3 text-sm text-gray-700 truncate">{apptRow.department || '—'}</div>
-                                <div className="col-span-2 text-sm text-gray-700 truncate">
-                                  {apptRow.appointment_date ? new Date(apptRow.appointment_date).toLocaleDateString() : '—'}
-                                </div>
-                                <div className="col-span-2 flex justify-end">
-                                  <StatusBadge value={apptRow.status} />
-                                </div>
-                              </div>
-                            ))}
-                            {(!recentAppointments || recentAppointments.length === 0) && (
-                              <div className="px-4 py-5 text-center text-sm text-gray-600">
-                                No recent appointments found.
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('appointments')}
+                          className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          View all
+                        </button>
                       </div>
 
-                      <div className="space-y-6">
+                      <div className="mt-4 overflow-hidden rounded-2xl border border-gray-200">
+                        <div className="grid grid-cols-12 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600">
+                          <div className="col-span-4">Patient</div>
+                          <div className="col-span-3">Department</div>
+                          <div className="col-span-2">Date</div>
+                          <div className="col-span-2">Time</div>
+                          <div className="col-span-1 text-right">Status</div>
+                        </div>
+                        <div className="divide-y divide-gray-200 bg-white">
+                          {(recentAppointments || []).slice(0, 8).map((apptRow) => (
+                            <div key={apptRow.id} className="grid grid-cols-12 items-center px-4 py-3 hover:bg-gray-50 transition-colors">
+                              <div className="col-span-4 min-w-0">
+                                <div className="font-semibold text-gray-900 truncate">{apptRow.patient_name || 'Patient'}</div>
+                                <div className="mt-0.5 text-xs text-gray-500 truncate">{apptRow.doctor_name ? `Dr. ${apptRow.doctor_name}` : 'Doctor not assigned'}</div>
+                              </div>
+                              <div className="col-span-3 text-sm text-gray-700 truncate">{apptRow.department || '—'}</div>
+                              <div className="col-span-2 text-sm text-gray-700 truncate">
+                                {apptRow.appointment_date ? new Date(apptRow.appointment_date).toLocaleDateString() : '—'}
+                              </div>
+                              <div className="col-span-2 text-sm text-gray-700 truncate">
+                                {apptRow.appointment_time || '—'}
+                              </div>
+                              <div className="col-span-1 flex justify-end">
+                                <StatusBadge value={apptRow.status} />
+                              </div>
+                            </div>
+                          ))}
+                          {(!recentAppointments || recentAppointments.length === 0) && (
+                            <div className="px-4 py-12 text-center text-sm text-gray-500">
+                              No recent appointments found.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Two-column layout: Departments + Ward Availability */}
+                    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        {/* Top Departments */}
                         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                           <div className="text-sm font-bold text-gray-900">Top departments</div>
                           <div className="mt-1 text-xs text-gray-500">By activity (last 30 days)</div>
                           <div className="mt-4">
                             {hasDeptData ? (
-                              <ResponsiveContainer width="100%" height={220} minHeight={220}>
-                                <BarChart data={deptTop} layout="vertical" margin={{ left: 24 }}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis type="number" />
-                                  <YAxis type="category" dataKey="name" width={90} />
+                              <ResponsiveContainer width="100%" height={200} minHeight={200}>
+                                <BarChart data={deptTop} layout="vertical" margin={{ left: 8 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                                  <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
                                   <Tooltip />
-                                  <Bar dataKey="patients" fill="#6366F1" radius={[8, 8, 8, 8]} />
+                                  <Bar dataKey="patients" fill="url(#deptGradient)" radius={[0, 6, 6, 0]} />
+                                  <defs>
+                                    <linearGradient id="deptGradient" x1="0" y1="0" x2="1" y2="0">
+                                      <stop offset="0%" stopColor="#6366F1" />
+                                      <stop offset="100%" stopColor="#8B5CF6" />
+                                    </linearGradient>
+                                  </defs>
                                 </BarChart>
                               </ResponsiveContainer>
                             ) : (
-                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+                              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
                                 No department activity yet.
                               </div>
                             )}
                           </div>
                         </div>
 
+                        {/* Ward Availability */}
                         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                           <div className="text-sm font-bold text-gray-900">Ward availability</div>
-                          <div className="mt-1 text-xs text-gray-500">Availability by ward / room type</div>
+                          <div className="mt-1 text-xs text-gray-500">By ward / room type</div>
                           <div className="mt-4 space-y-3">
-                            {(bedAvailability || []).slice(0, 6).map((bed) => {
+                            {(bedAvailability || []).slice(0, 5).map((bed) => {
                               const total = Number(bed?.total ?? 0);
                               const available = Number(
                                 bed?.available ?? Math.max(0, total - Number(bed?.occupied ?? 0))
                               );
                               const pct = total > 0 ? Math.round((available / total) * 100) : 0;
                               const barColor =
-                                bed?.color === 'red'
-                                  ? 'bg-rose-500'
-                                  : bed?.color === 'green'
-                                  ? 'bg-emerald-500'
-                                  : bed?.color === 'yellow'
-                                  ? 'bg-amber-500'
-                                  : bed?.color === 'purple'
-                                  ? 'bg-violet-500'
-                                  : bed?.color === 'indigo'
-                                  ? 'bg-indigo-500'
-                                  : 'bg-blue-500';
+                                pct < 20 ? 'from-rose-500 to-red-500' :
+                                pct < 50 ? 'from-amber-500 to-orange-500' :
+                                'from-emerald-500 to-teal-500';
 
                               return (
                                 <div
                                   key={bed?.type || `${total}:${available}`}
-                                  className="rounded-2xl border border-gray-200 bg-gray-50 p-3"
+                                  className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 hover:bg-gray-50 transition-colors"
                                 >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-semibold text-gray-900 truncate">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-medium text-gray-900 truncate">
                                         {bed?.type || 'Ward'}
                                       </div>
-                                      <div className="mt-0.5 text-xs text-gray-600">
+                                      <div className="text-xs text-gray-500">
                                         {formatCompactNumber(available)} / {formatCompactNumber(total)} available
                                       </div>
                                     </div>
-                                    <div className="text-xs font-semibold text-gray-700">{pct}%</div>
+                                    <div className={`text-xs font-bold ${pct < 20 ? 'text-rose-600' : pct < 50 ? 'text-amber-600' : 'text-emerald-600'}`}>{pct}%</div>
                                   </div>
-                                  <div className="mt-2 h-2 w-full rounded-full bg-white">
+                                  <div className="mt-2 h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
                                     <div
-                                      className={`h-2 rounded-full ${barColor}`}
+                                      className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
                                       style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
                                     />
                                   </div>
@@ -749,81 +729,12 @@ const HospitalDashboard = () => {
                             })}
 
                             {(!bedAvailability || bedAvailability.length === 0) && (
-                              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
+                              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
                                 No bed availability data yet.
                               </div>
                             )}
                           </div>
                         </div>
-
-                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                          <div className="text-sm font-bold text-gray-900">Quick actions</div>
-                          <div className="mt-1 text-xs text-gray-500">Jump to common workflows</div>
-                          <div className="mt-4 grid grid-cols-2 gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('appointments')}
-                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
-                            >
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Calendar className="h-4 w-4" />Appointments</div>
-                              <div className="mt-1 text-xs text-gray-600">Manage bookings</div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('beds')}
-                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
-                            >
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Bed className="h-4 w-4" />Beds</div>
-                              <div className="mt-1 text-xs text-gray-600">Wards & inventory</div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('doctors')}
-                              className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left hover:bg-gray-100"
-                            >
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Stethoscope className="h-4 w-4" />Doctors</div>
-                              <div className="mt-1 text-xs text-gray-600">Roster & availability</div>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                          <div className="text-sm font-bold text-gray-900">Queue & tasks</div>
-                          <div className="mt-1 text-xs text-gray-500">Operational items that need attention</div>
-                          <div className="mt-4 space-y-3">
-                            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-rose-800"><ShieldAlert className="h-4 w-4" />Emergency SOS</div>
-                                <div className="text-xs font-semibold text-rose-800">{formatCompactNumber(sosSummary?.pending ?? 0)} pending</div>
-                              </div>
-                              <div className="mt-1 text-xs text-rose-700/90">Review and accept nearby SOS requests.</div>
-                              <button
-                                type="button"
-                                onClick={() => setActiveTab('emergency')}
-                                className="mt-3 inline-flex items-center rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700"
-                              >
-                                Open SOS
-                              </button>
-                            </div>
-
-                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><CalendarCheck2 className="h-4 w-4" />Appointments</div>
-                                <div className="text-xs font-semibold text-gray-700">{formatCompactNumber((stats?.appointments?.pending ?? 0) + (stats?.appointments?.confirmed ?? 0))} in queue</div>
-                              </div>
-                              <div className="mt-1 text-xs text-gray-600">Confirm pending requests and assign doctors.</div>
-                            </div>
-
-                            <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><CircleDollarSign className="h-4 w-4" />Billing</div>
-                                <div className="text-xs font-semibold text-gray-700">{formatBDT(stats?.finances?.pending ?? 0)} pending</div>
-                              </div>
-                              <div className="mt-1 text-xs text-gray-600">Track receivables and daily collections.</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </>
                 );

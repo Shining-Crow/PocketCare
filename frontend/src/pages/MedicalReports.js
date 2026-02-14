@@ -10,11 +10,13 @@ import {
   Trash2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useTranslation } from "react-i18next";
 import api from "../utils/api";
 import ConfirmationModal from "../components/ConfirmationModal";
 import BackToDashboardButton from "../components/BackToDashboardButton";
 
 function MedicalReports() {
+  const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [ocrText, setOcrText] = useState("");
@@ -45,9 +47,9 @@ function MedicalReports() {
   }, []);
 
   const fileLabel = useMemo(() => {
-    if (!file) return "Choose a file (png/jpg/jpeg/pdf)";
+    if (!file) return t("Choose a file (png/jpg/jpeg/pdf)");
     return `${file.name} (${Math.round(file.size / 1024)} KB)`;
-  }, [file]);
+  }, [file, t]);
 
   const formattedExplanation = useMemo(() => {
     const raw = (aiExplanation || "").toString();
@@ -213,7 +215,7 @@ function MedicalReports() {
 
   const runSimplify = async () => {
     if (!file) {
-      setError("Please select a report file first.");
+      setError(t("Please select a report file first."));
       return;
     }
 
@@ -316,7 +318,7 @@ function MedicalReports() {
               <BackToDashboardButton className="shrink-0" />
               <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex items-center gap-2">
                 <FileText className="w-8 h-8 text-purple-700" />
-                Medical Reports
+                {t("Medical Reports")}
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
                   OCR + AI
                 </span>
@@ -338,7 +340,7 @@ function MedicalReports() {
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">
-                Upload & Simplify
+                {t("Upload & Simplify")}
               </h2>
               <div className="text-xs text-gray-500">
                 png / jpg / jpeg / pdf
@@ -352,7 +354,7 @@ function MedicalReports() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-gray-800">
-                    Report file
+                    {t("Report file")}
                   </label>
                   <p className="mt-1 text-xs text-gray-500">{fileLabel}</p>
                   <input
@@ -381,7 +383,7 @@ function MedicalReports() {
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-gray-900">
-                  Simplify with AI
+                  {t("Simplify with AI")}
                 </h2>
                 <span className="text-[11px] font-semibold text-gray-500">
                   OCR + Gemini rewrite (no diagnosis)
@@ -404,10 +406,10 @@ function MedicalReports() {
                   <Sparkles className="h-4 w-4" />
                 )}
                 {ocrLoading
-                  ? "Reading report…"
+                  ? t("Reading report…")
                   : aiLoading
-                    ? "Simplifying…"
-                    : "Simplify with AI"}
+                    ? t("Simplifying…")
+                    : t("Simplify with AI")}
               </button>
 
               <div className="mt-4 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
@@ -415,11 +417,12 @@ function MedicalReports() {
                   <span className="font-semibold text-gray-800">OCR</span>
                   {ocrLoading ? (
                     <span className="inline-flex items-center gap-2 text-gray-600">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}
+                      {t("Running")}
                     </span>
                   ) : ocrText.trim() ? (
                     <span className="inline-flex items-center gap-2 text-emerald-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Done
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {t("Done")}
                       {confidence !== null ? (
                         <span className="text-gray-500">
                           • {confidence.toFixed(1)}%
@@ -429,7 +432,7 @@ function MedicalReports() {
                   ) : (
                     <span className="inline-flex items-center gap-2 text-gray-500">
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />{" "}
-                      Pending
+                      {t("Pending")}
                     </span>
                   )}
                 </div>
@@ -440,16 +443,17 @@ function MedicalReports() {
                   </span>
                   {aiLoading ? (
                     <span className="inline-flex items-center gap-2 text-gray-600">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Writing
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}
+                      {t("Writing")}
                     </span>
                   ) : aiExplanation.trim() ? (
                     <span className="inline-flex items-center gap-2 text-emerald-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Ready
+                      <CheckCircle2 className="h-3.5 w-3.5" /> {t("Ready")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-2 text-gray-500">
                       <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />{" "}
-                      Pending
+                      {t("Pending")}
                     </span>
                   )}
                 </div>
@@ -468,7 +472,7 @@ function MedicalReports() {
               ) : null}
 
               <div className="mt-4 text-[11px] text-gray-500">
-                Informational only — not a medical diagnosis.
+                {t("Informational only — not a medical diagnosis.")}
               </div>
             </div>
 
@@ -477,10 +481,10 @@ function MedicalReports() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-bold text-gray-900">
-                    Simple explanation
+                    {t("Simple explanation")}
                   </h2>
                   <p className="mt-1 text-xs text-gray-500">
-                    A simplified summary based on the report text.
+                    {t("A simplified summary based on the report text.")}
                   </p>
                 </div>
                 <button
@@ -496,7 +500,7 @@ function MedicalReports() {
                 >
                   <Copy className="h-4 w-4" />
                   <span className="hidden sm:inline">
-                    {copied ? "Copied" : "Copy"}
+                    {copied ? t("Copied") : t("Copy")}
                   </span>
                 </button>
               </div>
@@ -504,11 +508,14 @@ function MedicalReports() {
               {!formattedExplanation.trim() ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-600">
                   <div className="font-semibold text-gray-900">
-                    No explanation yet
+                    {t("No explanation yet")}
                   </div>
                   <div className="mt-1 text-gray-600">
-                    Upload a report and click{" "}
-                    <span className="font-semibold">Simplify with AI</span>.
+                    {t("Upload a report and click")}{" "}
+                    <span className="font-semibold">
+                      {t("Simplify with AI")}
+                    </span>
+                    .
                   </div>
                 </div>
               ) : (
@@ -576,8 +583,9 @@ function MedicalReports() {
               )}
 
               <div className="mt-4 text-[11px] text-gray-500">
-                If anything looks wrong or concerning, consult a licensed
-                clinician.
+                {t(
+                  "If anything looks wrong or concerning, consult a licensed clinician.",
+                )}
               </div>
             </div>
           </div>
@@ -586,9 +594,11 @@ function MedicalReports() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">History</h2>
+                <h2 className="text-lg font-bold text-gray-900">
+                  {t("History")}
+                </h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  Your recent simplified reports
+                  {t("Your recent simplified reports")}
                 </p>
               </div>
               <button
@@ -602,10 +612,10 @@ function MedicalReports() {
                     ? "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
                     : "border-gray-200 bg-white text-red-600 hover:bg-gray-50"
                 }`}
-                title="Clear history"
+                title={t("Clear history")}
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Clear</span>
+                <span className="hidden sm:inline">{t("Clear")}</span>
               </button>
             </div>
 
@@ -618,10 +628,13 @@ function MedicalReports() {
             <div className="mt-4">
               {historyLoading ? (
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading history…
+                  <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                  {t("Loading history…")}
                 </div>
               ) : history.length === 0 ? (
-                <div className="text-sm text-gray-600">No history yet.</div>
+                <div className="text-sm text-gray-600">
+                  {t("No history yet.")}
+                </div>
               ) : (
                 <div className="max-h-[560px] overflow-auto pr-1 space-y-2">
                   {history.map((h) => {
@@ -669,14 +682,14 @@ function MedicalReports() {
                               </div>
                             ) : (
                               <div className="mt-1 text-xs text-gray-500">
-                                (No text)
+                                {t("(No text)")}
                               </div>
                             )}
                           </div>
                           <div className="shrink-0 pt-0.5">
                             {isActive ? (
                               <span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
-                                Active
+                                {t("Active")}
                               </span>
                             ) : null}
                           </div>
@@ -694,10 +707,12 @@ function MedicalReports() {
                 historyClearing ? null : setClearHistoryOpen(false)
               }
               onConfirm={clearHistory}
-              title="Clear report history?"
-              message="This will permanently remove all your saved OCR medical reports and AI explanations."
-              confirmText={historyClearing ? "Clearing…" : "Yes, clear"}
-              cancelText="Cancel"
+              title={t("Clear report history?")}
+              message={t(
+                "This will permanently remove all your saved OCR medical reports and AI explanations.",
+              )}
+              confirmText={historyClearing ? t("Clearing…") : t("Yes, clear")}
+              cancelText={t("Cancel")}
               type="danger"
               loading={historyClearing}
             />

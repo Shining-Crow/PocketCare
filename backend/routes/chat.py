@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from config import Config
 import os
+from utils.gemini_utils import normalize_language_code
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', Config.GEMINI_API_KEY)
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY
@@ -21,6 +22,18 @@ def get_db_connection():
     conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
     return conn
 
+
+def _preferred_language() -> str:
+    data = request.get_json(silent=True) or {}
+    return normalize_language_code(
+        data.get("language")
+        or data.get("preferred_language")
+        or request.args.get("language")
+        or request.headers.get("X-User-Language")
+        or request.headers.get("X-App-Language")
+        or request.headers.get("Accept-Language")
+    )
+
 chat_bp = Blueprint('chat', __name__)
 
 @chat_bp.route('/send', methods=['POST'])
@@ -29,6 +42,12 @@ def send_message():
     user_id = get_jwt_identity()
     data = request.get_json()
     user_message = data.get('message', '')
+    preferred_language = _preferred_language()
+    language_instruction = (
+        "IMPORTANT LANGUAGE RULE: Reply in Bangla (Bengali, বাংলা)."
+        if preferred_language == "bn"
+        else "IMPORTANT LANGUAGE RULE: Reply in English."
+    )
     if not user_message:
         return jsonify({'error': 'No message provided'}), 400
     # Save user message
@@ -51,6 +70,7 @@ def send_message():
                     "Keep your answers short, clear, and professional. "
                     "Always format your response using bullet points or numbered lists for clarity. "
                     "Avoid long paragraphs. Organize information so it's easy to read, like ChatGPT or Gemini web UI.\n\n"
+                    f"{language_instruction}\n\n"
                     f"User: {user_message}"
                 )}
             ]}

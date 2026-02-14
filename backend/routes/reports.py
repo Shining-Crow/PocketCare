@@ -8,7 +8,11 @@ from werkzeug.utils import secure_filename
 from config import Config
 from utils.auth_utils import jwt_required_custom
 from utils.database import execute_query
-from utils.gemini_utils import explain_bytes_with_gemini, simplify_ocr_text
+from utils.gemini_utils import (
+    explain_bytes_with_gemini,
+    normalize_language_code,
+    simplify_ocr_text,
+)
 from utils.ocr_utils import extract_text_from_image_bytes
 from utils.pdf_utils import extract_text_from_pdf_bytes
 
@@ -86,6 +90,25 @@ def _ocr_bytes(*, ext: str, data: bytes):
     return extract_text_from_image_bytes(data)
 
 
+def _preferred_language() -> str:
+    """Pick app language from request body/form/query/header.
+
+    Accepted values: en / bn / bangla / bengali / বাংলা
+    """
+
+    body = request.get_json(silent=True) or {}
+    return normalize_language_code(
+        body.get("language")
+        or body.get("preferred_language")
+        or request.form.get("language")
+        or request.form.get("preferred_language")
+        or request.args.get("language")
+        or request.headers.get("X-User-Language")
+        or request.headers.get("X-App-Language")
+        or request.headers.get("Accept-Language")
+    )
+
+
 @reports_bp.route("/ocr", methods=["POST"])
 @jwt_required_custom
 def ocr_report():
@@ -151,9 +174,10 @@ def explain_report_text():
         return jsonify({"error": "Missing text", "message": "Send JSON body with non-empty 'text'"}), 400
 
     model = (data.get("model") or "gemini-3-flash-preview").strip()
+    language = _preferred_language()
 
     try:
-        explanation = simplify_ocr_text(raw_text, model=model)
+        explanation = simplify_ocr_text(raw_text, language=language, model=model)
         return jsonify({"explanation": explanation, "model": model}), 200
     except ValueError as exc:
         return jsonify({"error": "Invalid input", "message": str(exc)}), 400
@@ -196,6 +220,7 @@ def simplify_report_and_save():
         )
 
     model = (request.form.get("model") or request.args.get("model") or "gemini-3-flash-preview").strip()
+    language = _preferred_language()
 
     data = f.read()
     if not data:
@@ -219,12 +244,17 @@ def simplify_report_and_save():
             mime_type = "image/jpeg"
 
         try:
-            explanation = explain_bytes_with_gemini(data, mime_type=mime_type, model=model)
+            explanation = explain_bytes_with_gemini(
+                data,
+                mime_type=mime_type,
+                language=language,
+                model=model,
+            )
         except Exception:
             # Fallback: keep the original behavior if vision/PDF analysis fails.
             # This prevents regressions on environments/models that don't support multimodal.
             if (ocr_text or "").strip() and not ocr_text.startswith("[OCR failed"):
-                explanation = simplify_ocr_text(ocr_text, model=model)
+                explanation = simplify_ocr_text(ocr_text, language=language, model=model)
             else:
                 raise
 

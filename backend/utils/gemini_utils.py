@@ -1,6 +1,24 @@
 import os
 
 
+def normalize_language_code(value: str | None) -> str:
+    """Normalize incoming language hint to 'en' or 'bn'."""
+    v = (value or "").strip().lower()
+    if v.startswith("bn") or v in {"bangla", "bengali", "বাংলা"}:
+        return "bn"
+    return "en"
+
+
+def language_prompt_instruction(language: str | None) -> str:
+    lang = normalize_language_code(language)
+    if lang == "bn":
+        return (
+            "IMPORTANT LANGUAGE RULE: Return all user-facing output in Bangla (Bengali, বাংলা). "
+            "Keep medical terms understandable and natural for Bangla readers."
+        )
+    return "IMPORTANT LANGUAGE RULE: Return all user-facing output in English."
+
+
 def generate_weight_recommendations(
     *,
     weight_kg: float,
@@ -9,6 +27,7 @@ def generate_weight_recommendations(
     bmi: float,
     goal_target_weight_kg: float | None,
     goal_target_date: str | None,
+    language: str = "en",
     model: str = "gemini-3-flash-preview",
 ) -> dict:
     """Generate general diet/exercise suggestions based on weight history.
@@ -38,6 +57,7 @@ def generate_weight_recommendations(
         "Provide GENERAL, safe, non-diagnostic wellness advice. "
         "Do NOT provide a medical diagnosis or medication guidance. "
         "If any value seems concerning, recommend consulting a clinician.\n\n"
+        f"{language_prompt_instruction(language)}\n\n"
         "User metrics:\n"
         f"- Weight (kg): {weight_kg}\n"
         f"- Height (cm): {height_cm}\n"
@@ -78,7 +98,12 @@ def generate_weight_recommendations(
         return {"ok": True, "payload": {"text": raw, "disclaimer": "General information only; not medical advice."}}
 
 
-def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -> str:
+def simplify_ocr_text(
+    ocr_text: str,
+    *,
+    language: str = "en",
+    model: str = "gemini-3-flash-preview",
+) -> str:
     if not (ocr_text or "").strip():
         raise ValueError("OCR text is empty")
 
@@ -111,8 +136,9 @@ def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -
         "that is NOT directly related to medical/healthcare purposes.\n\n"
         "IMPORTANT: Be strict. If you are unsure or the document is ambiguous, treat it as non-medical.\n\n"
         "If this IS a medical document, respond with exactly: MEDICAL\n"
-        "If this is NOT a medical document, respond with a helpful message in this format:\n"
+        "If this is NOT a medical document, respond with a helpful message in this format and language based on the LANGUAGE RULE below:\n"
         "NOT_MEDICAL: This appears to be a [document type]. Only health-related documents like lab reports, prescriptions, or medical records can be simplified here.\n\n"
+        f"{language_prompt_instruction(language)}\n\n"
         f"OCR TEXT:\n{trimmed}"
     )
 
@@ -125,7 +151,10 @@ def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -
         if validation_text.upper().startswith("NOT_MEDICAL:"):
             error_msg = validation_text[len("NOT_MEDICAL:"):].strip()
         else:
-            error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
+            if normalize_language_code(language) == "bn":
+                error_msg = "শুধুমাত্র স্বাস্থ্য-সম্পর্কিত ডকুমেন্ট সরল করা যাবে। অনুগ্রহ করে ল্যাব রিপোর্ট, প্রেসক্রিপশন, এক্স-রে বা চিকিৎসা রিপোর্ট আপলোড করুন।"
+            else:
+                error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
         raise ValueError(error_msg)
 
     # Proceed with medical report simplification
@@ -137,6 +166,7 @@ def simplify_ocr_text(ocr_text: str, *, model: str = "gemini-3-flash-preview") -
         "- Do NOT invent details that are not present.\n"
         "- Do NOT provide a diagnosis.\n"
         "- If there are abnormal lab values or urgent warnings explicitly stated, highlight them as 'Important'.\n"
+        f"{language_prompt_instruction(language)}\n"
         "Output format:\n"
         "1) Summary (2-4 bullets)\n"
         "2) Key details (bullets)\n"
@@ -156,6 +186,7 @@ def explain_bytes_with_gemini(
     file_bytes: bytes,
     *,
     mime_type: str,
+    language: str = "en",
     model: str = "gemini-3-flash-preview",
 ) -> str:
     """Analyze an image/PDF directly with Gemini for better layout-aware extraction.
@@ -190,8 +221,9 @@ def explain_bytes_with_gemini(
         "that is NOT directly related to medical/healthcare purposes.\n\n"
         "IMPORTANT: Be strict. If you are unsure or the document is ambiguous, treat it as non-medical.\n\n"
         "If this IS a medical document, respond with exactly: MEDICAL\n"
-        "If this is NOT a medical document, respond with a helpful message in this format:\n"
-        "NOT_MEDICAL: This appears to be a [document type]. Only health-related documents like lab reports, prescriptions, or medical records can be simplified here."
+        "If this is NOT a medical document, respond with a helpful message in this format and language based on the LANGUAGE RULE below:\n"
+        "NOT_MEDICAL: This appears to be a [document type]. Only health-related documents like lab reports, prescriptions, or medical records can be simplified here.\n\n"
+        f"{language_prompt_instruction(language)}"
     )
 
     validation_contents = [
@@ -208,7 +240,10 @@ def explain_bytes_with_gemini(
         if validation_text.upper().startswith("NOT_MEDICAL:"):
             error_msg = validation_text[len("NOT_MEDICAL:"):].strip()
         else:
-            error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
+            if normalize_language_code(language) == "bn":
+                error_msg = "শুধুমাত্র স্বাস্থ্য-সম্পর্কিত ডকুমেন্ট সরল করা যাবে। অনুগ্রহ করে ল্যাব রিপোর্ট, প্রেসক্রিপশন, এক্স-রে বা চিকিৎসা রিপোর্ট আপলোড করুন।"
+            else:
+                error_msg = "Only health-related documents can be simplified. Please upload a medical document such as a lab report, prescription, X-ray, or diagnosis report."
         raise ValueError(error_msg)
 
     # Proceed with medical report analysis
@@ -219,6 +254,7 @@ def explain_bytes_with_gemini(
         "- If a value is unclear/blurred, say so instead of guessing.\n"
         "- Do NOT invent details not present.\n"
         "- Do NOT provide a diagnosis or medication guidance.\n"
+        f"{language_prompt_instruction(language)}\n"
         "Output format:\n"
         "1) Summary (1-3 bullets)\n"
         "2) Key details (bullets; include dates, test names, and measured values)\n"

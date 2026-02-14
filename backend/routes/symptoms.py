@@ -12,6 +12,7 @@ from flask_jwt_extended import get_jwt_identity
 from config import Config
 from utils.auth_utils import jwt_required_custom
 from utils.database import execute_query
+from utils.gemini_utils import normalize_language_code
 from utils.validators import validate_required_fields
 
 symptoms_bp = Blueprint("symptoms", __name__)
@@ -240,7 +241,7 @@ def _normalize_specialty(value: Optional[str], allowed: List[str]) -> str:
 
 
 def _gemini_symptom_analysis(
-    payload: Dict[str, Any], allowed_specialties: List[str]
+    payload: Dict[str, Any], allowed_specialties: List[str], language: str = "en"
 ) -> Tuple[str, Optional[Dict[str, Any]]]:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not set")
@@ -253,6 +254,12 @@ def _gemini_symptom_analysis(
     medications = (payload.get("medications") or "").strip()
 
     allowed_list = ", ".join([s for s in allowed_specialties if s])
+    lang = normalize_language_code(language)
+    language_rule = (
+        "IMPORTANT LANGUAGE RULE: All user-facing text fields in the JSON (summary, reasoning, red_flags, next_steps, disclaimer) MUST be in Bangla (Bengali, বাংলা)."
+        if lang == "bn"
+        else "IMPORTANT LANGUAGE RULE: All user-facing text fields in the JSON must be in English."
+    )
 
     # Ask for strict JSON we can store + display.
     prompt = (
@@ -262,6 +269,7 @@ def _gemini_symptom_analysis(
         "set is_medical to false, set recommended_specialty to null, and set urgency_level to 'low'. "
         "If the input IS medical, recommend the most appropriate medical specialty and an urgency level. "
         "Keep it safe: if red-flag symptoms are present, set urgency_level to 'high'.\n\n"
+        f"{language_rule}\n\n"
         "If medical, choose recommended_specialty from this exact list. If unsure, choose General Practice:\n"
         f"{allowed_list}\n\n"
         "Return ONLY valid JSON with these keys exactly:\n"
@@ -321,24 +329,47 @@ def analyze_symptoms():
             return jsonify({"error": error}), 400
 
         symptoms_text = (data.get("symptoms") or "").strip()
+        preferred_language = normalize_language_code(
+            data.get("language")
+            or data.get("preferred_language")
+            or request.args.get("language")
+            or request.headers.get("X-User-Language")
+            or request.headers.get("X-App-Language")
+            or request.headers.get("Accept-Language")
+        )
         if len(symptoms_text) < 5:
             return jsonify({"error": "Please provide a bit more detail about your symptoms."}), 400
 
         # Guard: avoid returning medical specialties for clearly non-medical requests.
         if _is_non_medical_request(symptoms_text):
-            analysis_obj: Dict[str, Any] = {
-                "is_medical": False,
-                "recommended_specialty": None,
-                "urgency_level": "low",
-                "summary": "This message does not describe a medical symptom or health concern.",
-                "reasoning": "The symptom checker is intended for health-related symptoms; this looks like a non-medical request.",
-                "red_flags": [],
-                "next_steps": [
-                    "If you have a health concern, describe your symptoms (e.g., pain, fever, cough) and how long they have been present.",
-                    "For math or other non-medical questions, use an educational resource or ask a tutor.",
-                ],
-                "disclaimer": "This tool provides informational guidance only and is not a medical diagnosis.",
-            }
+            if preferred_language == "bn":
+                analysis_obj = {
+                    "is_medical": False,
+                    "recommended_specialty": None,
+                    "urgency_level": "low",
+                    "summary": "এই বার্তাটি কোনো চিকিৎসা উপসর্গ বা স্বাস্থ্য-সংক্রান্ত উদ্বেগ বর্ণনা করছে না।",
+                    "reasoning": "সিম্পটম চেকারটি কেবল স্বাস্থ্য-সম্পর্কিত উপসর্গের জন্য; এটি অ-চিকিৎসা অনুরোধ বলে মনে হচ্ছে।",
+                    "red_flags": [],
+                    "next_steps": [
+                        "আপনার স্বাস্থ্য সমস্যা থাকলে উপসর্গ (যেমন ব্যথা, জ্বর, কাশি) এবং কতদিন ধরে আছে তা লিখুন।",
+                        "গণিত বা অন্যান্য অ-চিকিৎসা প্রশ্নের জন্য শিক্ষামূলক রিসোর্স বা টিউটরের সহায়তা নিন।",
+                    ],
+                    "disclaimer": "এই টুলটি শুধুমাত্র তথ্যগত নির্দেশনা দেয়; এটি কোনো চিকিৎসা নির্ণয় নয়।",
+                }
+            else:
+                analysis_obj = {
+                    "is_medical": False,
+                    "recommended_specialty": None,
+                    "urgency_level": "low",
+                    "summary": "This message does not describe a medical symptom or health concern.",
+                    "reasoning": "The symptom checker is intended for health-related symptoms; this looks like a non-medical request.",
+                    "red_flags": [],
+                    "next_steps": [
+                        "If you have a health concern, describe your symptoms (e.g., pain, fever, cough) and how long they have been present.",
+                        "For math or other non-medical questions, use an educational resource or ask a tutor.",
+                    ],
+                    "disclaimer": "This tool provides informational guidance only and is not a medical diagnosis.",
+                }
 
             ai_raw = json.dumps(analysis_obj, ensure_ascii=False)
             recommended_specialty = None
@@ -376,7 +407,7 @@ def analyze_symptoms():
         if not allowed_for_ai:
             allowed_for_ai = list(_SPECIALTY_CANON)
 
-        ai_raw, ai_json = _gemini_symptom_analysis(data, allowed_for_ai)
+        ai_raw, ai_json = _gemini_symptom_analysis(data, allowed_for_ai, preferred_language)
 
         # If the model indicates the input isn't medical, do not force a specialty.
         is_medical = True

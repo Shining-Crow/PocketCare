@@ -1,10 +1,18 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { HeartPulse, LogOut, User, MessageSquare } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import {
+  HeartPulse,
+  LogOut,
+  User,
+  MessageSquare,
+  Languages,
+} from "lucide-react";
 import { logout } from "../utils/auth";
 
-const UserNavbar = () => {
+const UserNavbar = ({ language = "en", onToggleLanguage }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     logout();
@@ -31,10 +39,25 @@ const UserNavbar = () => {
 
           <div className="flex items-center space-x-2">
             <button
+              onClick={onToggleLanguage}
+              className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition border border-gray-200"
+              type="button"
+              title={
+                language === "en"
+                  ? t("Switch to Bangla")
+                  : t("Switch to English")
+              }
+            >
+              <Languages className="w-4 h-4" />
+              <span className="font-medium text-sm">
+                {language === "en" ? t("বাংলা") : t("English")}
+              </span>
+            </button>
+            <button
               onClick={() => navigate("/messages")}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
               type="button"
-              title="Messages"
+              title={t("Messages")}
             >
               <MessageSquare className="w-5 h-5" />
             </button>
@@ -42,7 +65,7 @@ const UserNavbar = () => {
               onClick={() => navigate("/profile")}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
               type="button"
-              title="Profile"
+              title={t("Profile")}
             >
               <User className="w-5 h-5" />
             </button>
@@ -52,7 +75,7 @@ const UserNavbar = () => {
               type="button"
             >
               <LogOut className="w-4 h-4" />
-              <span className="font-medium">Logout</span>
+              <span className="font-medium">{t("Logout")}</span>
             </button>
           </div>
         </div>

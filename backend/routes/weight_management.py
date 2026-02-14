@@ -4,9 +4,21 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from utils.database import execute_query
-from utils.gemini_utils import generate_weight_recommendations
+from utils.gemini_utils import generate_weight_recommendations, normalize_language_code
 
 weight_management_bp = Blueprint("weight_management", __name__)
+
+
+def _preferred_language() -> str:
+    data = request.get_json(silent=True) or {}
+    return normalize_language_code(
+        data.get("language")
+        or data.get("preferred_language")
+        or request.args.get("language")
+        or request.headers.get("X-User-Language")
+        or request.headers.get("X-App-Language")
+        or request.headers.get("Accept-Language")
+    )
 
 
 def _as_positive_float(value, field_name: str) -> float:
@@ -370,6 +382,7 @@ def get_weight_suggestions():
             bmi=float(latest["bmi"]),
             goal_target_weight_kg=float(goal["target_weight_kg"]) if goal and goal.get("target_weight_kg") is not None else None,
             goal_target_date=goal.get("target_date").isoformat() if goal and goal.get("target_date") else None,
+            language=_preferred_language(),
         )
 
         return jsonify({"recommendations": result.get("payload")}), 200

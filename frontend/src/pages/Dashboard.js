@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getCurrentUser, logout } from "../utils/auth";
 import api from "../utils/api";
 import {
@@ -62,7 +63,10 @@ function SosUpdateModal({ isOpen, onClose, title, message, tone = "info" }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <div className="relative min-h-screen flex items-center justify-center px-4">
         <div
           className={`w-full max-w-md rounded-3xl bg-white shadow-2xl ring-1 ${style.ring} border ${style.border} overflow-hidden`}
@@ -72,13 +76,16 @@ function SosUpdateModal({ isOpen, onClose, title, message, tone = "info" }) {
           <div className={`h-1.5 w-full bg-gradient-to-r ${style.accent}`} />
           <div className="p-6">
             <div className="flex items-start gap-4">
-              <div className={`h-12 w-12 rounded-2xl ${style.iconBg} flex items-center justify-center`}
+              <div
+                className={`h-12 w-12 rounded-2xl ${style.iconBg} flex items-center justify-center`}
               >
                 <Icon className={`w-6 h-6 ${style.iconFg}`} />
               </div>
               <div className="flex-1">
                 <div className="text-lg font-bold text-gray-900">{title}</div>
-                <div className="mt-1 text-sm text-gray-600 leading-relaxed">{message}</div>
+                <div className="mt-1 text-sm text-gray-600 leading-relaxed">
+                  {message}
+                </div>
               </div>
               <button
                 type="button"
@@ -107,6 +114,7 @@ function SosUpdateModal({ isOpen, onClose, title, message, tone = "info" }) {
 }
 
 function Dashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [dailyTips, setDailyTips] = useState([]);
@@ -247,8 +255,8 @@ function Dashboard() {
   };
 
   const handleActivityClick = (item) => {
-    const t = (item?.type || "").toString();
-    switch (t) {
+    const activityType = (item?.type || "").toString();
+    switch (activityType) {
       case "appointment":
         navigate("/appointments");
         return;
@@ -328,7 +336,7 @@ function Dashboard() {
                 "Engage in at least 30 minutes of physical activity daily to improve cardiovascular health and reduce stress.",
             },
           ],
-          3
+          3,
         );
         if (!cancelled) setDailyTips(fallback);
       }
@@ -349,7 +357,7 @@ function Dashboard() {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve(pos),
         (err) => reject(err),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
     });
 
@@ -436,7 +444,10 @@ function Dashboard() {
       setLatestSosUpdatedAt(new Date());
 
       // If we see an active request, ensure polling window exists.
-      if (req?.status && (req.status === "pending" || req.status === "acknowledged")) {
+      if (
+        req?.status &&
+        (req.status === "pending" || req.status === "acknowledged")
+      ) {
         if (!sosPollStartRef.current) sosPollStartRef.current = Date.now();
       }
     } catch (err) {
@@ -454,13 +465,17 @@ function Dashboard() {
 
   const resolveLatestSos = useCallback(async () => {
     const requestId = latestSos?.id;
-    if (!requestId || requestId === 'new') {
-      setLatestSosError('Cannot resolve this SOS yet. Please wait for the request to be created.');
+    if (!requestId || requestId === "new") {
+      setLatestSosError(
+        "Cannot resolve this SOS yet. Please wait for the request to be created.",
+      );
       return;
     }
 
-    if (latestSos?.status === 'acknowledged' && latestSos?.hospital_id) {
-      setLatestSosError('A hospital has accepted this SOS. Only the hospital can mark it resolved.');
+    if (latestSos?.status === "acknowledged" && latestSos?.hospital_id) {
+      setLatestSosError(
+        "A hospital has accepted this SOS. Only the hospital can mark it resolved.",
+      );
       return;
     }
 
@@ -469,22 +484,30 @@ function Dashboard() {
     try {
       await api.post(`/emergency/sos/${requestId}/resolve`);
       // Optimistic UI update so the tracker collapses immediately.
-      setLatestSos((prev) => (prev ? { ...prev, status: 'resolved', resolved_at: new Date().toISOString() } : prev));
+      setLatestSos((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "resolved",
+              resolved_at: new Date().toISOString(),
+            }
+          : prev,
+      );
       setLatestSosUpdatedAt(new Date());
       setSosStatusModal({
         show: true,
-        title: 'SOS Resolved',
-        message: 'You marked your emergency request as resolved.',
-        tone: 'info',
+        title: "SOS Resolved",
+        message: "You marked your emergency request as resolved.",
+        tone: "info",
       });
       // Re-fetch in the background to sync timestamps/hospital fields.
       fetchLatestSos();
     } catch (err) {
       const apiMsg = err?.response?.data?.error || err?.response?.data?.msg;
       const msg =
-        (typeof apiMsg === 'string' && apiMsg) ||
+        (typeof apiMsg === "string" && apiMsg) ||
         err?.message ||
-        'Failed to resolve SOS request.';
+        "Failed to resolve SOS request.";
       setLatestSosError(msg);
     } finally {
       setLatestSosResolving(false);
@@ -549,14 +572,16 @@ function Dashboard() {
     const stored = safeJsonParse(localStorage.getItem(storageKey)) || {};
     const storedRequestId = stored?.requestId ?? null;
     const storedStatus = stored?.status ?? null;
-    const alreadyNotifiedAcrossReloads = storedRequestId === requestId && storedStatus === status;
+    const alreadyNotifiedAcrossReloads =
+      storedRequestId === requestId && storedStatus === status;
 
     const prev = sosStatusNotifiedRef.current;
     if (prev.requestId !== requestId) {
       sosStatusNotifiedRef.current = { requestId, status: null };
     }
     const alreadyNotifiedThisSession =
-      sosStatusNotifiedRef.current.requestId === requestId && sosStatusNotifiedRef.current.status === status;
+      sosStatusNotifiedRef.current.requestId === requestId &&
+      sosStatusNotifiedRef.current.status === status;
     if (alreadyNotifiedAcrossReloads || alreadyNotifiedThisSession) return;
 
     if (status === "acknowledged") {
@@ -609,7 +634,10 @@ function Dashboard() {
       const tick = (now) => {
         if (!holdPointerActiveRef.current) return;
         const elapsed = now - holdStartRef.current;
-        const progress = Math.max(0, Math.min(100, (elapsed / SOS_HOLD_MS) * 100));
+        const progress = Math.max(
+          0,
+          Math.min(100, (elapsed / SOS_HOLD_MS) * 100),
+        );
 
         setSosProgress(progress);
 
@@ -627,7 +655,7 @@ function Dashboard() {
 
       holdRafRef.current = requestAnimationFrame(tick);
     },
-    [SOS_HOLD_MS, handleSOSActivate, stopHoldAnimation]
+    [SOS_HOLD_MS, handleSOSActivate, stopHoldAnimation],
   );
 
   const endHold = useCallback(
@@ -650,7 +678,7 @@ function Dashboard() {
         setSosProgress(0);
       }
     },
-    [stopHoldAnimation]
+    [stopHoldAnimation],
   );
 
   if (!user) return null;
@@ -669,7 +697,7 @@ function Dashboard() {
           <div className="mb-10">
             <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-6 text-center">
-                Emergency SOS
+                {t("Emergency SOS")}
               </h2>
 
               {/* HOLD circle */}
@@ -696,8 +724,9 @@ function Dashboard() {
                       strokeWidth="10"
                       fill="none"
                       strokeDasharray={`${2 * Math.PI * 88}`}
-                      strokeDashoffset={`${2 * Math.PI * 88 * (1 - sosProgress / 100)
-                        }`}
+                      strokeDashoffset={`${
+                        2 * Math.PI * 88 * (1 - sosProgress / 100)
+                      }`}
                       className=""
                       strokeLinecap="round"
                     />
@@ -721,23 +750,25 @@ function Dashboard() {
                   >
                     <span className="text-2xl font-semibold tracking-wide text-gray-900">
                       {sosSending
-                        ? "SENDING"
+                        ? t("SENDING")
                         : sosHolding
-                        ? `${Math.floor(sosProgress)}%`
-                        : "HOLD"}
+                          ? `${Math.floor(sosProgress)}%`
+                          : t("HOLD")}
                     </span>
                     <span className="mt-1 text-[11px] uppercase tracking-[0.25em] text-gray-500">
-                      Panic Mode
+                      {t("Panic Mode")}
                     </span>
                   </button>
                 </div>
 
                 <p className="mt-5 text-xs text-gray-500 text-center">
                   {sosSending
-                    ? "Sending your SOS…"
+                    ? t("Sending your SOS…")
                     : sosHolding
-                    ? "Keep holding to confirm SOS. Release to cancel."
-                    : "Press and hold for 1 second to send an emergency alert."}
+                      ? t("Keep holding to confirm SOS. Release to cancel.")
+                      : t(
+                          "Press and hold for 1 second to send an emergency alert.",
+                        )}
                 </p>
 
                 {sosFeedback?.type === "error" && (
@@ -745,8 +776,10 @@ function Dashboard() {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
-                        <div className="font-semibold">SOS not sent</div>
-                        <div className="text-red-700/90">{sosFeedback.message}</div>
+                        <div className="font-semibold">{t("SOS not sent")}</div>
+                        <div className="text-red-700/90">
+                          {sosFeedback.message}
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -763,12 +796,16 @@ function Dashboard() {
               {/* Emergency types */}
               <div className="mt-8">
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 text-center">
-                  Emergency type (optional)
+                  {t("Emergency type (optional)")}
                 </h3>
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   {[
                     { id: "chest-pain", label: "Chest Pain", icon: HeartPulse },
-                    { id: "breathing", label: "Breathing Issue", icon: Activity },
+                    {
+                      id: "breathing",
+                      label: "Breathing Issue",
+                      icon: Activity,
+                    },
                     {
                       id: "bleeding",
                       label: "Heavy Bleeding",
@@ -786,13 +823,14 @@ function Dashboard() {
                         onClick={() =>
                           setSelectedEmergency(active ? null : type.id)
                         }
-                        className={`flex items-center justify-center gap-1 rounded-xl border px-2 py-2 transition text-[11px] ${active
+                        className={`flex items-center justify-center gap-1 rounded-xl border px-2 py-2 transition text-[11px] ${
+                          active
                             ? "border-red-500 bg-red-50 text-red-600"
                             : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300"
-                          }`}
+                        }`}
                       >
                         <type.icon className="w-3.5 h-3.5" />
-                        <span className="font-medium">{type.label}</span>
+                        <span className="font-medium">{t(type.label)}</span>
                       </button>
                     );
                   })}
@@ -806,201 +844,238 @@ function Dashboard() {
                   value={emergencyNote}
                   onChange={(e) => setEmergencyNote(e.target.value)}
                   className="w-full rounded-2xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-gray-50"
-                  placeholder="Additional details (optional)"
+                  placeholder={t("Additional details (optional)")}
                 />
               </div>
 
               {/* Status tracker (only while active) */}
-              {(latestSos && latestSos.status !== "resolved") && (
-              <div className="mt-6 rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="h-11 w-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
-                      <AlertTriangle className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-gray-900">SOS status</div>
-                      <div className="text-xs text-gray-500">
-                        {latestSosUpdatedAt
-                          ? `Updated ${latestSosUpdatedAt.toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}`
-                          : ""}
+              {latestSos && latestSos.status !== "resolved" && (
+                <div className="mt-6 rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-gray-900">
+                          {t("SOS status")}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {latestSosUpdatedAt
+                            ? `${t("Updated")} ${latestSosUpdatedAt.toLocaleTimeString(
+                                [],
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}`
+                            : ""}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    {(latestSos?.id &&
-                      (latestSos.status === 'pending' ||
-                        (latestSos.status === 'acknowledged' && !latestSos?.hospital_id))) && (
+                    <div className="flex items-center gap-2">
+                      {latestSos?.id &&
+                        (latestSos.status === "pending" ||
+                          (latestSos.status === "acknowledged" &&
+                            !latestSos?.hospital_id)) && (
+                          <button
+                            type="button"
+                            onClick={resolveLatestSos}
+                            disabled={latestSosResolving}
+                            className="relative shrink-0 rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <span className="inline-flex items-center justify-center gap-2">
+                              {latestSosResolving && (
+                                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-200 border-t-white" />
+                              )}
+                              <span>{t("Resolve")}</span>
+                            </span>
+                          </button>
+                        )}
+
                       <button
                         type="button"
-                        onClick={resolveLatestSos}
-                        disabled={latestSosResolving}
-                        className="relative shrink-0 rounded-2xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        onClick={fetchLatestSos}
+                        disabled={latestSosLoading}
+                        className="relative w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <span className="inline-flex items-center justify-center gap-2">
-                          {latestSosResolving && (
-                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-200 border-t-white" />
+                          {latestSosLoading && (
+                            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
                           )}
-                          <span>Resolve</span>
+                          <span>{t("Refresh")}</span>
                         </span>
                       </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={fetchLatestSos}
-                      disabled={latestSosLoading}
-                      className="relative w-28 shrink-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      <span className="inline-flex items-center justify-center gap-2">
-                        {latestSosLoading && (
-                          <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-                        )}
-                        <span>Refresh</span>
-                      </span>
-                    </button>
+                    </div>
                   </div>
-                </div>
 
-                {latestSosError && (
-                  <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {latestSosError}
-                  </div>
-                )}
+                  {latestSosError && (
+                    <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {latestSosError}
+                    </div>
+                  )}
 
-                {!latestSos && !latestSosError && (
-                  <div className="mt-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                    No SOS request found yet. Send one to start tracking.
-                  </div>
-                )}
+                  {!latestSos && !latestSosError && (
+                    <div className="mt-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                      {t(
+                        "No SOS request found yet. Send one to start tracking.",
+                      )}
+                    </div>
+                  )}
 
-                {latestSos && (
-                  <div className="mt-4 grid gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${
-                          latestSos.status === "pending"
-                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                  {latestSos && (
+                    <div className="mt-4 grid gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border ${
+                            latestSos.status === "pending"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : latestSos.status === "acknowledged"
+                                ? "bg-blue-50 text-blue-800 border-blue-200"
+                                : latestSos.status === "resolved"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : "bg-gray-50 text-gray-700 border-gray-200"
+                          }`}
+                        >
+                          {String(latestSos.status || "unknown").toUpperCase()}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {latestSos.status === "pending"
+                            ? t("Waiting for a nearby hospital to accept.")
                             : latestSos.status === "acknowledged"
-                            ? "bg-blue-50 text-blue-800 border-blue-200"
-                            : latestSos.status === "resolved"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                            : "bg-gray-50 text-gray-700 border-gray-200"
-                        }`}
-                      >
-                        {String(latestSos.status || "unknown").toUpperCase()}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {latestSos.status === "pending"
-                          ? "Waiting for a nearby hospital to accept."
-                          : latestSos.status === "acknowledged"
-                          ? "A hospital has accepted your request."
-                          : latestSos.status === "resolved"
-                          ? "Marked as resolved by the hospital."
-                          : ""}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Request</div>
-                        <div className="mt-1 text-sm font-bold text-gray-900">#{latestSos.id}</div>
+                              ? t("A hospital has accepted your request.")
+                              : latestSos.status === "resolved"
+                                ? t("Marked as resolved by the hospital.")
+                                : ""}
+                        </span>
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Created</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">
-                          {formatShortDateTime(latestSos.created_at) || "—"}
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                            {t("Request")}
+                          </div>
+                          <div className="mt-1 text-sm font-bold text-gray-900">
+                            #{latestSos.id}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                            {t("Created")}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {formatShortDateTime(latestSos.created_at) || "—"}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                          <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                            {t("Type")}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">
+                            {latestSos.emergency_type_label ||
+                              latestSos.emergency_type ||
+                              t("General")}
+                          </div>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                        <div className="text-[11px] uppercase tracking-wider text-gray-500">Type</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-900">
-                          {latestSos.emergency_type_label || latestSos.emergency_type || "General"}
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Timeline */}
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                      <div className="text-xs font-semibold text-gray-800">Progress</div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                        {[
-                          { key: "pending", label: "Requested" },
-                          { key: "acknowledged", label: "Accepted" },
-                          { key: "resolved", label: "Resolved" },
-                        ].map((step, idx) => {
-                          const isDone =
-                            latestSos.status === "resolved" ||
-                            (latestSos.status === "acknowledged" && step.key !== "resolved") ||
-                            (latestSos.status === "pending" && step.key === "pending");
-                          const isActive = latestSos.status === step.key;
-                          return (
-                            <div key={step.key} className="flex items-center gap-2">
+                      {/* Timeline */}
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <div className="text-xs font-semibold text-gray-800">
+                          {t("Progress")}
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                          {[
+                            { key: "pending", label: "Requested" },
+                            { key: "acknowledged", label: "Accepted" },
+                            { key: "resolved", label: "Resolved" },
+                          ].map((step, idx) => {
+                            const isDone =
+                              latestSos.status === "resolved" ||
+                              (latestSos.status === "acknowledged" &&
+                                step.key !== "resolved") ||
+                              (latestSos.status === "pending" &&
+                                step.key === "pending");
+                            const isActive = latestSos.status === step.key;
+                            return (
                               <div
-                                className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-                                  isDone
-                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                    : "bg-gray-50 border-gray-200 text-gray-500"
-                                }`}
+                                key={step.key}
+                                className="flex items-center gap-2"
                               >
-                                {idx + 1}
-                              </div>
-                              <div className="min-w-0">
-                                <div className={`font-semibold ${isActive ? "text-gray-900" : "text-gray-700"}`}>
-                                  {step.label}
+                                <div
+                                  className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+                                    isDone
+                                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                      : "bg-gray-50 border-gray-200 text-gray-500"
+                                  }`}
+                                >
+                                  {idx + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <div
+                                    className={`font-semibold ${isActive ? "text-gray-900" : "text-gray-700"}`}
+                                  >
+                                    {t(step.label)}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {(latestSos.hospital_name || latestSos.hospital_phone) && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                        <div className="text-xs font-semibold text-gray-800">Hospital</div>
-                        <div className="mt-1 text-sm font-bold text-gray-900">
-                          {latestSos.hospital_name || "Hospital"}
+                            );
+                          })}
                         </div>
-                        {latestSos.hospital_phone && (
-                          <div className="mt-1 text-sm text-gray-700">{latestSos.hospital_phone}</div>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-2">
+                      </div>
+
+                      {(latestSos.hospital_name ||
+                        latestSos.hospital_phone) && (
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                          <div className="text-xs font-semibold text-gray-800">
+                            {t("Hospital")}
+                          </div>
+                          <div className="mt-1 text-sm font-bold text-gray-900">
+                            {latestSos.hospital_name || t("Hospital")}
+                          </div>
                           {latestSos.hospital_phone && (
-                            <a
-                              href={`tel:${latestSos.hospital_phone}`}
-                              className="rounded-xl bg-gray-900 text-white px-3 py-2 text-xs font-semibold hover:bg-gray-800"
-                            >
-                              Call hospital
-                            </a>
+                            <div className="mt-1 text-sm text-gray-700">
+                              {latestSos.hospital_phone}
+                            </div>
                           )}
-                          {typeof latestSos.latitude === "number" && typeof latestSos.longitude === "number" && (
-                            <a
-                              href={`https://www.google.com/maps?q=${latestSos.latitude},${latestSos.longitude}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                            >
-                              View location
-                            </a>
-                          )}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {latestSos.hospital_phone && (
+                              <a
+                                href={`tel:${latestSos.hospital_phone}`}
+                                className="rounded-xl bg-gray-900 text-white px-3 py-2 text-xs font-semibold hover:bg-gray-800"
+                              >
+                                {t("Call hospital")}
+                              </a>
+                            )}
+                            {typeof latestSos.latitude === "number" &&
+                              typeof latestSos.longitude === "number" && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${latestSos.latitude},${latestSos.longitude}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                  {t("View location")}
+                                </a>
+                              )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {latestSos.note && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                        <div className="text-xs font-semibold text-gray-800">Your note</div>
-                        <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{latestSos.note}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      {latestSos.note && (
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                          <div className="text-xs font-semibold text-gray-800">
+                            {t("Your note")}
+                          </div>
+                          <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+                            {latestSos.note}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1027,7 +1102,7 @@ function Dashboard() {
           {/* Healthcare Services Grid */}
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Healthcare Services
+              {t("Healthcare Services")}
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
@@ -1091,13 +1166,15 @@ function Dashboard() {
                     <service.icon className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {service.title}
+                    {t(service.title)}
                   </h3>
-                  <p className="text-sm text-gray-600 mb-4">{service.desc}</p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    {t(service.desc)}
+                  </p>
                   <span
                     className={`text-sm font-semibold bg-gradient-to-r ${service.color} bg-clip-text text-transparent group-hover:underline`}
                   >
-                    Open →
+                    {t("Open")} →
                   </span>
                 </div>
               ))}
@@ -1115,10 +1192,10 @@ function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      Recent Activity
+                      {t("Recent Activity")}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      Your latest actions across PocketCare
+                      {t("Your latest actions across PocketCare")}
                     </p>
                   </div>
                 </div>
@@ -1128,17 +1205,17 @@ function Dashboard() {
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
                   <span className="ml-3 text-gray-600 text-sm">
-                    Loading your recent activity...
+                    {t("Loading your recent activity...")}
                   </span>
                 </div>
               ) : recentActivity.length > 0 ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-medium text-gray-700">
-                      Recent Activity
+                      {t("Recent Activity")}
                     </span>
                     <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      Last {recentActivity.length}
+                      {t("Last")} {recentActivity.length}
                     </span>
                   </div>
                   {recentActivity.map((item, idx) => {
@@ -1156,8 +1233,8 @@ function Dashboard() {
                       item?.meta?.weight_goal_id ||
                       item?.meta?.chat_message_id ||
                       item?.timestamp ||
-                      'na';
-                    const keyBase = `${item?.type || 'activity'}:${metaId}`;
+                      "na";
+                    const keyBase = `${item?.type || "activity"}:${metaId}`;
 
                     return (
                       <div
@@ -1172,13 +1249,17 @@ function Dashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1 flex-wrap">
                             <h4 className="font-semibold text-gray-800 text-sm truncate">
-                              {item.title || "Activity"}
+                              {item.title || t("Activity")}
                             </h4>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge}`}>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${badge}`}
+                            >
                               {badgeText}
                             </span>
                             {tsLabel ? (
-                              <span className="text-xs text-gray-500">{tsLabel}</span>
+                              <span className="text-xs text-gray-500">
+                                {tsLabel}
+                              </span>
                             ) : null}
                           </div>
                           {item.subtitle ? (
@@ -1197,10 +1278,12 @@ function Dashboard() {
                     <Calendar className="w-8 h-8 text-indigo-600" />
                   </div>
                   <h4 className="text-lg font-semibold text-gray-800 mb-2">
-                    No activity yet
+                    {t("No activity yet")}
                   </h4>
                   <p className="text-gray-500 text-sm mb-4">
-                    Book an appointment, analyze symptoms, or upload a report
+                    {t(
+                      "Book an appointment, analyze symptoms, or upload a report",
+                    )}
                   </p>
                   <div
                     onClick={(e) => {
@@ -1219,7 +1302,7 @@ function Dashboard() {
                         clipRule="evenodd"
                       />
                     </svg>
-                    Get Started
+                    {t("Get Started")}
                   </div>
                 </div>
               )}
@@ -1233,10 +1316,10 @@ function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                      Daily Health Tip
+                      {t("Daily Health Tip")}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      Quick wins to support your health
+                      {t("Quick wins to support your health")}
                     </p>
                   </div>
                 </div>
@@ -1246,10 +1329,11 @@ function Dashboard() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">
-                      Today's tips
+                      {t("Today's tips")}
                     </span>
                     <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      {dailyTips.length} tip{dailyTips.length === 1 ? "" : "s"}
+                      {dailyTips.length} {t("tip")}
+                      {dailyTips.length === 1 ? "" : t("s")}
                     </span>
                   </div>
 
@@ -1268,7 +1352,9 @@ function Dashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-700 leading-relaxed">Loading tips…</p>
+                <p className="text-gray-700 leading-relaxed">
+                  {t("Loading tips…")}
+                </p>
               )}
             </div>
           </div>

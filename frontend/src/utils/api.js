@@ -36,11 +36,18 @@ api.interceptors.request.use(
       url.startsWith("/auth/hospital") ||
       url.includes("/hospital/");
 
-    const token = isAdminContext ? adminToken : isHospitalContext ? hospitalToken : userToken;
+    const token = isAdminContext
+      ? adminToken
+      : isHospitalContext
+        ? hospitalToken
+        : userToken;
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const preferredLanguage = localStorage.getItem("pc_user_language") || "en";
+    config.headers["X-User-Language"] = preferredLanguage;
 
     // If we're sending a file upload (FormData), remove the default JSON content-type.
     // This allows the browser to set `multipart/form-data; boundary=...` correctly.
@@ -57,7 +64,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
@@ -74,7 +81,9 @@ api.interceptors.response.use(
         (typeof apiMsg === "string" && apiMsg.toLowerCase().includes("token"));
 
       const hasAnyToken = !!(
-        localStorage.getItem("token") || localStorage.getItem("adminToken") || localStorage.getItem("hospitalToken")
+        localStorage.getItem("token") ||
+        localStorage.getItem("adminToken") ||
+        localStorage.getItem("hospitalToken")
       );
 
       if (shouldForceLogout && hasAnyToken) {
@@ -97,7 +106,7 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

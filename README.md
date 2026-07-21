@@ -2,6 +2,14 @@
 
 AI-assisted mobile-first health platform for symptom analysis and medical service connectivity.
 
+## Screenshots
+
+### Landing Page
+![Landing Page](images/Landing%20Page.png)
+
+### Homepage
+![Homepage](images/Homepage.png)
+
 ## Project Structure
 
 ```

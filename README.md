@@ -142,7 +142,7 @@ VALUES ('neweadmin@pocketcare.com', 'PASTE_HASH_HERE', 'Admin Name', 'admin', TR
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/sadekinborno/PocketCare.git
+git clone https://github.com/Shining-Crow/PocketCare.git
 cd PocketCare
 ```
 
